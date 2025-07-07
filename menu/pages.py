@@ -21,8 +21,13 @@ class Pages:
             handler=dashboard.index,
             icon="house",
         ),
-        "股票信息": PageConfig(
-            title="股票信息",
+        "关注股票": PageConfig(
+            title="关注的股票",
+            handler=stock.followIndex,
+            icon="heart-fill",
+        ),
+        "所有股票": PageConfig(
+            title="所有股票",
             handler=stock.index,
             icon="grid",
         ),

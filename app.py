@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # css设置
-with open('static/style.css') as f:
+with open('static/style.css', encoding='utf-8') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 # 菜单

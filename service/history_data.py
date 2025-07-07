@@ -2,14 +2,19 @@
 import streamlit as st
 import akshare as ak
 import logging
-import plotly.graph_objects as go
 from typing import Dict, Any, List
 from functools import partial
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import streamlit_echarts
 
-import numpy as np
+from enums.patterns import Patterns
+from utils.chart import ChartBuilder
+from utils.k_line_processor import KLineProcessor
+from utils.table import format_pinyin_short
+
+from service.stock import get_codes
 from utils.convert import date_range_filter, convert_date_format
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
@@ -20,6 +25,7 @@ from datetime import date, timedelta
 from utils.pagination import paginate_dataframe, SearchConfig, SearchField, ActionButton, ActionConfig
 from utils.session import get_session_key, SessionKeys, get_date_range
 from utils.table import format_amount, format_percent, format_volume
+from utils.uuid import generate_key
 
 KEY_PREFIX = "history_data"
 
@@ -87,7 +93,7 @@ def show_date_page(stock):
                         ActionButton(
                             icon="🐙",
                             label="获取",
-                            handler=partial(reload_by_date, category=stock.category, code=stock.code),
+                            handler=partial(reload_by_code_date, category=stock.category, code=stock.code),
                             type="primary"
                         ),
                     ],
@@ -98,6 +104,7 @@ def show_date_page(stock):
             )
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
+
 
 def show_chart_page(stock):
     try:
@@ -110,23 +117,33 @@ def show_chart_page(stock):
                 HistoryDateData.code == stock.code,
                 HistoryDateData.removed == False
             ).first()
+
+            if not date_range or None in date_range:
+                st.warning("没有找到数据")
+                return
+
             min_date, max_date = date_range
+            default_start_date = max(max_date - timedelta(days=90), min_date)
+
             # 添加日期选择器
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input(
                     "开始日期",
-                    value=max_date - timedelta(days=90),  # 默认显示最近30天
+                    value=default_start_date,
                     min_value=min_date,
-                    max_value=max_date
+                    max_value=max_date,
+                    key=generate_key()
                 )
             with col2:
                 end_date = st.date_input(
                     "结束日期",
                     value=max_date,
                     min_value=min_date,
-                    max_value=max_date
+                    max_value=max_date,
+                    key=generate_key()
                 )
+
             # 从数据库获取数据
             query = session.query(
                 HistoryDateData.date,
@@ -142,72 +159,183 @@ def show_chart_page(stock):
                 HistoryDateData.date <= end_date
             ).order_by(HistoryDateData.date)
 
+            # 读取数据到DataFrame
             df = pd.read_sql(query.statement, session.bind)
+
             if df.empty:
                 st.warning("所选日期范围内没有数据")
                 return
 
-            # 创建K线图
-            fig = go.Figure(data=[go.Candlestick(x=df['date'],
-                                                 open=df['opening'],
-                                                 high=df['highest'],
-                                                 low=df['lowest'],
-                                                 close=df['closing'])])
+            dates = df['date'].astype(str).tolist()
+            k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+            volumes = df['turnover_count'].tolist()
+            colors = ['#ef232a' if close > open else '#14b143'
+                      for open, close in zip(df['opening'], df['closing'])]
 
-            # 更新布局
-            fig.update_layout(
-                title=f'{stock.name}({stock.code}) K线图',
-                yaxis_title='价格',
-                xaxis_title='日期',
-                template='plotly_dark',
-                xaxis_rangeslider_visible=False,
-                xaxis=dict(
-                    tickformat='%Y-%m-%d',  # 设置日期格式
-                    tickangle=-45,  # 设置刻度标签角度
-                    nticks = 10  # 控制刻度数量
-                )
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            # 创建图表
+            kline = ChartBuilder.create_kline_chart(dates, k_line_data)
+            volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
+            grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
-            # 成交量图
-            volume_colors = ['red' if close < open else 'green'
-                             for close, open in zip(df['closing'], df['opening'])]
+            # 显示图表
+            streamlit_echarts.st_pyecharts(grid, theme="white", height="800px", key=generate_key())
 
-            volume_fig = go.Figure(data=[
-                go.Bar(x=df['date'],
-                       y=df['turnover_count'],
-                       marker_color=volume_colors)
-            ])
-
-            volume_fig.update_layout(
-                title='成交量',
-                yaxis_title='成交量',
-                xaxis_title='日期',
-                template='plotly_dark',
-                height=300,
-                xaxis=dict(
-                    tickformat='%Y-%m-%d',  # 设置日期格式
-                    tickangle=-45,  # 设置刻度标签角度
-                    nticks = 10  # 控制刻度数量
-                )
-            )
-
-            st.plotly_chart(volume_fig, use_container_width=True)
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
+def show_process_chart_page(stock):
+    try:
+        with get_db_session() as session:
+            # 获取该股票的最早和最晚日期
+            date_range = session.query(
+                func.min(HistoryDateData.date),
+                func.max(HistoryDateData.date)
+            ).filter(
+                HistoryDateData.code == stock.code,
+                HistoryDateData.removed == False
+            ).first()
+
+            if not date_range or None in date_range:
+                st.warning("没有找到数据")
+                return
+
+            min_date, max_date = date_range
+            default_start_date = max(max_date - timedelta(days=90), min_date)
+
+            # 添加日期选择器
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input(
+                    "开始日期",
+                    value=default_start_date,
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=generate_key()
+                )
+            with col2:
+                end_date = st.date_input(
+                    "结束日期",
+                    value=max_date,
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=generate_key()
+                )
+
+            # 从数据库获取数据
+            query = session.query(
+                HistoryDateData.date,
+                HistoryDateData.opening,
+                HistoryDateData.highest,
+                HistoryDateData.lowest,
+                HistoryDateData.closing,
+                HistoryDateData.turnover_count
+            ).filter(
+                HistoryDateData.code == stock.code,
+                HistoryDateData.removed == False,
+                HistoryDateData.date >= start_date,
+                HistoryDateData.date <= end_date
+            ).order_by(HistoryDateData.date)
+
+            # 读取数据到DataFrame
+            df = pd.read_sql(query.statement, session.bind)
+
+            if df.empty:
+                st.warning("所选日期范围内没有数据")
+                return
+
+            # 创建处理器实例
+            processor = KLineProcessor()
+            try:
+                processor.validate_data(df)
+                processed_df, contains_marks, processing_records, patterns = processor.process_klines(
+                    df,
+                )
+                processed_dates = processed_df['date'].astype(str).tolist()
+                processed_k_line_data = processed_df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+                processed_kline = ChartBuilder.create_kline_chart(
+                    processed_dates,
+                    processed_k_line_data,
+                    ma_lines=None,
+                    patterns=patterns
+                )
+                # 显示图表
+                streamlit_echarts.st_pyecharts(processed_kline,theme="white",height="500px",key=generate_key())
+
+                # 显示处理信息表格
+                if processing_records:
+                    st.markdown("<h6 style='margin-bottom: 10px;'>包含关系信息</h6>", unsafe_allow_html=True)
+                    st.markdown("""
+                       <div style='font-size: 12px;'>
+                       - 当两根K线互相包含时，根据前一根K线的趋势决定处理方向<br>
+                       - 向上处理：取两根K线中较高的最高价和较高的最低价<br>
+                       - 向下处理：取两根K线中较低的最高价和较低的最低价
+                       </div>
+                       """, unsafe_allow_html=True)
+
+                    # 创建更直观的包含关系DataFrame
+                    # 创建更直观的包含关系DataFrame
+                    contains_df = pd.DataFrame([
+                        {
+                            '上一K线日期': record['original_k1']['date'].strftime('%Y-%m-%d'),
+                            '上一K线最高/低': f"{record['original_k1']['highest']}/{record['original_k1']['lowest']}",
+                            '上一K线开/收盘': f"{record['original_k1']['opening']}/{record['original_k1']['closing']}",
+                            '当前K线日期': record['date'].strftime('%Y-%m-%d'),
+                            '当前K线最高/低': f"{record['original_k2']['highest']}/{record['original_k2']['lowest']}",
+                            '当前K线开/收盘': f"{record['original_k2']['opening']}/{record['original_k2']['closing']}",
+                            '下一K线日期': record['original_k3']['date'].strftime('%Y-%m-%d'),
+                            '下一K线最高/低': f"{record['original_k3']['highest']}/{record['original_k3']['lowest']}",
+                            '下一K线开/收盘': f"{record['original_k3']['opening']}/{record['original_k3']['closing']}",
+                            '处理方向': record['trend'],
+                            '合并后最高/低': f"{record['new_values']['high']}/{record['new_values']['low']}"
+                        }
+                        for record in processing_records
+                    ])
+
+                    # 显示包含关系表格
+                    st.dataframe(
+                        contains_df,
+                        height=min(len(contains_df) * 35 + 38, 400),
+                        use_container_width=True
+                    )
+
+                    st.markdown("---")
+
+                # 原有的分型信息表格
+                if patterns:
+                    st.markdown("<h6 style='margin-bottom: 10px;'>分型标记信息</h6>", unsafe_allow_html=True)
+                    pattern_df = pd.DataFrame({
+                        '日期': [p['date'] for p in patterns],
+                        '类型': ["⬆顶分型" if p['type'] == Patterns.TOP else "⬇底分型" for p in patterns],
+                        '价格': [p['value'] for p in patterns]
+                    })
+
+                    st.dataframe(
+                        pattern_df,
+                        height=min(len(pattern_df) * 35 + 38, 400),
+                        use_container_width=True
+                    )
+
+            except ValueError as e:
+                st.error(f"数据处理失败：{str(e)}")
+
+
+    except Exception as e:
+        st.error(f"加载数据失败：{str(e)}")
+
+
 def show_stock_detail(stock):
-    """显示股票详情"""
-    with st.expander("历史行情", expanded=True):
-        tab1, tab2 = st.tabs(["数据（单位「天」）", "k线图（单位「天」）"])
-        with tab1:
-            show_date_page(stock)
-        with tab2:
-            show_chart_page(stock)
+
+    with st.expander(f"{stock.category} {stock.code} ({stock.name}-{format_pinyin_short(stock.pinyin)})   「数据」", expanded=False):
+        show_date_page(stock)
+
+    with st.expander(f"{stock.category} {stock.code} ({stock.name}-{format_pinyin_short(stock.pinyin)})   「k线图」", expanded=True):
+        show_chart_page(stock)
+
+    with st.expander(f"{stock.category} {stock.code} ({stock.name}-{format_pinyin_short(stock.pinyin)})   「k线图-包含&分型处理」", expanded=True):
+        show_process_chart_page(stock)
 
 
-
-def reload_by_date(category: Category, code: str):
+def reload_by_code_date(category: Category, code: str):
     prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{code}_date', category=category)
     date_range = get_date_range(prefix=prefix)
     if not date_range:
@@ -230,6 +358,30 @@ def reload_by_date(category: Category, code: str):
         code=code,
         start_date=start_date,
         end_date=end_date)
+
+def reload_by_category_date(category: Category, start_date: str, end_date: str):
+    codes = get_codes(category)
+    for code in codes:
+        logging.info(f"开始处理[{code}]数据..., 开始日期: {start_date}, 结束日期: {end_date}")
+        def build_filter(args: Dict[str, Any], session: Session) -> List:
+            return [
+                HistoryDateData.code == code,
+                HistoryDateData.date >= start_date,
+                HistoryDateData.date <= end_date,
+            ]
+        history_handler = create_reload_handler(
+            model=HistoryDateData,
+            fetch_func=fetch_by_date,
+            unique_fields=['code', 'date'],
+            build_filter=build_filter,
+            with_date_range=True,
+        )
+        history_handler.refresh_ignore_message(
+            code=code,
+            start_date=start_date,
+            end_date=end_date)
+    logging.info(f"结束处理[{code}]数据..., 开始日期: {start_date}, 结束日期: {end_date}")
+
 
 def fetch_by_date(code: str, start_date: str, end_date: str) -> list:
     # 拉取 https://akshare.akfamily.xyz/data/stock/stock.html#id22

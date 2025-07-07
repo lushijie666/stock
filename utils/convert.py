@@ -27,6 +27,22 @@ def clean_number_value(value: str) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
+
+def clean_name(name: str) -> str:
+    replacements = {
+        'Ａ': '',
+        'ａ': '',
+        '*': '',
+        '　': '',  # 全角空格
+        ' ': '',  # 半角空格
+        '\t': '',  # 制表符
+        '\n': '',  # 换行符
+        '\r': '',  # 回车符
+    }
+    for old, new in replacements.items():
+        name = name.replace(old, new)
+    return name.strip()
+
 def get_column_value(row: pd.Series, field: str, default: str = "") -> str:
     try:
         # 获取可能的列名列表
