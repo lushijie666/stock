@@ -87,12 +87,6 @@ def show_page(category: Category):
                             type="text",
                             placeholder="输入股票代码"
                         ),
-                        SearchField(
-                            field="name",
-                            label="股票名称",
-                            type="text",
-                            placeholder="输入股票名称"
-                        )
                     ],
                     layout=[1, 1, 1, 1]
                 ),
@@ -158,11 +152,15 @@ def fetch(category: Category) -> list:
                     cls=Category.from_stock_code(code)
                     if cls != category:
                         continue
+                    current_price=row.get("最新价")
+                    if pd.isna(current_price) or current_price == "":
+                        continue
+
                     data.append(RealTimeData(
                         category=category,
                         code=code,
                         #name=row.get("名称"),
-                        current_price=row.get("最新价"),
+                        current_price=current_price,
                         change_percent=row.get("涨跌幅"),
                         change_amount=row.get("涨跌额"),
                         turnover_count=row.get("成交量"),

@@ -2,14 +2,17 @@
 import streamlit as st
 import akshare as ak
 import logging
-import plotly.graph_objects as go
 from typing import Dict, Any, List
 from functools import partial
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import streamlit_echarts
 
-import numpy as np
+from utils.chart import ChartBuilder
+from utils.table import format_pinyin_short
+
+from service.stock import get_codes
 from utils.convert import date_range_filter, convert_date_format
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
@@ -87,7 +90,7 @@ def show_date_page(stock):
                         ActionButton(
                             icon="🐙",
                             label="获取",
-                            handler=partial(reload_by_date, category=stock.category, code=stock.code),
+                            handler=partial(reload_by_code_date, category=stock.category, code=stock.code),
                             type="primary"
                         ),
                     ],
@@ -98,6 +101,7 @@ def show_date_page(stock):
             )
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
+
 
 def show_chart_page(stock):
     try:
@@ -110,13 +114,20 @@ def show_chart_page(stock):
                 HistoryDateData.code == stock.code,
                 HistoryDateData.removed == False
             ).first()
+
+            if not date_range or None in date_range:
+                st.warning("没有找到数据")
+                return
+
             min_date, max_date = date_range
+            default_start_date = max(max_date - timedelta(days=90), min_date)
+
             # 添加日期选择器
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input(
                     "开始日期",
-                    value=max_date - timedelta(days=90),  # 默认显示最近30天
+                    value=default_start_date,
                     min_value=min_date,
                     max_value=max_date
                 )
@@ -127,6 +138,7 @@ def show_chart_page(stock):
                     min_value=min_date,
                     max_value=max_date
                 )
+
             # 从数据库获取数据
             query = session.query(
                 HistoryDateData.date,
@@ -142,72 +154,42 @@ def show_chart_page(stock):
                 HistoryDateData.date <= end_date
             ).order_by(HistoryDateData.date)
 
+            # 读取数据到DataFrame
             df = pd.read_sql(query.statement, session.bind)
+
             if df.empty:
                 st.warning("所选日期范围内没有数据")
                 return
 
-            # 创建K线图
-            fig = go.Figure(data=[go.Candlestick(x=df['date'],
-                                                 open=df['opening'],
-                                                 high=df['highest'],
-                                                 low=df['lowest'],
-                                                 close=df['closing'])])
+            dates = df['date'].astype(str).tolist()
+            k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+            volumes = df['turnover_count'].tolist()
+            colors = ['#ef232a' if close > open else '#14b143'
+                      for open, close in zip(df['opening'], df['closing'])]
 
-            # 更新布局
-            fig.update_layout(
-                title=f'{stock.name}({stock.code}) K线图',
-                yaxis_title='价格',
-                xaxis_title='日期',
-                template='plotly_dark',
-                xaxis_rangeslider_visible=False,
-                xaxis=dict(
-                    tickformat='%Y-%m-%d',  # 设置日期格式
-                    tickangle=-45,  # 设置刻度标签角度
-                    nticks = 10  # 控制刻度数量
-                )
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            # 创建图表
+            kline = ChartBuilder.create_kline_chart(dates, k_line_data)
+            volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
+            grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
-            # 成交量图
-            volume_colors = ['red' if close < open else 'green'
-                             for close, open in zip(df['closing'], df['opening'])]
+            # 显示图表
+            streamlit_echarts.st_pyecharts(grid, theme="white", height="800px")
 
-            volume_fig = go.Figure(data=[
-                go.Bar(x=df['date'],
-                       y=df['turnover_count'],
-                       marker_color=volume_colors)
-            ])
-
-            volume_fig.update_layout(
-                title='成交量',
-                yaxis_title='成交量',
-                xaxis_title='日期',
-                template='plotly_dark',
-                height=300,
-                xaxis=dict(
-                    tickformat='%Y-%m-%d',  # 设置日期格式
-                    tickangle=-45,  # 设置刻度标签角度
-                    nticks = 10  # 控制刻度数量
-                )
-            )
-
-            st.plotly_chart(volume_fig, use_container_width=True)
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
+
+
 def show_stock_detail(stock):
     """显示股票详情"""
-    with st.expander("历史行情", expanded=True):
-        tab1, tab2 = st.tabs(["数据（单位「天」）", "k线图（单位「天」）"])
-        with tab1:
-            show_date_page(stock)
-        with tab2:
-            show_chart_page(stock)
+    with st.expander(f"{stock.category} {stock.code} ({stock.name}-{format_pinyin_short(stock.pinyin)})   数据（单位「天」）", expanded=False):
+        show_date_page(stock)
+
+    with st.expander(f"{stock.category} {stock.code} ({stock.name}-{format_pinyin_short(stock.pinyin)})   k线图（单位「天」）", expanded=True):
+        show_chart_page(stock)
 
 
-
-def reload_by_date(category: Category, code: str):
+def reload_by_code_date(category: Category, code: str):
     prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{code}_date', category=category)
     date_range = get_date_range(prefix=prefix)
     if not date_range:
@@ -230,6 +212,30 @@ def reload_by_date(category: Category, code: str):
         code=code,
         start_date=start_date,
         end_date=end_date)
+
+def reload_by_category_date(category: Category, start_date: str, end_date: str):
+    codes = get_codes(category)
+    for code in codes:
+        logging.info(f"开始处理[{code}]数据..., 开始日期: {start_date}, 结束日期: {end_date}")
+        def build_filter(args: Dict[str, Any], session: Session) -> List:
+            return [
+                HistoryDateData.code == code,
+                HistoryDateData.date >= start_date,
+                HistoryDateData.date <= end_date,
+            ]
+        history_handler = create_reload_handler(
+            model=HistoryDateData,
+            fetch_func=fetch_by_date,
+            unique_fields=['code', 'date'],
+            build_filter=build_filter,
+            with_date_range=True,
+        )
+        history_handler.refresh_ignore_message(
+            code=code,
+            start_date=start_date,
+            end_date=end_date)
+    logging.info(f"结束处理[{code}]数据..., 开始日期: {start_date}, 结束日期: {end_date}")
+
 
 def fetch_by_date(code: str, start_date: str, end_date: str) -> list:
     # 拉取 https://akshare.akfamily.xyz/data/stock/stock.html#id22

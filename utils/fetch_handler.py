@@ -132,6 +132,34 @@ class ReloadHandler(Generic[T, D]):
         finally:
             self.clear_displays()
 
+    def refresh_ignore_message(self, *args, **kwargs):
+        try:
+            data = self.config.fetch_func(*args, **kwargs)
+            if not data:
+                return None
+            with get_db_session() as session:
+                if self.config.mark_existing:
+                    filter_conditions = self.config.build_filter(kwargs, session)
+                    session.query(self.config.model).filter(
+                        *filter_conditions,
+                        self.config.model.removed == False
+                    ).update({
+                        # 使用字典形式，不需要 == 操作符
+                        'removed': True,
+                        'updated_at': datetime.now()
+                    }, synchronize_session=False)  # 添加 synchronize_session=False
+                    session.commit()
+                upsert_objects(
+                    objects=data,
+                    session=session,
+                    model=self.config.model,
+                    unique_fields=self.config.unique_fields
+                )
+                return None
+        except Exception as e:
+            logging.error(f"Refresh error: {str(e)}")
+            return None
+
 @dataclass
 class DateRangeConfig:
     prefix: str = ""

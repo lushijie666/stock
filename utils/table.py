@@ -38,3 +38,7 @@ def format_volume(value: float) -> str:
         return f"{value / 10000:.2f}万手"
     return f"{value:.0f}手"
 
+
+def format_pinyin_short(value):
+    return value.split(',')[1] if value else ''
+

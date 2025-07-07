@@ -10,6 +10,7 @@ from models.stock import Stock
 from utils.db import get_db_session
 from utils.message import show_message
 from utils.session import get_session_key, SessionKeys
+from utils.table import format_pinyin_short
 
 T = TypeVar('T')
 
@@ -35,7 +36,7 @@ class StockSelectorManager:
 
     def create_options(self, stocks: List[Stock]) -> List[Tuple[str, str]]:
         """创建选择器选项"""
-        return [("", "请选择股票")] + [(stock.code, stock.name) for stock in stocks]
+        return [("", "请选择股票")] + [(stock.code, stock.name, format_pinyin_short(stock.pinyin)) for stock in stocks]
 
     def show_selector(self) -> None:
         """显示选择器"""
@@ -56,7 +57,7 @@ class StockSelectorManager:
                 selected = st.selectbox(
                     "",
                     options=options,
-                    format_func=lambda x: x[1] if x[0] == "" else f"{x[0]} ({x[1]})",
+                    format_func=lambda x: x[1] if x[0] == "" else f"{x[0]} ({x[1]}-{x[2]})",
                     key=select_key,
                     on_change=self.handle_selection,
                     label_visibility="collapsed"

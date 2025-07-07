@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
-from time import time
 
 import streamlit as st
 from sqlalchemy.orm import Query
 from typing import Any, List, Dict, Optional, Callable
 import pandas as pd
 import logging
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
+
+from sqlalchemy import or_
 
 
 @dataclass
@@ -21,6 +22,7 @@ class SearchField:
     filter_func: Optional[Callable] = None  # 自定义过滤函数
     min_date: date = None
     max_date: date = None
+    search_fields: List[str] = None
 
 @dataclass
 class SearchConfig:
@@ -66,6 +68,17 @@ class Pagination:
                 if field.filter_func:
                     # 使用自定义过滤函数
                     query = field.filter_func(query, value)
+                elif field.field == "keyword" and field.search_fields:
+                    # keyword 类型的多字段搜索
+                    conditions = []
+                    for search_field in field.search_fields:
+                        try:
+                            column = getattr(query.column_descriptions[0]['type'], search_field)
+                            conditions.append(column.ilike(f"%{value}%"))
+                        except Exception as e:
+                            logging.error(f"Error creating condition for field {search_field}: {str(e)}")
+                    if conditions:
+                        query = query.filter(or_(*conditions))
                 else:
                     # 默认过滤逻辑
                     try:
@@ -94,7 +107,8 @@ def paginate_dataframe(
         search_config: Optional[SearchConfig] = None,
         action_config: Optional[ActionConfig] = None,
         title: str = "",
-        key_prefix: str = ""
+        key_prefix: str = "",
+        model = None
 ) -> None:
     try:
         # 初始化session_state
@@ -304,3 +318,4 @@ def paginate_dataframe(
     except Exception as e:
         logging.error(f"Error in paginate_dataframe: {str(e)}")
         st.error(f"分页显示失败：{str(e)}")
+

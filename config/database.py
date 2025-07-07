@@ -21,13 +21,14 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # PostgreSQL 连接配置
-DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}?client_encoding=utf8"
 
 # 创建引擎
 # 创建引擎（开启echo可以看到所有SQL）
 engine = create_engine(
     DATABASE_URL,
     echo=False,  # 不使用SQLAlchemy的内置日志
+    connect_args={'client_encoding': 'utf8'}
 )
 
 # SQL执行监听器
