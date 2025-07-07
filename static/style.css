@@ -1,0 +1,317 @@
+/* 隐藏 Streamlit 默认元素 */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+.st-emotion-cache-1xgtwnd {
+    display: flex;
+    -webkit-box-pack: justify;
+    justify-content: space-between;
+    -webkit-box-align: start;
+    align-items: start;
+    padding: 0 !important;  /* 覆盖原有的 padding */
+}
+
+/* 侧边栏样式 */
+[data-testid="stSidebar"] {
+    background-color: #f8f9fa;
+}
+
+i.icon.bi-menu-up::before {
+    font-size: 0.1rem !important;
+    content: "\f48c" !important;
+}
+
+/* 内容区域样式 */
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 0rem;
+}
+
+/* 卡片样式 */
+.stCard {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* 标题样式 */
+h1 {
+    color: #1f1f1f;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+/* 按钮样式 */
+.stButton>button {
+    background-color: #1677ff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+}
+
+.custom-caption {
+    font-size: 0.9rem !important;
+    color: #1677ff !important;
+    padding: 0.8rem 0 !important;
+    border-bottom: 2px solid #1677ff !important;
+    margin-bottom: 1.5rem !important;
+    font-weight: 500 !important;
+}
+
+.pagination-info {
+    color: #666;
+    font-size: 12px;
+    text-align: right;
+    padding-right: 10px;
+    line-height: 36px;
+}
+.page-number {
+    margin: 0 15px;
+    font-size: 10px;
+    color: #666;
+    text-align: center;
+    line-height: 36px;
+}
+ .stButton>button:disabled {
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+    border: 1px solid #ddd !important;
+    cursor: not-allowed;
+    opacity: 1 !important;
+ }
+
+/* 鼠标悬停在禁用按钮上的样式 */
+.stButton>button:disabled:hover {
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+    border: 1px solid #ddd !important;
+}
+
+/* 活动按钮样式 */
+.stButton>button:enabled {
+    background-color: #1677ff;
+    color: white;
+    border: none;
+}
+
+
+/* 鼠标悬停在活动按钮上的样式 */
+/*.stButton>button:enabled:hover {
+    background-color: #ff3d00;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}*/
+
+ .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 10px;
+ }
+
+.table-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+}
+.table-subtitle {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* 搜索区域样式 */
+.search-container {
+    margin: 10px 0;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+ /* 美化搜索框 */
+.stTextInput input {
+    border-radius: 4px;
+}
+
+
+/* 美化搜索按钮 */
+.stButton button {
+    border-radius: 4px;
+    background-color: #007bff;
+    color: white !important;  /* 强制使用白色 */
+    min-height: 32px !important;
+    line-height: 1.2 !important;
+    height: auto !important;
+}
+
+.stButton button:hover {
+    background-color: #0056b3;
+    color: white !important;  /* 悬停时保持白色 */
+}
+.stButton button:active {
+    color: white !important;  /* 点击时保持白色 */
+}
+.stButton button:focus {
+    color: white !important;  /* 聚焦时保持白色 */
+}
+.stButton button:visited {
+    color: white !important;  /* 访问后保持白色 */
+}
+/* 禁用按钮状态 */
+.stButton button:disabled {
+    background-color: #cccccc !important;
+    color: #666666 !important;
+}
+.search-action-container {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 1rem;
+    margin: 0.5rem 0 1rem 0;
+    border: 1px solid #eee;
+}
+
+/* 搜索框样式 */
+.stTextInput input {
+    border-radius: 4px;
+}
+
+/* 按钮样式 */
+.stButton button {
+    border-radius: 4px;
+    width: 100%;
+}
+
+/* 主要按钮 */
+.stButton button[data-baseweb="button"] {
+    background-color: #007bff;
+    color: white !important;
+}
+
+/* 操作按钮 */
+.action-button button {
+    margin: 0 2px;
+}
+
+/* 搜索区域和操作区域之间的分隔 */
+.search-action-divider {
+    border-right: 1px solid #dee2e6;
+    margin: 0 1rem;
+}
+
+/* 遮罩层样式 */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999999;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.loading-spinner {
+    background: white;
+    padding: 20px 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.loading-spinner p {
+    margin-top: 10px;
+    color: #333;
+    font-size: 16px;
+}
+
+/* Streamlit spinner样式 */
+.stSpinner > div {
+    border-top-color: #ff4b4b !important;
+    width: 3rem !important;
+    height: 3rem !important;
+}
+
+/* 消息容器样式 */
+.custom-message-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 999999;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+/* 消息样式 */
+.custom-message {
+    text-align: center;
+    padding: 1rem 2rem;
+    border-radius: 0.5rem;
+    background-color: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-width: 80%;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* 成功消息样式 */
+.custom-success {
+    background-color: #D1E7DD;
+    color: #0A3622;
+    border: 1px solid #BADBCC;
+}
+
+/* 警告消息样式 */
+.custom-warning {
+    background-color: #FFF3CD;
+    color: #664D03;
+    border: 1px solid #FFECB5;
+}
+
+/* 错误消息样式 */
+.custom-error {
+    background-color: #F8D7DA;
+    color: #842029;
+    border: 1px solid #F5C2C7;
+}
+
+/* 消息内容样式 */
+.message-content {
+    margin: 0;
+    line-height: 1.5;
+    font-size: 1rem;
+}

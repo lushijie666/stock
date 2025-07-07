@@ -1,0 +1,8 @@
+python-dotenv==1.0.0
+streamlit>=1.45.1
+akshare>=1.16.93
+psycopg2-binary >= 2.9.6
+SQLAlchemy==2.0.27
+pandas==2.2.0
+plotly>=5.18.0
+streamlit-option-menu>=0.3.12
