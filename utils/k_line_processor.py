@@ -51,13 +51,15 @@ class KLineProcessor:
                 k3_body_ratio = abs(k3['opening'] - k3['closing']) / (k3_range + 0.001)
 
                 # 包含关系检测
+                # K2被K3包含：K2的最高价>=K3的最高价 且 K2的最低价<=K3的最低价
+                # 或者K3被K2包含：K3的最高价>=K2的最高价 且 K3的最低价<=K2的最低价
                 k2_body = (min(k2['opening'], k2['closing']), max(k2['opening'], k2['closing']))
                 k3_body = (min(k3['opening'], k3['closing']), max(k3['opening'], k3['closing']))
 
                 is_contained = (
-                                       (k2_body[1] >= k3_body[1] and k2_body[0] <= k3_body[0]) or
-                                       (k3_body[1] >= k2_body[1] and k3_body[0] <= k2_body[0])
-                               ) and (k2_body_ratio > 0.2 or k3_body_ratio > 0.2)
+                                       (k2_body[1] >= k3_body[1] and k2_body[0] <= k3_body[0]) or  # K2包含K3
+                                       (k3_body[1] >= k2_body[1] and k3_body[0] <= k2_body[0])  # K3包含K2
+                               ) and (k2_body_ratio > 0.2 or k3_body_ratio > 0.2)  # 实体比例达标
 
                 if is_contained:
                     # 趋势判断（前3根）
@@ -66,16 +68,28 @@ class KLineProcessor:
 
                     # 合并处理（显式保留日期）
                     new_date = k2['date']  # 保留K2的日期
+
+                    # 正确的包含处理逻辑：
+                    # 向上包含：取两K线中较高的最高价和较高的最低价
+                    # 向下包含：取两K线中较低的最高价和较低的最低价
                     if trend_up:
                         new_high = max(k2['highest'], k3['highest'])
                         new_low = max(k2['lowest'], k3['lowest'])
-                        new_open = min(k2['opening'], k3['opening'])
-                        new_close = max(k2['closing'], k3['closing'])
+                        # 开盘价取合并后第一根K线的开盘价，收盘价取合并后最高价所在K线的收盘价
+                        new_open = k2['opening']
+                        if k3['highest'] > k2['highest']:
+                            new_close = k3['closing']
+                        else:
+                            new_close = k2['closing']
                     else:
                         new_high = min(k2['highest'], k3['highest'])
                         new_low = min(k2['lowest'], k3['lowest'])
-                        new_open = max(k2['opening'], k3['opening'])
-                        new_close = min(k2['closing'], k3['closing'])
+                        # 开盘价取合并后第一根K线的开盘价，收盘价取合并后最低价所在K线的收盘价
+                        new_open = k2['opening']
+                        if k3['lowest'] < k2['lowest']:
+                            new_close = k3['closing']
+                        else:
+                            new_close = k2['closing']
 
                     # 更新当前K线
                     processed_data.at[i, 'date'] = new_date
@@ -127,7 +141,7 @@ class KLineProcessor:
 
         参数:
             df (pd.DataFrame): 包含K线数据的DataFrame，需有列 ['date', 'opening', 'closing', 'high', 'low']
-            body_ratio_threshold (float): 实体比例阈值（默认0.3，即实体部分至少占K线范围的30%）
+            body_ratio_threshold (float): 实体比例阈值（默认0.2，即实体部分至少占K线范围的30%）
 
         返回:
             list: 分型列表，每个元素为字典，包含 index/date/value/type
@@ -159,8 +173,10 @@ class KLineProcessor:
             right_high = right['highest']
             right_low = right['lowest']
 
-            # 顶分型条件：当前高点严格高于左右高点，且实体比例达标
-            if (current_high > left_high and current_high > right_high):
+            # 顶分型条件：当前高点严格高于左右高点，且当前低点也严格高于左右低点
+            # 【a,b,c bG>aG && bG>cG && bD>aD &&bD>cD】
+            if (current_high > left_high and current_high > right_high and
+                    current_low > left_low and current_low > right_low):
                 patterns.append({
                     'index': i,
                     'date': current['date'],
@@ -168,8 +184,10 @@ class KLineProcessor:
                     'type': Patterns.TOP
                 })
 
-            # 底分型条件：当前低点严格低于左右低点，且实体比例达标
-            elif (current_low < left_low and current_low < right_low):
+            # 底分型条件：当前低点严格低于左右低点，且当前高点也严格低于左右高点
+            # 【a,b,c bG<aG && bG<cG && bD<aD &&bD<cD】
+            elif (current_low < left_low and current_low < right_low and
+                  current_high < left_high and current_high < right_high):
                 patterns.append({
                     'index': i,
                     'date': current['date'],

@@ -125,24 +125,40 @@ def show_chart_page(stock):
             min_date, max_date = date_range
             default_start_date = max(max_date - timedelta(days=90), min_date)
 
+            # 使用固定的 key 前缀来保持日期选择器状态
+            chart_key_prefix = f"chart_page_{stock.code}"
+
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_chart',category=stock.category)
+            start_date_key = f"{key_prefix}_start_date"
+            end_date_key = f"{key_prefix}_end_date"
+
+            if start_date_key not in st.session_state:
+                st.session_state[start_date_key] = default_start_date
+            if end_date_key not in st.session_state:
+                st.session_state[end_date_key] = max_date
+
             # 添加日期选择器
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input(
                     "开始日期",
-                    value=default_start_date,
+                    value=st.session_state[start_date_key],
                     min_value=min_date,
                     max_value=max_date,
-                    key=generate_key()
+                    key=start_date_key
                 )
+                if start_date != st.session_state[start_date_key]:
+                    st.session_state[start_date_key] = start_date
             with col2:
                 end_date = st.date_input(
                     "结束日期",
-                    value=max_date,
+                    value=st.session_state[end_date_key],
                     min_value=min_date,
                     max_value=max_date,
-                    key=generate_key()
+                    key=end_date_key
                 )
+                if end_date != st.session_state[end_date_key]:
+                    st.session_state[end_date_key] = end_date
 
             # 从数据库获取数据
             query = session.query(
@@ -178,7 +194,7 @@ def show_chart_page(stock):
             grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
             # 显示图表
-            streamlit_echarts.st_pyecharts(grid, theme="white", height="800px", key=generate_key())
+            streamlit_echarts.st_pyecharts(grid, theme="white", height="800px", key=f"{chart_key_prefix}_chart")
 
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
@@ -202,24 +218,40 @@ def show_process_chart_page(stock):
             min_date, max_date = date_range
             default_start_date = max(max_date - timedelta(days=90), min_date)
 
+            # 使用统一的 key_prefix 方式
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_process_chart', category=stock.category)
+
+            # 初始化 session state 中的日期值
+            start_date_key = f"{key_prefix}_start_date"
+            end_date_key = f"{key_prefix}_end_date"
+
+            if start_date_key not in st.session_state:
+                st.session_state[start_date_key] = default_start_date
+            if end_date_key not in st.session_state:
+                st.session_state[end_date_key] = max_date
+
             # 添加日期选择器
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input(
                     "开始日期",
-                    value=default_start_date,
+                    value=st.session_state[start_date_key],
                     min_value=min_date,
                     max_value=max_date,
-                    key=generate_key()
+                    key=start_date_key
                 )
+                if start_date != st.session_state[start_date_key]:
+                    st.session_state[start_date_key] = start_date
             with col2:
                 end_date = st.date_input(
                     "结束日期",
-                    value=max_date,
+                    value=st.session_state[end_date_key],
                     min_value=min_date,
                     max_value=max_date,
-                    key=generate_key()
+                    key=end_date_key
                 )
+                if end_date != st.session_state[end_date_key]:
+                    st.session_state[end_date_key] = end_date
 
             # 从数据库获取数据
             query = session.query(

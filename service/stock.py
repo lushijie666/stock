@@ -147,49 +147,31 @@ def show_follow_page(category: Category):
     st.divider()
     try:
         with get_db_session() as session:
-            # 构建查询
             query = session.query(Stock).filter(
                 Stock.category == category,
                 Stock.removed == False,
                 Stock.is_followed == True
             ).order_by(Stock.code.asc())
-            # 使用通用的分页
-            paginate_dataframe(
-                query,
-                100,
-                columns_config={
-                    # 基础信息
-                    # 'category': st.column_config.TextColumn('分类', help="股票分类"),
-                    'code': st.column_config.TextColumn('股票代码', help="股票代码"),
-                    'name': st.column_config.TextColumn('股票名称', help="股票名称"),
-                    'pinyin': st.column_config.TextColumn('股票简拼', help="股票拼音简称"),
-                    'full_name': st.column_config.TextColumn('全称', help="公司名称"),
-                    'ipo_at': st.column_config.DatetimeColumn('上市时间', help="上市时间"),
-                    'total_capital': st.column_config.TextColumn('总股本(股)', help="总股本"),
-                    'flow_capital': st.column_config.TextColumn('流通股本(股)', help="流通股本"),
-                    'industry': st.column_config.TextColumn('行业', help="行业"),
-                },
-                # 格式化函数
-                format_funcs={
-                    'pinyin': format_pinyin_short,
-                },
-                search_config=SearchConfig(
-                    fields=[
-                        SearchField(
-                            field="keyword",
-                            label="股票代码/名称/简拼",
-                            type="text",
-                            placeholder="输入股票代码/名称/简拼",
-                            search_fields = ["code", "name", "pinyin"]
-                        )
-                    ],
-                    layout=[1, 1, 1, 1]
-                ),
-                title= category.fullText,
-                key_prefix=get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category),
-                model=Stock,
-            )
 
+            # 获取所有关注的股票
+            stocks = query.all()
+            if not stocks:
+                st.info("暂无关注的股票")
+                return
+
+            # 手动渲染表格 + 按钮
+            st.markdown("<h5>已关注的股票</h5>", unsafe_allow_html=True)
+            for stock in stocks:
+                col1, col2 = st.columns([8, 1])
+                with col1:
+                    st.markdown(f"**{stock.name}** ({stock.code})")
+                    st.caption(f"全称: {stock.full_name}")
+                    st.caption(f"上市时间: {stock.ipo_at}")
+                    st.caption(f"行业: {stock.industry}")
+                with col2:
+                    if st.button("移除关注", key=f"remove_{stock.code}", type="secondary"):
+                        remove_follow(category, stock.code)
+                        st.rerun()  # 刷新页面
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
@@ -238,6 +220,22 @@ def add_follow(category: Category, stock_code: str):
     except Exception as e:
         show_message(f"添加关注失败：{str(e)}", type="error")
 
+def remove_follow(category: Category, stock_code: str):
+    try:
+        with get_db_session() as session:
+            stock = session.query(Stock).filter(
+                Stock.code == stock_code,
+                Stock.category == category,
+            ).first()
+            if stock:
+                stock.is_followed = False
+                session.commit()
+                show_message(f"已取消关注：{stock.name}({stock.code})", type="success")
+                st.rerun()  # 刷新页面以更新显示
+            else:
+                show_message("未找到选中的股票", type="warning")
+    except Exception as e:
+        show_message(f"取消关注失败：{str(e)}", type="error")
 
 def reload(category: Category):
     def build_filter(args: Dict[str, Any], session: Session) -> List:
