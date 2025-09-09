@@ -10,7 +10,7 @@ from sqlalchemy import func
 import streamlit_echarts
 
 from enums.patterns import Patterns
-from utils.chart import ChartBuilder
+from utils.chart import ChartBuilder, calculate_macd
 from utils.k_line_processor import KLineProcessor
 from utils.table import format_pinyin_short
 
@@ -142,7 +142,6 @@ def show_chart_page(stock):
             with col1:
                 start_date = st.date_input(
                     "开始日期",
-                    value=st.session_state[start_date_key],
                     min_value=min_date,
                     max_value=max_date,
                     key=start_date_key
@@ -152,7 +151,6 @@ def show_chart_page(stock):
             with col2:
                 end_date = st.date_input(
                     "结束日期",
-                    value=st.session_state[end_date_key],
                     min_value=min_date,
                     max_value=max_date,
                     key=end_date_key
@@ -182,19 +180,38 @@ def show_chart_page(stock):
                 st.warning("所选日期范围内没有数据")
                 return
 
+            # 计算 MACD
+            macd_df = calculate_macd(df)
+            macd_dates = df['date'].astype(str).tolist()
+            diff_values = macd_df['DIFF'].tolist()
+            dea_values = macd_df['DEA'].tolist()
+            macd_hist = macd_df['MACD_hist'].tolist()
+
             dates = df['date'].astype(str).tolist()
             k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
             volumes = df['turnover_count'].tolist()
             colors = ['#ef232a' if close > open else '#14b143'
                       for open, close in zip(df['opening'], df['closing'])]
 
-            # 创建图表
+            # 创建 K 线图
             kline = ChartBuilder.create_kline_chart(dates, k_line_data)
             volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
             grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
-            # 显示图表
+            # 显示K线图
             streamlit_echarts.st_pyecharts(grid, theme="white", height="800px", key=f"{chart_key_prefix}_chart")
+            # 显示 MACD 图
+            macd_chart = ChartBuilder.create_macd_chart(
+                dates=macd_dates,
+                diff=diff_values,
+                dea=dea_values,
+                hist=macd_hist,
+                fast_period=12,
+                slow_period=26,
+                signal_period=9,
+                title="MACD"
+            )
+            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="400px", key=f"{chart_key_prefix}_macd")
 
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
@@ -235,7 +252,6 @@ def show_process_chart_page(stock):
             with col1:
                 start_date = st.date_input(
                     "开始日期",
-                    value=st.session_state[start_date_key],
                     min_value=min_date,
                     max_value=max_date,
                     key=start_date_key
@@ -245,7 +261,6 @@ def show_process_chart_page(stock):
             with col2:
                 end_date = st.date_input(
                     "结束日期",
-                    value=st.session_state[end_date_key],
                     min_value=min_date,
                     max_value=max_date,
                     key=end_date_key

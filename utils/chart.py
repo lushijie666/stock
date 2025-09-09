@@ -3,7 +3,7 @@ from datetime import datetime, date  # 添加这行导入
 from pyecharts.charts import Pie, Kline, Bar, Grid, Line, Scatter
 from pyecharts import options as opts
 from pyecharts.commons.utils import JsCode
-
+import pandas as pd
 from enums.patterns import Patterns
 
 
@@ -139,8 +139,8 @@ class ChartBuilder:
 
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
-                title="",
-                pos_left="center",
+                title="K线图",
+                pos_left="left",
             ),
             legend_opts=opts.LegendOpts(
                 type_="scroll",
@@ -281,7 +281,7 @@ class ChartBuilder:
                 kline,
                 grid_opts=opts.GridOpts(
                     pos_left="10%",
-                    pos_right="8%",
+                    pos_right="10%",
                     pos_top="5%",
                     height="60%"
                 ),
@@ -290,10 +290,172 @@ class ChartBuilder:
                 volume_bar,
                 grid_opts=opts.GridOpts(
                     pos_left="10%",
-                    pos_right="8%",
-                    pos_top="70%",
+                    pos_right="10%",
+                    pos_top="71%",
                     height="20%"
                 ),
             )
         )
         return grid
+
+    @staticmethod
+    def create_macd_chart(dates: list, diff: list, dea: list, hist: list,
+                          fast_period=12, slow_period=26, signal_period=9,
+                          title: str = "MACD"):
+        # 动态生成标题
+        full_title = f"{title} ({fast_period},{slow_period},{signal_period})"
+
+        # 计算Y轴范围
+        y_min = min(min(diff or [0]), min(dea or [0]), min(hist or [0])) * 1.1
+        y_max = max(max(diff or [0]), max(dea or [0]), max(hist or [0])) * 1.1
+
+        # 创建柱状图（简化颜色设置）
+        bar = (
+            Bar()
+            .add_xaxis(dates)
+            .add_yaxis(
+                series_name="MACD",
+                y_axis=hist,
+                itemstyle_opts=opts.ItemStyleOpts(
+                    color=JsCode("""
+                        function(params) {
+                            if (params && params.value !== undefined) {
+                                return params.value > 0 ? '#FF6B6B' : '#4ECDC4';
+                            }
+                            return '#4ECDC4';
+                        }
+                    """)
+                ),
+                bar_width='60%',
+                yaxis_index=0,
+                z_level=2,
+                label_opts=opts.LabelOpts(is_show=False)
+            )
+        )
+
+        # 创建线图（简化配置）
+        line = (
+            Line()
+            .add_xaxis(dates)
+            .add_yaxis(
+                series_name="DIFF",
+                y_axis=diff,
+                is_smooth=True,
+                color="#FF9F1C",
+                linestyle_opts=opts.LineStyleOpts(width=2),
+                symbol="none",
+                yaxis_index=1,
+                z_level=1,
+                label_opts=opts.LabelOpts(is_show=False)
+            )
+            .add_yaxis(
+                series_name="DEA",
+                y_axis=dea,
+                is_smooth=True,
+                color="#2EC4B6",
+                linestyle_opts=opts.LineStyleOpts(width=2),
+                symbol="none",
+                yaxis_index=1,
+                z_level=1,
+                label_opts=opts.LabelOpts(is_show=False)
+            )
+        )
+
+        # 合并图表
+        overlap = bar.overlap(line)
+
+        # 设置全局选项（最简化可靠配置）
+        overlap.set_global_opts(
+            title_opts=opts.TitleOpts(title=full_title),
+            legend_opts=opts.LegendOpts(
+                pos_top="45%",
+                pos_left="right",
+                orient="vertical",  # 改为垂直排列
+                inactive_color="#ccc"
+
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="axis",
+                axis_pointer_type="cross",
+                formatter=JsCode("""
+                    function(params) {
+                        if (!params || params.length === 0) return '';
+                        let result = '';
+                        if (params[0].axisValue) {
+                            result = params[0].axisValue + '<br/>';
+                        }
+                        params.forEach(item => {
+                            if (item) {
+                                const value = (item.value !== undefined && item.value !== null) ? item.value : '-';
+                                const color = item.color || '#666';
+                                const seriesName = item.seriesName || '';
+                                result += `
+                                <span style="display:inline-block;
+                                            margin-right:5px;
+                                            width:10px;
+                                            height:10px;
+                                            background-color:${color}"></span>
+                                ${seriesName}: <b>${typeof value === 'number' ? value.toFixed(4) : value}</b><br/>`;
+                            }
+                        });
+                        return result;
+                    }
+                """)
+            ),
+            datazoom_opts=opts.DataZoomOpts(is_show=True,
+                    type_="slider",
+                    pos_bottom="0%",
+                    pos_left="10%",  # 左侧边距
+                    pos_right="10%",  # 右侧边距
+                    xaxis_index=[0, 1],
+                    range_start=0,
+                    range_end=100,
+            ),
+            yaxis_opts=opts.AxisOpts(
+                name="MACD",
+                position="left",
+                min_=y_min,
+                max_=y_max,
+                axisline_opts=opts.AxisLineOpts(linestyle_opts=opts.LineStyleOpts(color="#666")),
+                splitline_opts=opts.SplitLineOpts(is_show=True)
+            ),
+            xaxis_opts=opts.AxisOpts(
+                axislabel_opts=opts.LabelOpts(color="#000000"),
+                splitline_opts=opts.SplitLineOpts(is_show=False),
+                axispointer_opts=opts.AxisPointerOpts(is_show=True, type_="line")
+            )
+        )
+
+        # 添加第二个Y轴
+        overlap.extend_axis(
+            yaxis=opts.AxisOpts(
+                name="DIFF/DEA",
+                position="right",
+                min_=y_min,
+                max_=y_max,
+                axisline_opts=opts.AxisLineOpts(linestyle_opts=opts.LineStyleOpts(color="#666"))
+            )
+        )
+
+        # 创建Grid布局（简化）
+        grid = Grid(init_opts=opts.InitOpts(width="100%", height="600px"))
+        grid.add(
+            overlap,
+            grid_opts=opts.GridOpts(
+                pos_left="10%",
+                pos_right="10%",
+                pos_top="20%",
+                pos_bottom="16%"
+            )
+        )
+        return grid
+
+
+def calculate_macd(df: pd.DataFrame, fast_period=12, slow_period=26, signal_period=9):
+    df = df.copy()
+    df['EMA12'] = df['closing'].ewm(span=fast_period, adjust=False).mean()
+    df['EMA26'] = df['closing'].ewm(span=slow_period, adjust=False).mean()
+    df['DIFF'] = df['EMA12'] - df['EMA26']
+    df['DEA'] = df['DIFF'].ewm(span=signal_period, adjust=False).mean()
+    df['MACD_hist'] = df['DIFF'] - df['DEA']
+    return df[['DIFF', 'DEA', 'MACD_hist']]
