@@ -136,117 +136,120 @@ class ChartBuilder:
                     itemstyle_opts=opts.ItemStyleOpts(color="#44FF44"),
                 )
                 kline = kline.overlap(scatter_bottom)
+        # 添加信号
+        if signals:
+            print(signals)
+            buy_signals_strong = []
+            buy_signals_weak = []
+            sell_signals_strong = []
+            sell_signals_weak = []
 
-            if signals:
-                buy_signals_strong = []
-                buy_signals_weak = []
-                sell_signals_strong = []
-                sell_signals_weak = []
+            for signal in signals:
 
-                for signal in signals:
-                    # 确保日期格式正确
-                    if hasattr(signal['date'], 'strftime'):
-                        date_str = signal['date'].strftime('%Y-%m-%d')
+                # 确保日期格式与 K 线图 x 轴一致
+                if hasattr(signal['date'], 'strftime'):
+                    date_str = signal['date'].strftime('%Y-%m-%d')
+                else:
+                    date_str = str(signal['date'])
+
+                # 确保价格是数值类型
+                price = float(signal['price'])
+                point = [date_str, price]
+
+                if signal['signal_type'] == 'buy':
+                    if signal['strength'] == 'strong':
+                        buy_signals_strong.append(point)
                     else:
-                        date_str = str(signal['date'])
+                        buy_signals_weak.append(point)
+                elif signal['signal_type'] == 'sell':
+                    if signal['strength'] == 'strong':
+                        sell_signals_strong.append(point)
+                    else:
+                        sell_signals_weak.append(point)
 
-                    point = [date_str, float(signal['price'])]
-
-                    if signal['signal_type'] == 'buy':
-                        if signal['strength'] == 'strong':
-                            buy_signals_strong.append(point)
-                        else:
-                            buy_signals_weak.append(point)
-                    elif signal['signal_type'] == 'sell':
-                        if signal['strength'] == 'strong':
-                            sell_signals_strong.append(point)
-                        else:
-                            sell_signals_weak.append(point)
-
-                # 添加强买入信号
-                if buy_signals_strong:
-                    scatter_buy_strong = (
-                        Scatter()
-                        .add_xaxis([p[0] for p in buy_signals_strong])
-                        .add_yaxis(
-                            series_name="MB(强)",
-                            y_axis=[p[1] for p in buy_signals_strong],
-                            symbol_size=20,
-                            symbol='circle',
-                            itemstyle_opts=opts.ItemStyleOpts(color='#8B0000'),  # 深红色
-                            label_opts=opts.LabelOpts(
-                                is_show=True,
-                                position="top",
-                                formatter="MB",
-                                color='#8B0000'
-                            )
+            # 添加强买入信号
+            if buy_signals_strong:
+                scatter_buy_strong = (
+                    Scatter()
+                    .add_xaxis([p[0] for p in buy_signals_strong])
+                    .add_yaxis(
+                        series_name="MB(强)",
+                        y_axis=[p[1] for p in buy_signals_strong],
+                        symbol_size=20,
+                        symbol='triangle',  # 使用三角形符号更明显
+                        itemstyle_opts=opts.ItemStyleOpts(color='#8B0000'),
+                        label_opts=opts.LabelOpts(
+                            is_show=True,
+                            position="top",
+                            formatter="MB",
+                            color='#8B0000'
                         )
                     )
-                    kline = kline.overlap(scatter_buy_strong)
+                )
+                kline = kline.overlap(scatter_buy_strong)
 
-                # 添加弱买入信号
-                if buy_signals_weak:
-                    scatter_buy_weak = (
-                        Scatter()
-                        .add_xaxis([p[0] for p in buy_signals_weak])
-                        .add_yaxis(
-                            series_name="MB(弱)",
-                            y_axis=[p[1] for p in buy_signals_weak],
-                            symbol_size=20,
-                            symbol='circle',
-                            itemstyle_opts=opts.ItemStyleOpts(color='#FF7F7F'),  # 浅红色
-                            label_opts=opts.LabelOpts(
-                                is_show=True,
-                                position="top",
-                                formatter="MB",
-                                color='#FF7F7F'
-                            )
+            # 添加弱买入信号
+            if buy_signals_weak:
+                scatter_buy_weak = (
+                    Scatter()
+                    .add_xaxis([p[0] for p in buy_signals_weak])
+                    .add_yaxis(
+                        series_name="MB(弱)",
+                        y_axis=[p[1] for p in buy_signals_weak],
+                        symbol_size=20,
+                        symbol='triangle',
+                        itemstyle_opts=opts.ItemStyleOpts(color='#FF7F7F'),
+                        label_opts=opts.LabelOpts(
+                            is_show=True,
+                            position="top",
+                            formatter="MB",
+                            color='#FF7F7F'
                         )
                     )
-                    kline = kline.overlap(scatter_buy_weak)
+                )
+                kline = kline.overlap(scatter_buy_weak)
 
-                # 添加强卖出信号
-                if sell_signals_strong:
-                    scatter_sell_strong = (
-                        Scatter()
-                        .add_xaxis([p[0] for p in sell_signals_strong])
-                        .add_yaxis(
-                            series_name="MS(强)",
-                            y_axis=[p[1] for p in sell_signals_strong],
-                            symbol_size=20,
-                            symbol='circle',
-                            itemstyle_opts=opts.ItemStyleOpts(color='#006400'),  # 深绿色
-                            label_opts=opts.LabelOpts(
-                                is_show=True,
-                                position="bottom",
-                                formatter="MS",
-                                color='#006400'
-                            )
+            # 添加强卖出信号
+            if sell_signals_strong:
+                scatter_sell_strong = (
+                    Scatter()
+                    .add_xaxis([p[0] for p in sell_signals_strong])
+                    .add_yaxis(
+                        series_name="MS(强)",
+                        y_axis=[p[1] for p in sell_signals_strong],
+                        symbol_size=20,
+                        symbol='diamond',  # 使用菱形符号
+                        itemstyle_opts=opts.ItemStyleOpts(color='#006400'),
+                        label_opts=opts.LabelOpts(
+                            is_show=True,
+                            position="bottom",
+                            formatter="MS",
+                            color='#006400'
                         )
                     )
-                    kline = kline.overlap(scatter_sell_strong)
+                )
+                kline = kline.overlap(scatter_sell_strong)
 
-                # 添加弱卖出信号
-                if sell_signals_weak:
-                    scatter_sell_weak = (
-                        Scatter()
-                        .add_xaxis([p[0] for p in sell_signals_weak])
-                        .add_yaxis(
-                            series_name="MS(弱)",
-                            y_axis=[p[1] for p in sell_signals_weak],
-                            symbol_size=20,
-                            symbol='circle',
-                            itemstyle_opts=opts.ItemStyleOpts(color='#90EE90'),  # 浅绿色
-                            label_opts=opts.LabelOpts(
-                                is_show=True,
-                                position="bottom",
-                                formatter="MS",
-                                color='#90EE90'
-                            )
+            # 添加弱卖出信号
+            if sell_signals_weak:
+                scatter_sell_weak = (
+                    Scatter()
+                    .add_xaxis([p[0] for p in sell_signals_weak])
+                    .add_yaxis(
+                        series_name="MS(弱)",
+                        y_axis=[p[1] for p in sell_signals_weak],
+                        symbol_size=20,
+                        symbol='diamond',
+                        itemstyle_opts=opts.ItemStyleOpts(color='#90EE90'),
+                        label_opts=opts.LabelOpts(
+                            is_show=True,
+                            position="bottom",
+                            formatter="MS",
+                            color='#90EE90'
                         )
                     )
-                    kline = kline.overlap(scatter_sell_weak)
-
+                )
+                kline = kline.overlap(scatter_sell_weak)
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
                 title="K线图",
