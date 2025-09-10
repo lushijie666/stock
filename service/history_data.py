@@ -10,7 +10,7 @@ from sqlalchemy import func
 import streamlit_echarts
 
 from enums.patterns import Patterns
-from utils.chart import ChartBuilder, calculate_macd
+from utils.chart import ChartBuilder, calculate_macd, calculate_macd_signals
 from utils.k_line_processor import KLineProcessor
 from utils.table import format_pinyin_short
 
@@ -182,6 +182,9 @@ def show_chart_page(stock):
 
             # 计算 MACD
             macd_df = calculate_macd(df)
+            # 计算信号标记
+            signals = calculate_macd_signals(df, macd_df)
+
             macd_dates = df['date'].astype(str).tolist()
             diff_values = macd_df['DIFF'].tolist()
             dea_values = macd_df['DEA'].tolist()
@@ -194,7 +197,7 @@ def show_chart_page(stock):
                       for open, close in zip(df['opening'], df['closing'])]
 
             # 创建 K 线图
-            kline = ChartBuilder.create_kline_chart(dates, k_line_data)
+            kline = ChartBuilder.create_kline_chart(dates, k_line_data, signals=signals)
             volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
             grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 

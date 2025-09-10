@@ -57,7 +57,7 @@ class ChartBuilder:
         return pie
 
     @staticmethod
-    def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None):
+    def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None, signals=None):
         kline = (
             Kline()
             .add_xaxis(dates)
@@ -136,6 +136,116 @@ class ChartBuilder:
                     itemstyle_opts=opts.ItemStyleOpts(color="#44FF44"),
                 )
                 kline = kline.overlap(scatter_bottom)
+
+            if signals:
+                buy_signals_strong = []
+                buy_signals_weak = []
+                sell_signals_strong = []
+                sell_signals_weak = []
+
+                for signal in signals:
+                    # 确保日期格式正确
+                    if hasattr(signal['date'], 'strftime'):
+                        date_str = signal['date'].strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(signal['date'])
+
+                    point = [date_str, float(signal['price'])]
+
+                    if signal['signal_type'] == 'buy':
+                        if signal['strength'] == 'strong':
+                            buy_signals_strong.append(point)
+                        else:
+                            buy_signals_weak.append(point)
+                    elif signal['signal_type'] == 'sell':
+                        if signal['strength'] == 'strong':
+                            sell_signals_strong.append(point)
+                        else:
+                            sell_signals_weak.append(point)
+
+                # 添加强买入信号
+                if buy_signals_strong:
+                    scatter_buy_strong = (
+                        Scatter()
+                        .add_xaxis([p[0] for p in buy_signals_strong])
+                        .add_yaxis(
+                            series_name="MB(强)",
+                            y_axis=[p[1] for p in buy_signals_strong],
+                            symbol_size=20,
+                            symbol='circle',
+                            itemstyle_opts=opts.ItemStyleOpts(color='#8B0000'),  # 深红色
+                            label_opts=opts.LabelOpts(
+                                is_show=True,
+                                position="top",
+                                formatter="MB",
+                                color='#8B0000'
+                            )
+                        )
+                    )
+                    kline = kline.overlap(scatter_buy_strong)
+
+                # 添加弱买入信号
+                if buy_signals_weak:
+                    scatter_buy_weak = (
+                        Scatter()
+                        .add_xaxis([p[0] for p in buy_signals_weak])
+                        .add_yaxis(
+                            series_name="MB(弱)",
+                            y_axis=[p[1] for p in buy_signals_weak],
+                            symbol_size=20,
+                            symbol='circle',
+                            itemstyle_opts=opts.ItemStyleOpts(color='#FF7F7F'),  # 浅红色
+                            label_opts=opts.LabelOpts(
+                                is_show=True,
+                                position="top",
+                                formatter="MB",
+                                color='#FF7F7F'
+                            )
+                        )
+                    )
+                    kline = kline.overlap(scatter_buy_weak)
+
+                # 添加强卖出信号
+                if sell_signals_strong:
+                    scatter_sell_strong = (
+                        Scatter()
+                        .add_xaxis([p[0] for p in sell_signals_strong])
+                        .add_yaxis(
+                            series_name="MS(强)",
+                            y_axis=[p[1] for p in sell_signals_strong],
+                            symbol_size=20,
+                            symbol='circle',
+                            itemstyle_opts=opts.ItemStyleOpts(color='#006400'),  # 深绿色
+                            label_opts=opts.LabelOpts(
+                                is_show=True,
+                                position="bottom",
+                                formatter="MS",
+                                color='#006400'
+                            )
+                        )
+                    )
+                    kline = kline.overlap(scatter_sell_strong)
+
+                # 添加弱卖出信号
+                if sell_signals_weak:
+                    scatter_sell_weak = (
+                        Scatter()
+                        .add_xaxis([p[0] for p in sell_signals_weak])
+                        .add_yaxis(
+                            series_name="MS(弱)",
+                            y_axis=[p[1] for p in sell_signals_weak],
+                            symbol_size=20,
+                            symbol='circle',
+                            itemstyle_opts=opts.ItemStyleOpts(color='#90EE90'),  # 浅绿色
+                            label_opts=opts.LabelOpts(
+                                is_show=True,
+                                position="bottom",
+                                formatter="MS",
+                                color='#90EE90'
+                            )
+                        )
+                    )
+                    kline = kline.overlap(scatter_sell_weak)
 
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
@@ -320,13 +430,13 @@ class ChartBuilder:
                     color=JsCode("""
                         function(params) {
                             if (params && params.value !== undefined) {
-                                return params.value > 0 ? '#FF6B6B' : '#4ECDC4';
+                                return params.value > 0 ? '#ef232a	' : '#14b143';
                             }
-                            return '#4ECDC4';
+                            return '#14b143';
                         }
                     """)
                 ),
-                bar_width='60%',
+                bar_width='40%',
                 yaxis_index=0,
                 z_level=2,
                 label_opts=opts.LabelOpts(is_show=False)
@@ -341,8 +451,7 @@ class ChartBuilder:
                 series_name="DIFF",
                 y_axis=diff,
                 is_smooth=True,
-                color="#FF9F1C",
-                linestyle_opts=opts.LineStyleOpts(width=2),
+                linestyle_opts=opts.LineStyleOpts(width=3),
                 symbol="none",
                 yaxis_index=1,
                 z_level=1,
@@ -352,8 +461,7 @@ class ChartBuilder:
                 series_name="DEA",
                 y_axis=dea,
                 is_smooth=True,
-                color="#2EC4B6",
-                linestyle_opts=opts.LineStyleOpts(width=2),
+                linestyle_opts=opts.LineStyleOpts(width=3),
                 symbol="none",
                 yaxis_index=1,
                 z_level=1,
@@ -459,3 +567,67 @@ def calculate_macd(df: pd.DataFrame, fast_period=12, slow_period=26, signal_peri
     df['DEA'] = df['DIFF'].ewm(span=signal_period, adjust=False).mean()
     df['MACD_hist'] = df['DIFF'] - df['DEA']
     return df[['DIFF', 'DEA', 'MACD_hist']]
+
+
+def calculate_macd_signals(df, macd_df):
+    """
+    根据MACD指标计算买卖信号
+    """
+    signals = []
+
+    # 确保两个DataFrame长度一致
+    min_len = min(len(df), len(macd_df))
+    df = df.iloc[:min_len]
+    macd_df = macd_df.iloc[:min_len]
+
+    try:
+        for i in range(1, len(macd_df)):
+            # 获取当前和前一日的数据
+            prev_diff = macd_df.iloc[i - 1]['DIFF']
+            prev_dea = macd_df.iloc[i - 1]['DEA']
+            curr_diff = macd_df.iloc[i]['DIFF']
+            curr_dea = macd_df.iloc[i]['DEA']
+
+            # 从原始df中获取日期和价格
+            date = df.iloc[i]['date']
+            price = df.iloc[i]['closing']
+
+            # 计算DIFF的角度（使用前后两天的差值）
+            if i >= 2:
+                prev2_diff = macd_df.iloc[i - 2]['DIFF']
+                # 避免除零错误
+                if abs(curr_diff - prev2_diff) > 1e-10:
+                    diff_angle = abs((curr_diff - prev2_diff) / 2 * 45)
+                else:
+                    diff_angle = 0
+            else:
+                diff_angle = 0
+
+            # 买入信号：DIFF上穿DEA且DIFF>0
+            if prev_diff <= prev_dea and curr_diff > curr_dea and curr_diff > 0:
+                strength = 'strong' if diff_angle > 30 else 'weak'
+                signals.append({
+                    'date': date,
+                    'price': float(price),
+                    'signal_type': 'buy',
+                    'strength': strength
+                })
+
+            # 卖出信号：DIFF下穿DEA
+            elif prev_diff >= prev_dea and curr_diff < curr_dea:
+                # 如果DIFF<0且DEA<0，为强卖出信号
+                if curr_diff < 0 and curr_dea < 0:
+                    strength = 'strong'
+                else:
+                    strength = 'weak'
+
+                signals.append({
+                    'date': date,
+                    'price': float(price),
+                    'signal_type': 'sell',
+                    'strength': strength
+                })
+    except Exception as e:
+        pass
+
+    return signals
