@@ -76,12 +76,13 @@ class ChartBuilder:
         if ma_lines:
             lines = Line()
             lines.add_xaxis(dates)
+
             for name, values in ma_lines.items():
                 lines.add_yaxis(
                     name,
                     values,
                     is_smooth=True,
-                    label_opts=opts.LabelOpts(is_show=False)  # 不显示标签
+                    label_opts=opts.LabelOpts(is_show=False),  # 不显示标签
                 )
             kline = kline.overlap(lines)
 
@@ -138,7 +139,6 @@ class ChartBuilder:
                 kline = kline.overlap(scatter_bottom)
         # 添加信号
         if signals:
-            print(signals)
             buy_signals_strong = []
             buy_signals_weak = []
             sell_signals_strong = []
@@ -182,7 +182,7 @@ class ChartBuilder:
                             is_show=True,
                             position="top",
                             formatter="MB",
-                            color='#8B0000'
+                            color='#8B0000',
                         )
                     )
                 )
@@ -203,7 +203,7 @@ class ChartBuilder:
                             is_show=True,
                             position="top",
                             formatter="MB",
-                            color='#FF7F7F'
+                            color='#FF7F7F',
                         )
                     )
                 )
@@ -250,6 +250,7 @@ class ChartBuilder:
                     )
                 )
                 kline = kline.overlap(scatter_sell_weak)
+
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
                 title="K线图",
@@ -632,5 +633,73 @@ def calculate_macd_signals(df, macd_df):
                 })
     except Exception as e:
         pass
+
+    return signals
+
+
+def calculate_sma_signals(df, ma_lines):
+    """
+    根据简单移动平均线计算买卖信号
+    1. 5日线上穿10日线，且MACD的DIFF>0时为买入信号
+    2. 收盘价<10日线时为卖出信号
+    """
+    signals = []
+
+    # 确保有足够数据
+    if len(df) < 11 or 'MA5' not in ma_lines or 'MA10' not in ma_lines:
+        return signals
+
+    # 计算MACD的DIFF值用于判断
+    macd_df = calculate_macd(df)
+
+    # 获取数据
+    dates = df['date']
+    closing_prices = df['closing']
+    ma5_values = ma_lines['MA5']
+    ma10_values = ma_lines['MA10']
+    diff_values = macd_df['DIFF']
+
+    # 遍历数据计算信号
+    for i in range(1, len(df)):
+        # 检查是否有足够的数据点
+        if i < 1:
+            continue
+
+        try:
+            # 获取当前和前一日的数据
+            prev_ma5 = ma5_values[i - 1] if not pd.isna(ma5_values[i - 1]) else None
+            curr_ma5 = ma5_values[i] if not pd.isna(ma5_values[i]) else None
+            prev_ma10 = ma10_values[i - 1] if not pd.isna(ma10_values[i - 1]) else None
+            curr_ma10 = ma10_values[i] if not pd.isna(ma10_values[i]) else None
+            curr_diff = diff_values[i] if not pd.isna(diff_values[i]) else None
+            curr_closing = closing_prices.iloc[i]
+            curr_date = dates.iloc[i]
+
+            # 确保所有必要数据都存在
+            if (prev_ma5 is None or curr_ma5 is None or
+                    prev_ma10 is None or curr_ma10 is None or
+                    curr_diff is None):
+                continue
+
+            # 买入信号：5日线上穿10日线，且MACD的DIFF>0
+            if (prev_ma5 <= prev_ma10 and curr_ma5 > curr_ma10 and curr_diff > 0):
+                signals.append({
+                    'date': curr_date,
+                    'price': float(curr_closing),
+                    'signal_type': 'buy',
+                    'strength': 'strong'
+                })
+
+            # 卖出信号：收盘价 < 10日线
+            if curr_ma10 is not None and curr_closing < curr_ma10:
+                signals.append({
+                    'date': curr_date,
+                    'price': float(curr_closing),
+                    'signal_type': 'sell',
+                    'strength': 'weak'
+                })
+
+        except Exception as e:
+            continue
 
     return signals

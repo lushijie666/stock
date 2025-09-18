@@ -10,7 +10,7 @@ from sqlalchemy import func
 import streamlit_echarts
 
 from enums.patterns import Patterns
-from utils.chart import ChartBuilder, calculate_macd, calculate_macd_signals
+from utils.chart import ChartBuilder, calculate_macd, calculate_macd_signals, calculate_sma_signals
 from utils.k_line_processor import KLineProcessor
 from utils.table import format_pinyin_short
 
@@ -157,7 +157,6 @@ def show_chart_page(stock):
                 )
                 if end_date != st.session_state[end_date_key]:
                     st.session_state[end_date_key] = end_date
-
             # 从数据库获取数据
             query = session.query(
                 HistoryDateData.date,
@@ -180,10 +179,20 @@ def show_chart_page(stock):
                 st.warning("所选日期范围内没有数据")
                 return
 
+            ma_lines = {}
+            default_ma_periods = [5, 10, 30, 250]
+            for period in default_ma_periods:
+                ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
+
             # 计算 MACD
             macd_df = calculate_macd(df)
             # 计算信号标记
             signals = calculate_macd_signals(df, macd_df)
+
+            # 计算SMA信号
+            sma_signals = calculate_sma_signals(df, ma_lines)
+            # 合并信号
+            all_signals = signals + sma_signals
 
             macd_dates = df['date'].astype(str).tolist()
             diff_values = macd_df['DIFF'].tolist()
@@ -197,7 +206,7 @@ def show_chart_page(stock):
                       for open, close in zip(df['opening'], df['closing'])]
 
             # 创建 K 线图
-            kline = ChartBuilder.create_kline_chart(dates, k_line_data, signals=signals)
+            kline = ChartBuilder.create_kline_chart(dates, k_line_data, ma_lines=ma_lines, signals=all_signals)
             volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
             grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
