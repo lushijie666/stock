@@ -57,7 +57,7 @@ class ChartBuilder:
         return pie
 
     @staticmethod
-    def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None, signals=None):
+    def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None):
         kline = (
             Kline()
             .add_xaxis(dates)
@@ -107,13 +107,14 @@ class ChartBuilder:
                 scatter_top.add_xaxis([p[0] for p in top_points])
                 scatter_top.add_yaxis(
                     series_name="顶分型",
-                    y_axis=[p[1] + 0.8 for p in top_points],  # 向上偏移一点
+                    y_axis=[p[1] + 0.6 for p in top_points],  # 向上偏移一点
                     symbol='pin',  # 使用默认符号
-                    symbol_size=0,
+                    symbol_size=10,
                     label_opts=opts.LabelOpts(
                         is_show=True,  # 显示标签
                         color="#FF4444",
-                        font_size=12,
+                        font_size=14,
+                        font_weight='bold',
                         formatter="⬆"  # 显示"顶"字
                     ),
                     itemstyle_opts=opts.ItemStyleOpts(color="#FF4444"),
@@ -125,13 +126,14 @@ class ChartBuilder:
                 scatter_bottom.add_xaxis([p[0] for p in bottom_points])
                 scatter_bottom.add_yaxis(
                     series_name="底分型",
-                    y_axis=[p[1] - 0.8 for p in bottom_points],  # 向下偏移一点
+                    y_axis=[p[1] - 0.6 for p in bottom_points],  # 向下偏移一点
                     symbol='pin',  # 使用默认符号
-                    symbol_size=0,  # 将符号大小设为0（隐藏默认符号）
+                    symbol_size=10,
                     label_opts=opts.LabelOpts(
                         is_show=True,  # 显示标签
                         color="#44FF44",
-                        font_size=12,
+                        font_size=14,
+                        font_weight='bold',
                         formatter="⬇"  # 显示"底"字
                     ),
                     itemstyle_opts=opts.ItemStyleOpts(color="#44FF44"),
@@ -175,13 +177,14 @@ class ChartBuilder:
                     .add_yaxis(
                         series_name="MB(强)",
                         y_axis=[p[1] for p in buy_signals_strong],
-                        symbol_size=20,
+                        symbol_size=10,
                         symbol='triangle',  # 使用三角形符号更明显
                         itemstyle_opts=opts.ItemStyleOpts(color='#8B0000'),
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="top",
                             formatter="MB",
+                            font_size=10,
                             color='#8B0000',
                         )
                     )
@@ -196,13 +199,14 @@ class ChartBuilder:
                     .add_yaxis(
                         series_name="MB(弱)",
                         y_axis=[p[1] for p in buy_signals_weak],
-                        symbol_size=20,
+                        symbol_size=10,
                         symbol='triangle',
                         itemstyle_opts=opts.ItemStyleOpts(color='#FF7F7F'),
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="top",
                             formatter="MB",
+                            font_size=10,
                             color='#FF7F7F',
                         )
                     )
@@ -217,13 +221,14 @@ class ChartBuilder:
                     .add_yaxis(
                         series_name="MS(强)",
                         y_axis=[p[1] for p in sell_signals_strong],
-                        symbol_size=20,
+                        symbol_size=10,
                         symbol='diamond',  # 使用菱形符号
                         itemstyle_opts=opts.ItemStyleOpts(color='#006400'),
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="bottom",
                             formatter="MS",
+                            font_size=10,
                             color='#006400'
                         )
                     )
@@ -238,18 +243,105 @@ class ChartBuilder:
                     .add_yaxis(
                         series_name="MS(弱)",
                         y_axis=[p[1] for p in sell_signals_weak],
-                        symbol_size=20,
+                        symbol_size=10,
                         symbol='diamond',
                         itemstyle_opts=opts.ItemStyleOpts(color='#90EE90'),
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="bottom",
                             formatter="MS",
+                            font_size=10,
                             color='#90EE90'
                         )
                     )
                 )
                 kline = kline.overlap(scatter_sell_weak)
+
+        # 添加笔标记
+        if strokes:
+            start_points = []
+            end_points = []
+
+            for stroke in strokes:
+                start_date_str = stroke['start_date'].strftime('%Y-%m-%d')
+                end_date_str = stroke['end_date'].strftime('%Y-%m-%d')
+
+                start_points.append([start_date_str, stroke['start_price']])
+                end_points.append([end_date_str, stroke['end_price']])
+
+            # 创建两个独立的散点系列
+            if start_points:
+                start_scatter = Scatter()
+                start_scatter.add_xaxis([p[0] for p in start_points])
+                start_scatter.add_yaxis(
+                    series_name="笔起点",
+                    y_axis=[p[1] for p in start_points],
+                    symbol='circle',
+                    symbol_size=10,
+                    itemstyle_opts=opts.ItemStyleOpts(color='#0000FF'),
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="top",
+                        formatter="S",
+                        color='#0000FF',
+                        font_weight='bold',
+                    )
+                )
+                kline = kline.overlap(start_scatter)
+
+            if end_points:
+                end_scatter = Scatter()
+                end_scatter.add_xaxis([p[0] for p in end_points])
+                end_scatter.add_yaxis(
+                    series_name="笔终点",
+                    y_axis=[p[1] for p in end_points],
+                    symbol='circle',
+                    symbol_size=10,
+                    itemstyle_opts=opts.ItemStyleOpts(color='#D39126FF'),
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="bottom",
+                        formatter="X",
+                        color='#D39126FF',
+                        font_weight='bold',
+                    )
+                )
+                kline = kline.overlap(end_scatter)
+
+        # 添加线段标记
+        if segments:
+            # 绘制线段（使用Line图表）
+            segment_line = Line()
+
+            # 为每条线段创建独立的数据系列，避免连接不同线段
+            for i, segment in enumerate(segments):
+                start_date_str = segment['start_date'].strftime('%Y-%m-%d') if isinstance(segment['start_date'],
+                                                                                          (datetime, date)) else str(
+                    segment['start_date'])
+                end_date_str = segment['end_date'].strftime('%Y-%m-%d') if isinstance(segment['end_date'],
+                                                                                      (datetime, date)) else str(
+                    segment['end_date'])
+
+                # 为每条线段创建独立的x轴和y轴数据
+                segment_x = [start_date_str, end_date_str]
+                segment_y = [segment['start_price'], segment['end_price']]
+
+                segment_line.add_xaxis(segment_x)
+                segment_line.add_yaxis(
+                    series_name=f"线段{i + 1}",
+                    y_axis=segment_y,
+                    linestyle_opts=opts.LineStyleOpts(
+                        width=3,
+                        color='#FF00FF',  # 紫色线段
+                        type_='dashed'  # 虚线样式
+                    ),
+                    symbol='none',  # 不显示符号
+                    label_opts=opts.LabelOpts(is_show=False)
+                )
+
+            # 正确设置is_connect_nulls参数
+            segment_line.set_series_opts(is_connect_nulls=False)
+            kline = kline.overlap(segment_line)
 
         kline.set_global_opts(
             title_opts=opts.TitleOpts(

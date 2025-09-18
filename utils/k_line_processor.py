@@ -198,6 +198,115 @@ class KLineProcessor:
         return patterns
 
     @classmethod
+    def identify_strokes_and_segments(cls, patterns, df):
+        """
+        识别笔和线段
+
+        笔的概念：连续两个相临的顶和底，且顶和底至少有一根K线相连 【标记的顶点和低点中，算上顶和低点所在的两根K线，K线的数量应该大于等于5】
+        画笔是关于顶底特殊情况的处理：
+            1.如果前后分型属于同一性质，对于顶，前面的低于后面的，只保留后面的，前面的可以忽略掉；对于底，前面的高于后面的，前面的可以忽略掉，只保留后面的；
+           翻译：【顶分型的下一个分型也是顶分型。则保留大的分型。不保留的分型标记失效。】
+        【底分型的下一个分型也是底分型。则保留小的分型。不保留的分型标记失效。】
+          向上一笔：从底到顶 。用S标记
+          向下一笔：从顶到底。用X标记
+
+        线段概念：连续的三笔之间若存在重叠部分，其起点和终点之间的连线为线段
+        """
+        if len(patterns) < 2:
+            return [], []
+
+        # 第一步：处理相同性质的分型
+        filtered_patterns = []
+        i = 0
+        while i < len(patterns):
+            current = patterns[i]
+            # 检查下一个是否为相同类型的分型
+            if i + 1 < len(patterns) and patterns[i + 1]['type'] == current['type']:
+                next_pattern = patterns[i + 1]
+                # 对于顶分型，保留高的
+                if current['type'] == Patterns.TOP:
+                    if current['value'] > next_pattern['value']:
+                        filtered_patterns.append(current)
+                    else:
+                        filtered_patterns.append(next_pattern)
+                # 对于底分型，保留低的
+                else:  # BOTTOM
+                    if current['value'] < next_pattern['value']:
+                        filtered_patterns.append(current)
+                    else:
+                        filtered_patterns.append(next_pattern)
+                i += 2  # 跳过下一个
+            else:
+                filtered_patterns.append(current)
+                i += 1
+
+        # 第二步：识别笔
+        strokes = []
+        i = 0
+        while i < len(filtered_patterns) - 1:
+            start_pattern = filtered_patterns[i]
+            end_pattern = filtered_patterns[i + 1]
+
+            # 确保是相邻的顶和底（或底和顶）
+            if start_pattern['type'] != end_pattern['type']:
+                # 计算K线数量（包括两个分型所在的K线）
+                start_index = start_pattern['index']
+                end_index = end_pattern['index']
+
+                # 确保起始点在结束点之前
+                if start_index < end_index:
+                    kline_count = end_index - start_index + 1
+
+                    # 至少需要5根K线
+                    if kline_count >= 5:
+                        direction = 'up' if start_pattern['type'] == Patterns.BOTTOM else 'down'
+                        stroke = {
+                            'start_date': start_pattern['date'],
+                            'end_date': end_pattern['date'],
+                            'start_price': start_pattern['value'],
+                            'end_price': end_pattern['value'],
+                            'start_index': start_index,
+                            'end_index': end_index,
+                            'direction': direction,
+                            'kline_count': kline_count
+                        }
+                        strokes.append(stroke)
+            i += 1
+
+        # 第三步：识别线段（基于连续三笔的重叠）
+        segments = []
+        if len(strokes) >= 3:
+            i = 0
+            while i <= len(strokes) - 3:
+                # 取连续三笔
+                first_stroke = strokes[i]
+                second_stroke = strokes[i + 1]
+                third_stroke = strokes[i + 2]
+
+                # 检查是否存在重叠部分
+                # 向上线段：第一笔的高点 > 第二笔的低点 且 第三笔的高点 > 第二笔的低点
+                # 向下线段：第一笔的低点 < 第二笔的高点 且 第三笔的低点 < 第二笔的高点
+
+                # 判断方向是否一致（都向上或都向下）
+                if (first_stroke['direction'] == second_stroke['direction'] == third_stroke['direction']):
+                    # 创建线段：从第一笔起点到第三笔终点
+                    segment = {
+                        'start_date': first_stroke['start_date'],
+                        'end_date': third_stroke['end_date'],
+                        'start_price': first_stroke['start_price'],
+                        'end_price': third_stroke['end_price'],
+                        'direction': first_stroke['direction'],
+                        'strokes': [first_stroke, second_stroke, third_stroke]
+                    }
+                    segments.append(segment)
+                    i += 3  # 跳过已处理的三笔
+                else:
+                    i += 1
+
+        return strokes, segments
+
+
+    @classmethod
     def process_klines(cls, df, body_ratio_threshold=0.2):
         """
         完整的K线处理流程：先处理包含关系，再识别分型。

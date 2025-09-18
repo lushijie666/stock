@@ -309,13 +309,17 @@ def show_process_chart_page(stock):
                 processed_df, contains_marks, processing_records, patterns = processor.process_klines(
                     df,
                 )
+                strokes, segments = processor.identify_strokes_and_segments(patterns, processed_df)
+
                 processed_dates = processed_df['date'].astype(str).tolist()
                 processed_k_line_data = processed_df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
                 processed_kline = ChartBuilder.create_kline_chart(
                     processed_dates,
                     processed_k_line_data,
                     ma_lines=None,
-                    patterns=patterns
+                    patterns=patterns,
+                    strokes=strokes,  # 传入笔信息
+                    segments=segments  # 传入线段信
                 )
                 # 显示图表
                 streamlit_echarts.st_pyecharts(processed_kline,theme="white",height="500px",key=generate_key())
@@ -373,7 +377,43 @@ def show_process_chart_page(stock):
                         height=min(len(pattern_df) * 35 + 38, 400),
                         use_container_width=True
                     )
+                    # 新增：显示笔信息
+                    if strokes:
+                        st.markdown("<h6 style='margin-bottom: 10px;'>笔信息</h6>", unsafe_allow_html=True)
+                        strokes_df = pd.DataFrame([
+                            {
+                                '起始日期': s['start_date'].strftime('%Y-%m-%d'),
+                                '结束日期': s['end_date'].strftime('%Y-%m-%d'),
+                                '方向': '⬆向上一笔(S)' if s['direction'] == 'up' else '⬇向下一笔(X)',
+                                '起始价格': s['start_price'],
+                                '结束价格': s['end_price']
+                            }
+                            for s in strokes
+                        ])
+                        st.dataframe(
+                            strokes_df,
+                            height=min(len(strokes_df) * 35 + 38, 400),
+                            use_container_width=True
+                        )
 
+                    # 新增：显示线段信息
+                    if segments:
+                        st.markdown("<h6 style='margin-bottom: 10px;'>线段信息</h6>", unsafe_allow_html=True)
+                        segments_df = pd.DataFrame([
+                            {
+                                '起始日期': seg['start_date'].strftime('%Y-%m-%d'),
+                                '结束日期': seg['end_date'].strftime('%Y-%m-%d'),
+                                '方向': '⬆向上线段' if seg['direction'] == 'up' else '⬇向线下段',
+                                '起始价格': seg['start_price'],
+                                '结束价格': seg['end_price']
+                            }
+                            for seg in segments
+                        ])
+                        st.dataframe(
+                            segments_df,
+                            height=min(len(segments_df) * 35 + 38, 400),
+                            use_container_width=True
+                        )
             except ValueError as e:
                 st.error(f"数据处理失败：{str(e)}")
 
