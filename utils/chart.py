@@ -256,92 +256,156 @@ class ChartBuilder:
                     )
                 )
                 kline = kline.overlap(scatter_sell_weak)
-
-        # 添加笔标记
+        # 添加笔的连线（按类型分组合并）
         if strokes:
-            start_points = []
-            end_points = []
+            # 分别收集向上笔和向下笔的数据
+            up_strokes_x_data = []
+            up_strokes_y_data = []
+            down_strokes_x_data = []
+            down_strokes_y_data = []
 
-            for stroke in strokes:
-                start_date_str = stroke['start_date'].strftime('%Y-%m-%d')
-                end_date_str = stroke['end_date'].strftime('%Y-%m-%d')
+            # 收集所有笔的数据点
+            for i, stroke in enumerate(strokes):
+                start_index = stroke['start_index']
+                end_index = stroke['end_index']
 
-                start_points.append([start_date_str, stroke['start_price']])
-                end_points.append([end_date_str, stroke['end_price']])
+                # 确保索引在有效范围内
+                if start_index < len(dates) and end_index < len(dates):
+                    start_date = dates[start_index]
+                    end_date = dates[end_index]
 
-            # 创建两个独立的散点系列
-            if start_points:
-                start_scatter = Scatter()
-                start_scatter.add_xaxis([p[0] for p in start_points])
-                start_scatter.add_yaxis(
-                    series_name="笔起点",
-                    y_axis=[p[1] for p in start_points],
-                    symbol='circle',
-                    symbol_size=10,
-                    itemstyle_opts=opts.ItemStyleOpts(color='#0000FF'),
-                    label_opts=opts.LabelOpts(
-                        is_show=True,
-                        position="top",
-                        formatter="S",
-                        color='#0000FF',
-                        font_weight='bold',
-                    )
-                )
-                kline = kline.overlap(start_scatter)
+                    if stroke['type'] == 'up':
+                        # 添加向上笔的数据点
+                        up_strokes_x_data.extend([start_date, end_date])
+                        up_strokes_y_data.extend([stroke['start_value'], stroke['end_value']])
+                        # 添加None值以分隔不同的笔
+                        if i < len(strokes) - 1:  # 不是最后一条线
+                            up_strokes_x_data.append(None)
+                            up_strokes_y_data.append(None)
+                    else:
+                        # 添加向下笔的数据点
+                        down_strokes_x_data.extend([start_date, end_date])
+                        down_strokes_y_data.extend([stroke['start_value'], stroke['end_value']])
+                        # 添加None值以分隔不同的笔
+                        if i < len(strokes) - 1:  # 不是最后一条线
+                            down_strokes_x_data.append(None)
+                            down_strokes_y_data.append(None)
 
-            if end_points:
-                end_scatter = Scatter()
-                end_scatter.add_xaxis([p[0] for p in end_points])
-                end_scatter.add_yaxis(
-                    series_name="笔终点",
-                    y_axis=[p[1] for p in end_points],
-                    symbol='circle',
-                    symbol_size=10,
-                    itemstyle_opts=opts.ItemStyleOpts(color='#D39126FF'),
-                    label_opts=opts.LabelOpts(
-                        is_show=True,
-                        position="bottom",
-                        formatter="X",
-                        color='#D39126FF',
-                        font_weight='bold',
-                    )
-                )
-                kline = kline.overlap(end_scatter)
-
-        # 添加线段标记
-        if segments:
-            # 绘制线段（使用Line图表）
-            segment_line = Line()
-
-            # 为每条线段创建独立的数据系列，避免连接不同线段
-            for i, segment in enumerate(segments):
-                start_date_str = segment['start_date'].strftime('%Y-%m-%d') if isinstance(segment['start_date'],
-                                                                                          (datetime, date)) else str(
-                    segment['start_date'])
-                end_date_str = segment['end_date'].strftime('%Y-%m-%d') if isinstance(segment['end_date'],
-                                                                                      (datetime, date)) else str(
-                    segment['end_date'])
-
-                # 为每条线段创建独立的x轴和y轴数据
-                segment_x = [start_date_str, end_date_str]
-                segment_y = [segment['start_price'], segment['end_price']]
-
-                segment_line.add_xaxis(segment_x)
-                segment_line.add_yaxis(
-                    series_name=f"线段{i + 1}",
-                    y_axis=segment_y,
+            # 创建向上笔系列
+            if up_strokes_x_data and up_strokes_y_data:
+                up_line = Line()
+                up_line.add_xaxis(up_strokes_x_data)
+                up_line.add_yaxis(
+                    series_name="向上笔(S)",
+                    y_axis=up_strokes_y_data,
+                    is_connect_nones=False,  # 不连接空值
+                    is_smooth=False,
+                    symbol="none",
                     linestyle_opts=opts.LineStyleOpts(
                         width=3,
-                        color='#FF00FF',  # 紫色线段
-                        type_='dashed'  # 虚线样式
+                        color="#EE3B3B",
+                        type_="solid"
                     ),
-                    symbol='none',  # 不显示符号
+                    itemstyle_opts=opts.ItemStyleOpts(color="#EE3B3B"),
                     label_opts=opts.LabelOpts(is_show=False)
                 )
+                kline = kline.overlap(up_line)
 
-            # 正确设置is_connect_nulls参数
-            segment_line.set_series_opts(is_connect_nulls=False)
-            kline = kline.overlap(segment_line)
+            # 创建向下笔系列
+            if down_strokes_x_data and down_strokes_y_data:
+                down_line = Line()
+                down_line.add_xaxis(down_strokes_x_data)
+                down_line.add_yaxis(
+                    series_name="向下笔(X)",
+                    y_axis=down_strokes_y_data,
+                    is_connect_nones=False,  # 不连接空值
+                    is_smooth=False,
+                    symbol="none",
+                    linestyle_opts=opts.LineStyleOpts(
+                        width=3,
+                        color="#32CD32",
+                        type_="solid"
+                    ),
+                    itemstyle_opts=opts.ItemStyleOpts(color="#32CD32"),
+                    label_opts=opts.LabelOpts(is_show=False)
+                )
+                kline = kline.overlap(down_line)
+
+        # 添加线段的连线（按类型分组合并）
+        if segments:
+            # 分别收集向上线段和向号线段的数据
+            up_segments_x_data = []
+            up_segments_y_data = []
+            down_segments_x_data = []
+            down_segments_y_data = []
+
+            # 收集所有线段的数据点
+            for i, segment in enumerate(segments):
+                start_index = segment['start_index']
+                end_index = segment['end_index']
+
+                # 确保索引在有效范围内
+                if start_index < len(dates) and end_index < len(dates):
+                    start_date = dates[start_index]
+                    end_date = dates[end_index]
+
+                    if segment['type'] == 'up':
+                        # 添加向上线段的数据点
+                        up_segments_x_data.extend([start_date, end_date])
+                        up_segments_y_data.extend([segment['start_value'], segment['end_value']])
+                        # 添加None值以分隔不同的线段
+                        if i < len(segments) - 1:  # 不是最后一条线段
+                            up_segments_x_data.append(None)
+                            up_segments_y_data.append(None)
+                    else:
+                        # 添加向号线段的数据点
+                        down_segments_x_data.extend([start_date, end_date])
+                        down_segments_y_data.extend([segment['start_value'], segment['end_value']])
+                        # 添加None值以分隔不同的线段
+                        if i < len(segments) - 1:  # 不是最后一条线段
+                            down_segments_x_data.append(None)
+                            down_segments_y_data.append(None)
+
+            # 创建向上线段系列
+            if up_segments_x_data and up_segments_y_data:
+                up_seg_line = Line()
+                up_seg_line.add_xaxis(up_segments_x_data)
+                up_seg_line.add_yaxis(
+                    series_name="向上线段",
+                    y_axis=up_segments_y_data,
+                    is_connect_nones=False,  # 不连接空值
+                    is_smooth=False,
+                    symbol="none",
+                    linestyle_opts=opts.LineStyleOpts(
+                        width=4,
+                        color="#A52A2A",
+                        type_="dotted"
+                    ),
+                    itemstyle_opts=opts.ItemStyleOpts(color="#A52A2A"),
+                    label_opts=opts.LabelOpts(is_show=False)
+                )
+                kline = kline.overlap(up_seg_line)
+
+            # 创建向号线段系列
+            if down_segments_x_data and down_segments_y_data:
+                down_seg_line = Line()
+                down_seg_line.add_xaxis(down_segments_x_data)
+                down_seg_line.add_yaxis(
+                    series_name="向下线段",
+                    y_axis=down_segments_y_data,
+                    is_connect_nones=False,  # 不连接空值
+                    is_smooth=False,
+                    symbol="none",
+                    linestyle_opts=opts.LineStyleOpts(
+                        width=4,
+                        color="#228B22",
+                        type_="dotted"
+                    ),
+                    itemstyle_opts=opts.ItemStyleOpts(color="#228B22"),
+                    label_opts=opts.LabelOpts(is_show=False)
+                )
+                kline = kline.overlap(down_seg_line)
+
 
         kline.set_global_opts(
             title_opts=opts.TitleOpts(

@@ -128,7 +128,7 @@ def show_page(category: Category):
                     buttons=[
                         ActionButton(
                             icon="🐙",
-                            label="获取",
+                            label="更新",
                             handler=partial(reload, category=category),
                             type="primary"
                         ),
