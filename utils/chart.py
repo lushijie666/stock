@@ -796,8 +796,9 @@ def calculate_macd_signals(df, macd_df):
 def calculate_sma_signals(df, ma_lines):
     """
     根据简单移动平均线计算买卖信号
-    1. 5日线上穿10日线，且MACD的DIFF>0时为买入信号
-    2. 收盘价<10日线时为卖出信号
+    1. 5日线上穿10日线时为买入信号（删除DIF和DEA大于0的条件）
+    2. 10日均线下破5日均线 && MACD DIF下破DEA 时为强卖出信号
+    3. 收盘价<10日线时为弱卖出信号
     """
     signals = []
 
@@ -814,6 +815,7 @@ def calculate_sma_signals(df, ma_lines):
     ma5_values = ma_lines['MA5']
     ma10_values = ma_lines['MA10']
     diff_values = macd_df['DIFF']
+    dea_values = macd_df['DEA']
 
     # 遍历数据计算信号
     for i in range(1, len(df)):
@@ -827,18 +829,22 @@ def calculate_sma_signals(df, ma_lines):
             curr_ma5 = ma5_values[i] if not pd.isna(ma5_values[i]) else None
             prev_ma10 = ma10_values[i - 1] if not pd.isna(ma10_values[i - 1]) else None
             curr_ma10 = ma10_values[i] if not pd.isna(ma10_values[i]) else None
+            prev_diff = diff_values[i - 1] if not pd.isna(diff_values[i - 1]) else None
             curr_diff = diff_values[i] if not pd.isna(diff_values[i]) else None
+            prev_dea = dea_values[i - 1] if not pd.isna(dea_values[i - 1]) else None
+            curr_dea = dea_values[i] if not pd.isna(dea_values[i]) else None
             curr_closing = closing_prices.iloc[i]
             curr_date = dates.iloc[i]
 
             # 确保所有必要数据都存在
             if (prev_ma5 is None or curr_ma5 is None or
                     prev_ma10 is None or curr_ma10 is None or
-                    curr_diff is None):
+                    prev_diff is None or curr_diff is None or
+                    prev_dea is None or curr_dea is None):
                 continue
 
-            # 买入信号：5日线上穿10日线，且MACD的DIFF>0
-            if (prev_ma5 <= prev_ma10 and curr_ma5 > curr_ma10 and curr_diff > 0):
+            # 买入信号：5日线上穿10日线
+            if (prev_ma5 <= prev_ma10 and curr_ma5 > curr_ma10):
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),
@@ -846,8 +852,18 @@ def calculate_sma_signals(df, ma_lines):
                     'strength': 'strong'
                 })
 
-            # 卖出信号：收盘价 < 10日线
-            if curr_ma10 is not None and curr_closing < curr_ma10:
+            # 强卖出信号：10日均线下破5日均线 && MACD DIF下破DEA
+            if (prev_ma5 >= prev_ma10 and curr_ma5 < curr_ma10 and
+                prev_diff >= prev_dea and curr_diff < curr_dea):
+                signals.append({
+                    'date': curr_date,
+                    'price': float(curr_closing),
+                    'signal_type': 'sell',
+                    'strength': 'strong'
+                })
+
+            # 弱卖出信号：收盘价 < 10日线
+            elif curr_ma10 is not None and curr_closing < curr_ma10:
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),

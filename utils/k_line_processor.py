@@ -175,8 +175,9 @@ class KLineProcessor:
 
             # 顶分型条件：当前高点严格高于左右高点，且当前低点也严格高于左右低点
             # 【a,b,c bG>aG && bG>cG && bD>aD &&bD>cD】
-            if (current_high > left_high and current_high > right_high and
-                    current_low > left_low and current_low > right_low):
+            #if (current_high > left_high and current_high > right_high and
+            #        current_low > left_low and current_low > right_low):
+            if (current_high > left_high and current_high > right_high):
                 patterns.append({
                     'index': i,
                     'date': current['date'],
@@ -186,8 +187,9 @@ class KLineProcessor:
 
             # 底分型条件：当前低点严格低于左右低点，且当前高点也严格低于左右高点
             # 【a,b,c bG<aG && bG<cG && bD<aD &&bD<cD】
-            elif (current_low < left_low and current_low < right_low and
-                  current_high < left_high and current_high < right_high):
+            #elif (current_low < left_low and current_low < right_low and
+            #      current_high < left_high and current_high < right_high):
+            elif (current_low < left_low and current_low < right_low) :
                 patterns.append({
                     'index': i,
                     'date': current['date'],
