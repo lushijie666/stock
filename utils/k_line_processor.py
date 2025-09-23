@@ -357,6 +357,111 @@ class KLineProcessor:
                 i += 1  # 移动到下一笔
         return segments
 
+    @staticmethod
+    def identify_centers(strokes):
+        """
+        直接使用笔数据识别中枢
+        中枢定义：
+        - 一个标准的中枢由三个（或以上）连续的次级别走势重叠构成
+        - 上涨趋势中的中枢：由"下-上-下"三个次级别走势构成
+        - 下跌趋势中的中枢：由"上-下-上"三个次级别走势构成
+        """
+        if len(strokes) < 3:
+            return []
+        centers = []
+
+        # 遍历笔，寻找可能构成中枢的连续三笔
+        for i in range(len(strokes) - 2):
+            stroke1 = strokes[i]
+            stroke2 = strokes[i + 1]
+            stroke3 = strokes[i + 2]
+
+            # 判断是否构成中枢模式
+            # 上涨趋势中枢：下-上-下
+            if (stroke1['type'] == 'down' and
+                    stroke2['type'] == 'up' and
+                    stroke3['type'] == 'down'):
+
+                # 正确计算中枢重叠区间
+                # 第一段的范围
+                range1_min = min(stroke1['start_value'], stroke1['end_value'])
+                range1_max = max(stroke1['start_value'], stroke1['end_value'])
+
+                # 第二段的范围
+                range2_min = min(stroke2['start_value'], stroke2['end_value'])
+                range2_max = max(stroke2['start_value'], stroke2['end_value'])
+
+                # 第三段的范围
+                range3_min = min(stroke3['start_value'], stroke3['end_value'])
+                range3_max = max(stroke3['start_value'], stroke3['end_value'])
+
+                # 计算三段的重叠区间
+                zg = max(range1_min, range2_min, range3_min)  # 中枢低点
+                zd = min(range1_max, range2_max, range3_max)  # 中枢高点
+
+                # 修正：中枢高点应该高于中枢低点才有效
+                if zd > zg:
+                    # 计算中枢的GG和DD
+                    gg = max(range1_max, range2_max, range3_max)  # 最高点
+                    dd = min(range1_min, range2_min, range3_min)  # 最低点
+
+                    center = {
+                        'start_index': stroke1['start_index'],
+                        'end_index': stroke3['end_index'],
+                        'start_date': stroke1['start_date'],
+                        'end_date': stroke3['end_date'],
+                        'ZG': zd,  # 中枢高点
+                        'ZD': zg,  # 中枢低点
+                        'GG': gg,  # 中枢波动中的最高点
+                        'DD': dd,  # 中枢波动中的最低点
+                        'type': 'up_center',  # 上涨中枢
+                        'strokes': [stroke1, stroke2, stroke3]
+                    }
+                    centers.append(center)
+
+            # 下跌趋势中枢：上-下-上
+            elif (stroke1['type'] == 'up' and
+                  stroke2['type'] == 'down' and
+                  stroke3['type'] == 'up'):
+
+                # 正确计算中枢重叠区间
+                # 第一段的范围
+                range1_min = min(stroke1['start_value'], stroke1['end_value'])
+                range1_max = max(stroke1['start_value'], stroke1['end_value'])
+
+                # 第二段的范围
+                range2_min = min(stroke2['start_value'], stroke2['end_value'])
+                range2_max = max(stroke2['start_value'], stroke2['end_value'])
+
+                # 第三段的范围
+                range3_min = min(stroke3['start_value'], stroke3['end_value'])
+                range3_max = max(stroke3['start_value'], stroke3['end_value'])
+
+                # 计算三段的重叠区间
+                zg = max(range1_min, range2_min, range3_min)  # 中枢低点
+                zd = min(range1_max, range2_max, range3_max)  # 中枢高点
+
+                # 修正：中枢高点应该高于中枢低点才有效
+                if zd > zg:
+                    # 计算中枢的GG和DD
+                    gg = max(range1_max, range2_max, range3_max)  # 最高点
+                    dd = min(range1_min, range2_min, range3_min)  # 最低点
+
+                    center = {
+                        'start_index': stroke1['start_index'],
+                        'end_index': stroke3['end_index'],
+                        'start_date': stroke1['start_date'],
+                        'end_date': stroke3['end_date'],
+                        'ZG': zd,  # 中枢高点
+                        'ZD': zg,  # 中枢低点
+                        'GG': gg,  # 中枢波动中的最高点
+                        'DD': dd,  # 中枢波动中的最低点
+                        'type': 'down_center',  # 下跌中枢
+                        'strokes': [stroke1, stroke2, stroke3]
+                    }
+                    centers.append(center)
+
+        return centers
     @classmethod
     def process_klines(cls, df, body_ratio_threshold=0.2):
         """

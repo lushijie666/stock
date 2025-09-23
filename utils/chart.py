@@ -57,7 +57,7 @@ class ChartBuilder:
         return pie
 
     @staticmethod
-    def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None):
+    def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None):
         kline = (
             Kline()
             .add_xaxis(dates)
@@ -405,8 +405,102 @@ class ChartBuilder:
                     label_opts=opts.LabelOpts(is_show=False)
                 )
                 kline = kline.overlap(down_seg_line)
+        # 绘制中枢框
+        if centers:
+            # 创建一个虚拟系列来显示中枢图例
+            dummy_line = Line()
+            dummy_line.add_xaxis([dates[0]])
 
+            # 添加中枢区域图例项
+            dummy_line.add_yaxis(
+                series_name="中枢区域",
+                y_axis=[None],
+                linestyle_opts=opts.LineStyleOpts(
+                    color="rgba(255, 175, 0, 0.2)",
+                    width=10
+                ),
+                label_opts=opts.LabelOpts(is_show=False)
+            )
 
+            # 添加中枢高点图例项
+            dummy_line.add_yaxis(
+                series_name="中枢高点",
+                y_axis=[None],
+                linestyle_opts=opts.LineStyleOpts(
+                    color="orange",
+                    type_="dashed"
+                ),
+                label_opts=opts.LabelOpts(is_show=False)
+            )
+
+            # 添加中枢低点图例项
+            dummy_line.add_yaxis(
+                series_name="中枢低点",
+                y_axis=[None],
+                linestyle_opts=opts.LineStyleOpts(
+                    color="orange",
+                    type_="dashed"
+                ),
+                label_opts=opts.LabelOpts(is_show=False)
+            )
+
+            # 将虚拟系列添加到图表中
+           # kline = kline.overlap(dummy_line)
+
+            # 设置实际的标记区域和标记线
+            markarea_data = []
+            markline_data = []
+
+            for i, center in enumerate(centers):
+                # 添加中枢区域标记
+                markarea_data.append(
+                    opts.MarkAreaItem(
+                        name="",  # 不设置名称，避免重复
+                        x=(center['start_date'].strftime('%Y-%m-%d') if hasattr(center['start_date'],
+                                                                                'strftime') else str(
+                            center['start_date']),
+                           center['end_date'].strftime('%Y-%m-%d') if hasattr(center['end_date'],
+                                                                              'strftime') else str(
+                               center['end_date'])),
+                        y=(float(center['ZD']), float(center['ZG'])),
+                        itemstyle_opts=opts.ItemStyleOpts(
+                            color="rgba(255, 175, 0, 0.05)",  # 半透明橙色
+                            border_color="rgba(255, 175, 0, 1)",
+                            border_width=1
+                        )
+                    )
+                )
+
+                # 添加中枢高点和低点标记线
+                markline_data.extend([
+                    opts.MarkLineItem(
+                        name="",  # 不设置名称
+                        y=float(center['ZG']),
+                        linestyle_opts=opts.LineStyleOpts(
+                            color="orange",
+                            type_="dashed"
+                        )
+                    ),
+                    opts.MarkLineItem(
+                        name="",  # 不设置名称
+                        y=float(center['ZD']),
+                        linestyle_opts=opts.LineStyleOpts(
+                            color="orange",
+                            type_="dashed"
+                        )
+                    )
+                ])
+
+            # 应用标记区域和标记线
+            if markarea_data:
+                kline.set_series_opts(
+                    markarea_opts=opts.MarkAreaOpts(data=markarea_data)
+                )
+
+            if markline_data:
+                kline.set_series_opts(
+                    markline_opts=opts.MarkLineOpts(data=markline_data)
+                )
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
                 title="K线图",

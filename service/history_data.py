@@ -313,6 +313,9 @@ def show_process_chart_page(stock):
                 strokes = KLineProcessor.identify_strokes(patterns, processed_df)
                 # 识别线段
                 segments = KLineProcessor.identify_segments(strokes)
+                # 识别中枢
+                centers = KLineProcessor.identify_centers(strokes)
+
                 processed_dates = processed_df['date'].astype(str).tolist()
                 processed_k_line_data = processed_df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
                 processed_kline = ChartBuilder.create_kline_chart(
@@ -321,7 +324,8 @@ def show_process_chart_page(stock):
                     ma_lines=None,
                     patterns=patterns,
                     strokes=strokes,
-                    segments=segments
+                    segments=segments,
+                    centers=centers
 
                 )
                 # 显示图表
@@ -416,6 +420,32 @@ def show_process_chart_page(stock):
                     st.dataframe(
                         segment_df,
                         height=min(len(segment_df) * 35 + 38, 400),
+                        use_container_width=True
+                    )
+                    st.markdown("---")
+                # 显示中枢信息表格
+                if centers:
+                    st.markdown("<h6 style='margin-bottom: 10px;'>中枢信息</h6>", unsafe_allow_html=True)
+                    center_df = pd.DataFrame([
+                        {
+                            '起始日期': c['start_date'].strftime('%Y-%m-%d') if hasattr(c['start_date'],
+                                                                                        'strftime') else str(
+                                c['start_date']),
+                            '结束日期': c['end_date'].strftime('%Y-%m-%d') if hasattr(c['end_date'],
+                                                                                      'strftime') else str(
+                                c['end_date']),
+                            '中枢类型': "上涨中枢" if c['type'] == 'up_center' else "下跌中枢",
+                            '中枢高点(ZG)': round(c['ZG'], 2),
+                            '中枢低点(ZD)': round(c['ZD'], 2),
+                            '中枢波动最高点(GG)': round(c['GG'], 2),
+                            '中枢波动最低点(DD)': round(c['DD'], 2),
+                            '包含笔数': len(c['strokes'])
+                        }
+                        for c in centers
+                    ])
+                    st.dataframe(
+                        center_df,
+                        height=min(len(center_df) * 35 + 38, 400),
                         use_container_width=True
                     )
             except ValueError as e:
