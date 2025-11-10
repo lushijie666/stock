@@ -1,218 +1,851 @@
+/* ============================================  
+   现代化股票分析系统 UI 样式 - 参考企业级设计
+   ============================================ */
+
 /* 隐藏 Streamlit 默认元素 */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
+/* 全局样式重置 */
+* {
+    box-sizing: border-box;
+}
+
+/* 主容器样式 */
 .st-emotion-cache-1xgtwnd {
     display: flex;
-    -webkit-box-pack: justify;
     justify-content: space-between;
-    -webkit-box-align: start;
     align-items: start;
-    padding: 0 !important;  /* 覆盖原有的 padding */
+    padding: 0 !important;
 }
 
+/* ============================================
+   侧边栏样式 - 企业级设计
+   ============================================ */
 /* 侧边栏样式 */
 [data-testid="stSidebar"] {
-    background-color: #f8f9fa;
+    background-color: #2d3748 !important;
+    width: 240px !important;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+    padding: 0 !important;
+    min-height: 100vh !important;
+    height: 100vh !important;
+    border-right: none !important;
 }
 
-i.icon.bi-menu-up::before {
-    font-size: 0.1rem !important;
-    content: "\f48c" !important;
+[data-testid="stSidebar"] > div:first-child {
+    background-color: #2d3748 !important;
+    padding-top: 0 !important;
+    padding: 0 !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
-/* 内容区域样式 */
-.block-container {
-    padding-top: 1rem;
-    padding-bottom: 0rem;
+/* 隐藏折叠按钮 */
+[data-testid="stSidebar"] [data-testid="collapsedControl"] {
+    display: none !important;
 }
 
-/* 卡片样式 */
-.stCard {
-    background-color: white;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+/* 侧边栏头部样式 */
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* 标题样式 */
-h1 {
-    color: #1f1f1f;
-    font-size: 1.8rem;
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-icon {
+    background-color: #4299e1;
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.logo-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.logo-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+/* 导航菜单样式 */
+.navigation-menu {
+    padding: 16px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.nav-item {
+    margin-bottom: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item.active {
+    background-color: rgba(66, 153, 225, 0.2);
+    border-left: 3px solid #4299e1;
+}
+
+.nav-item-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+}
+
+.nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.nav-icon svg {
+    fill: currentColor;
+    stroke: currentColor;
+    width: 18px;
+    height: 18px;
+}
+
+.nav-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #a0aec0;
+}
+
+.nav-item:hover .nav-text {
+    color: #e2e8f0;
+}
+
+.nav-item.active .nav-text {
+    color: #4299e1;
     font-weight: 600;
 }
 
-/* 按钮样式 */
+/* 侧边栏底部版权信息 */
+.sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #718096;
+    font-size: 12px;
+    text-align: center;
+    margin-top: auto;
+}
+
+/* 自定义滚动条 */
+.navigation-menu::-webkit-scrollbar {
+    width: 6px;
+}
+
+.navigation-menu::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.navigation-menu::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.navigation-menu::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* 菜单项样式（保留作为备用） */
+.menu-item {
+    color: #ffffff !important;
+    font-size: 0.98rem !important;
+    font-weight: 500 !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.9rem 1.2rem !important;
+    margin: 0.25rem 0.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.7rem !important;
+    transition: all 0.2s ease !important;
+    width: calc(100% - 1rem) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    cursor: pointer !important;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    transform: translateX(3px) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+}
+
+.menu-item-selected {
+    color: #ffffff !important;
+    font-size: 0.98rem !important;
+    font-weight: 600 !important;
+    background: rgba(255, 255, 255, 0.25) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.9rem 1.2rem !important;
+    margin: 0.25rem 0.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.7rem !important;
+    transition: all 0.2s ease !important;
+    width: calc(100% - 1rem) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    cursor: pointer !important;
+}
+
+.menu-icon {
+    font-size: 1.15rem !important;
+    display: inline-block;
+}
+
+.menu-text {
+    flex: 1;
+}
+
+/* 隐藏菜单按钮 */
+button[id^="menu_"] {
+    display: none !important;
+}
+
+/* ============================================
+   内容区域样式
+   ============================================ */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1400px;
+}
+
+/* ============================================
+   卡片样式 - 现代化设计
+   ============================================ */
+.stCard {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    padding: 1.5rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    transition: all 0.3s ease;
+}
+
+.stCard:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+/* ============================================
+   标题样式
+   ============================================ */
+h1 {
+    color: #1e293b;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+h2 {
+    color: #334155;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+h3 {
+    color: #475569;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* ============================================
+   按钮样式 - 现代化设计
+   ============================================ */
 .stButton>button {
-    background-color: #1677ff;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
+    padding: 0.65rem 1.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-.custom-caption {
-    font-size: 0.9rem !important;
-    color: #1677ff !important;
-    padding: 0.8rem 0 !important;
-    border-bottom: 2px solid #1677ff !important;
-    margin-bottom: 1.5rem !important;
-    font-weight: 500 !important;
+.stButton>button:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    transform: translateY(-2px);
 }
 
-.pagination-info {
-    color: #666;
-    font-size: 12px;
-    text-align: right;
-    padding-right: 10px;
-    line-height: 36px;
+.stButton>button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
-.page-number {
-    margin: 0 15px;
-    font-size: 10px;
-    color: #666;
-    text-align: center;
-    line-height: 36px;
-}
- .stButton>button:disabled {
-    background-color: #f5f5f5 !important;
-    color: #999 !important;
-    border: 1px solid #ddd !important;
+
+/* 禁用按钮样式 */
+.stButton>button:disabled {
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%) !important;
+    color: #94a3b8 !important;
+    border: 1px solid #e2e8f0 !important;
     cursor: not-allowed;
     opacity: 1 !important;
- }
+    box-shadow: none !important;
+}
 
-/* 鼠标悬停在禁用按钮上的样式 */
 .stButton>button:disabled:hover {
-    background-color: #f5f5f5 !important;
-    color: #999 !important;
-    border: 1px solid #ddd !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
-/* 活动按钮样式 */
-.stButton>button:enabled {
-    background-color: #1677ff;
-    color: white;
-    border: none;
+/* ============================================
+   面包屑导航样式 - 现代化优化
+   ============================================ */
+.breadcrumb-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    border-radius: 10px;
+    padding: 0.8rem 1.2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
 }
 
+.breadcrumb-content {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+}
 
-/* 鼠标悬停在活动按钮上的样式 */
-/*.stButton>button:enabled:hover {
-    background-color: #ff3d00;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}*/
+.breadcrumb-icon {
+    font-size: 1.1rem;
+    color: #3b82f6;
+    display: flex;
+    align-items: center;
+}
 
- .table-header {
+.breadcrumb-label {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.breadcrumb-separator {
+    color: #cbd5e1;
+    font-weight: 600;
+    margin: 0 0.2rem;
+}
+
+.breadcrumb-current {
+    color: #1e293b;
+    font-weight: 700;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* 保留旧样式以兼容 */
+.custom-caption {
+    font-size: 0.9rem !important;
+    color: #64748b !important;
+    padding: 0.8rem 1.2rem !important;
+    border-bottom: none !important;
+    margin-bottom: 1.5rem !important;
+    font-weight: 500 !important;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.custom-caption::before {
+    content: "📍";
+    font-size: 1.1rem;
+    color: #3b82f6;
+}
+
+/* ============================================
+   股票卡片样式 - 紧凑美观设计
+   ============================================ */
+
+/* 搜索框容器样式 */
+div:has(input[placeholder*="搜索股票"]) {
+    margin-bottom: 1rem;
+}
+
+/* 股票卡片样式 */
+.stock-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 10px;
+    padding: 0.9rem;
+    margin-bottom: 0.6rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.stock-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+    border-color: #cbd5e1;
+}
+
+.stock-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-    margin-bottom: 10px;
- }
+    margin-bottom: 0.7rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.stock-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.stock-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.stock-code {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.stock-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.stock-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    flex-wrap: wrap;
+}
+
+.info-label {
+    color: #64748b;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.info-value {
+    color: #1e293b;
+    font-weight: 400;
+    flex: 1;
+    word-break: break-word;
+    min-width: 0;
+}
+
+.info-separator {
+    color: #cbd5e1;
+    margin: 0 0.3rem;
+    font-weight: 300;
+    flex-shrink: 0;
+}
+
+/* 股票卡片容器样式 */
+div[data-testid="column"]:has(.stock-card) {
+    padding: 0 0.5rem;
+}
+
+/* 移除关注按钮样式优化 - 紧跟在卡片后面 */
+.stock-card ~ .stButton,
+div:has(.stock-card) + div .stButton {
+    margin-top: 0.4rem;
+}
+
+div:has(.stock-card) + div .stButton > button {
+    padding: 0.35rem 0.7rem !important;
+    font-size: 0.8rem !important;
+    height: auto !important;
+    min-height: 32px !important;
+}
+
+/* ============================================
+   表格样式 - 现代化设计
+   ============================================ */
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 0;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 1.5rem;
+}
 
 .table-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #333;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1e293b;
+    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
+
 .table-subtitle {
-    font-size: 0.9rem;
-    color: #666;
+    font-size: 0.95rem;
+    color: #64748b;
+    font-weight: 500;
 }
 
-/* 搜索区域样式 */
+/* Streamlit 数据表格样式 */
+[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================
+   搜索区域样式
+   ============================================ */
 .search-container {
-    margin: 10px 0;
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-}
-
- /* 美化搜索框 */
-.stTextInput input {
-    border-radius: 4px;
-}
-
-
-/* 美化搜索按钮 */
-.stButton button {
-    border-radius: 4px;
-    background-color: #007bff;
-    color: white !important;  /* 强制使用白色 */
-    min-height: 32px !important;
-    line-height: 1.2 !important;
-    height: auto !important;
-}
-
-.stButton button:hover {
-    background-color: #0056b3;
-    color: white !important;  /* 悬停时保持白色 */
-}
-.stButton button:active {
-    color: white !important;  /* 点击时保持白色 */
-}
-.stButton button:focus {
-    color: white !important;  /* 聚焦时保持白色 */
-}
-.stButton button:visited {
-    color: white !important;  /* 访问后保持白色 */
-}
-/* 禁用按钮状态 */
-.stButton button:disabled {
-    background-color: #cccccc !important;
-    color: #666666 !important;
-}
-.search-action-container {
-    background-color: #f8f9fa;
-    border-radius: 4px;
-    padding: 1rem;
-    margin: 0.5rem 0 1rem 0;
-    border: 1px solid #eee;
+    margin: 1rem 0;
+    padding: 1.2rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 /* 搜索框样式 */
-.stTextInput input {
-    border-radius: 4px;
+.stTextInput>div>div>input {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
 }
 
-/* 按钮样式 */
-.stButton button {
-    border-radius: 4px;
-    width: 100%;
+.stTextInput>div>div>input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
 }
 
-/* 主要按钮 */
-.stButton button[data-baseweb="button"] {
-    background-color: #007bff;
-    color: white !important;
+
+/* 选择框容器 */
+.stSelectbox {
+    margin-bottom: 0.8rem;
 }
 
-/* 操作按钮 */
-.action-button button {
-    margin: 0 2px;
+/* 选择框主体
+.stSelectbox > div > div {
+    border-radius: 12px !important;
+    border: 2px solid #e2e8f0 !important;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    padding: 0.6rem 0.9rem !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+    min-height: 44px !important;
+    width: 100% !important;
+    overflow: visible !important;
+    max-width: 100% !important;
+}
+ */
+
+.stSelectbox > div > div:hover {
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+    background: #ffffff !important;
 }
 
-/* 搜索区域和操作区域之间的分隔 */
+.stSelectbox > div > div:focus-within,
+.stSelectbox > div > div[data-baseweb="select"]:focus-within {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(59, 130, 246, 0.2) !important;
+    background: #ffffff !important;
+}
+
+/* 选择框内的文字 */
+.stSelectbox > div > div > div,
+.stSelectbox > div > div > div[data-baseweb="select"] > div {
+    color: #1e293b !important;
+    font-weight: 500 !important;
+    font-size: 0.95rem !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+    min-width: 0 !important;
+}
+
+/* 下拉箭头 */
+.stSelectbox > div > div > div[data-baseweb="select"] > div:last-child svg,
+.stSelectbox > div > div svg {
+    color: #64748b !important;
+    transition: transform 0.3s ease !important;
+}
+
+.stSelectbox > div > div:focus-within svg,
+.stSelectbox > div > div[data-baseweb="select"]:focus-within svg {
+    color: #3b82f6 !important;
+    transform: rotate(180deg) !important;
+}
+
+/* 下拉列表容器 */
+.stSelectbox [role="listbox"],
+div[data-baseweb="popover"] {
+    border-radius: 12px !important;
+    border: 2px solid #e2e8f0 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+    background: #ffffff !important;
+    margin-top: 0.5rem !important;
+    padding: 0.5rem 0 !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+}
+
+/* 下拉列表项 */
+.stSelectbox [role="listbox"] [role="option"],
+div[data-baseweb="popover"] [role="option"],
+li[role="option"] {
+    padding: 0.75rem 1rem !important;
+    margin: 0.2rem 0.5rem !important;
+    border-radius: 8px !important;
+    color: #1e293b !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+}
+
+/* 下拉列表项悬停 */
+.stSelectbox [role="listbox"] [role="option"]:hover,
+div[data-baseweb="popover"] [role="option"]:hover,
+li[role="option"]:hover {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%) !important;
+    color: #3b82f6 !important;
+    transform: translateX(4px) !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* 下拉列表项选中/高亮 */
+.stSelectbox [role="listbox"] [role="option"][aria-selected="true"],
+.stSelectbox [role="listbox"] [role="option"][data-highlighted="true"],
+div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+div[data-baseweb="popover"] [role="option"][data-highlighted="true"],
+li[role="option"][aria-selected="true"],
+li[role="option"][data-highlighted="true"] {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* 占位符文字 */
+.stSelectbox > div > div > div[data-baseweb="select"] > div:first-child[aria-label],
+.stSelectbox > div > div > div:first-child {
+    color: #94a3b8 !important;
+}
+
+/* 选择框标签 */
+.stSelectbox label {
+    font-weight: 600 !important;
+    color: #334155 !important;
+    font-size: 0.9rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* 滚动条美化 */
+.stSelectbox [role="listbox"]::-webkit-scrollbar,
+div[data-baseweb="popover"]::-webkit-scrollbar {
+    width: 6px;
+}
+
+.stSelectbox [role="listbox"]::-webkit-scrollbar-track,
+div[data-baseweb="popover"]::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.stSelectbox [role="listbox"]::-webkit-scrollbar-thumb,
+div[data-baseweb="popover"]::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.stSelectbox [role="listbox"]::-webkit-scrollbar-thumb:hover,
+div[data-baseweb="popover"]::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* 日期选择器样式 */
+.stDateInput>div>div>input {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+}
+
+.stDateInput>div>div>input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 搜索操作容器 */
+.search-action-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    border-radius: 12px;
+    padding: 1.2rem;
+    margin: 1rem 0;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
 .search-action-divider {
-    border-right: 1px solid #dee2e6;
+    border-right: 2px solid #e2e8f0;
     margin: 0 1rem;
 }
 
-/* 遮罩层样式 */
+/* ============================================
+   分页样式 - 修复对齐问题
+   ============================================ */
+.pagination-info {
+    color: #64748b;
+    font-size: 0.9rem;
+    text-align: right;
+    padding-right: 10px;
+    line-height: 38px;  /* 与按钮高度对齐 */
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+}
+
+.page-number {
+    margin: 0 15px;
+    font-size: 0.85rem;
+    color: #64748b;
+    text-align: center;
+    line-height: 38px;  /* 与按钮高度对齐 */
+    font-weight: 500;
+}
+
+/* 分页按钮容器对齐 */
+div[data-testid="column"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 确保分页按钮在同一水平线上 */
+.stButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stButton > button {
+    height: 38px;  /* 统一按钮高度 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+/* 数字输入框样式和对齐 */
+.stNumberInput {
+    display: flex;
+    align-items: center;
+}
+
+.stNumberInput>div>div>input {
+    border-radius: 8px;
+    border: 2px solid #e2e8f0;
+    text-align: center;
+    font-weight: 600;
+    height: 38px;  /* 与按钮高度一致 */
+    line-height: 38px;
+}
+
+.stNumberInput>div>div>input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ============================================
+   Tab 标签页样式
+   ============================================ */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.5rem;
+    background-color: #f8fafc;
+    padding: 0.5rem;
+    border-radius: 12px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.stTabs [aria-selected="false"] {
+    color: #64748b;
+}
+
+.stTabs [aria-selected="false"]:hover {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+}
+
+/* ============================================
+   加载动画样式
+   ============================================ */
 .overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(255, 255, 255, 0.85);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 999999;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
     animation: fadeIn 0.3s ease-in-out;
 }
 
@@ -222,12 +855,13 @@ h1 {
 }
 
 .loading-spinner {
-    background: white;
-    padding: 20px 40px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    padding: 2rem 3rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     text-align: center;
     animation: slideIn 0.3s ease-out;
+    border: 1px solid #e2e8f0;
 }
 
 @keyframes slideIn {
@@ -242,19 +876,22 @@ h1 {
 }
 
 .loading-spinner p {
-    margin-top: 10px;
-    color: #333;
-    font-size: 16px;
+    margin-top: 1rem;
+    color: #334155;
+    font-size: 1rem;
+    font-weight: 500;
 }
 
 /* Streamlit spinner样式 */
 .stSpinner > div {
-    border-top-color: #ff4b4b !important;
+    border-top-color: #3b82f6 !important;
     width: 3rem !important;
     height: 3rem !important;
 }
 
-/* 消息容器样式 */
+/* ============================================
+   消息提示样式
+   ============================================ */
 .custom-message-container {
     position: fixed;
     top: 50%;
@@ -266,15 +903,15 @@ h1 {
     justify-content: center;
 }
 
-/* 消息样式 */
 .custom-message {
     text-align: center;
-    padding: 1rem 2rem;
-    border-radius: 0.5rem;
+    padding: 1.5rem 2.5rem;
+    border-radius: 12px;
     background-color: white;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     max-width: 80%;
     animation: slideIn 0.3s ease-out;
+    border: 2px solid transparent;
 }
 
 @keyframes slideIn {
@@ -290,28 +927,218 @@ h1 {
 
 /* 成功消息样式 */
 .custom-success {
-    background-color: #D1E7DD;
-    color: #0A3622;
-    border: 1px solid #BADBCC;
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    color: #065f46;
+    border-color: #10b981;
 }
 
 /* 警告消息样式 */
 .custom-warning {
-    background-color: #FFF3CD;
-    color: #664D03;
-    border: 1px solid #FFECB5;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+    border-color: #f59e0b;
 }
 
 /* 错误消息样式 */
 .custom-error {
-    background-color: #F8D7DA;
-    color: #842029;
-    border: 1px solid #F5C2C7;
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #991b1b;
+    border-color: #ef4444;
 }
 
 /* 消息内容样式 */
 .message-content {
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.6;
     font-size: 1rem;
+    font-weight: 500;
+}
+
+/* ============================================
+   信息提示框样式
+   ============================================ */
+.stAlert {
+    border-radius: 12px;
+    border-left: 4px solid;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.stAlert[data-baseweb="notification"] {
+    border-radius: 12px;
+}
+
+/* ============================================
+   图表容器样式
+   ============================================ */
+[data-testid="stPlotlyChart"] {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================
+   响应式设计
+   ============================================ */
+@media (max-width: 768px) {
+    .block-container {
+        padding: 1rem;
+    }
+    
+    h1 {
+        font-size: 1.5rem;
+    }
+    
+    .table-title {
+        font-size: 1.2rem;
+    }
+}
+
+/* ============================================
+   滚动条样式美化
+   ============================================ */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ============================================
+   分隔线样式
+   ============================================ */
+hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #e2e8f0 50%, transparent 100%);
+    margin: 2rem 0;
+}
+
+/* ============================================
+   输入框标签样式
+   ============================================ */
+.stTextInput label,
+.stSelectbox label,
+.stDateInput label,
+.stNumberInput label {
+    font-weight: 600;
+    color: #334155;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ============================================
+   统计卡片样式 - 从dashboard.py提取
+   ============================================ */
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+    text-align: center;
+    color: white;
+    height: 100%;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card-secondary {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    box-shadow: 0 8px 24px rgba(240, 147, 251, 0.3);
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 150px;
+    height: 150px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+
+.metric-card::after {
+    content: '';
+    position: absolute;
+    bottom: -30px;
+    left: -30px;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+
+.metric-label {
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+    font-weight: 500;
+    opacity: 0.95;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.metric-description {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-top: 0.5rem;
+}
+
+/* ============================================
+   搜索标题样式 - 从service/stock.py提取
+   ============================================ */
+.search-section {
+    margin-bottom: 1rem;
+}
+
+.search-title {
+    color: #1e293b;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
+}
+
+/* ============================================
+   信息标题样式 - 从service/history_data.py提取
+   ============================================ */
+.info-section-title {
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.info-description {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+/* ============================================
+   消息图标样式 - 从utils/message.py提取
+   ============================================ */
+.message-icon {
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+    display: inline-block;
 }

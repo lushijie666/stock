@@ -34,9 +34,13 @@ class StockSelectorManager:
             Stock.category == self.config.category
         ).order_by(Stock.code.asc()).all()
 
-    def create_options(self, stocks: List[Stock]) -> List[Tuple[str, str]]:
+    def create_options(self, stocks: List[Stock]) -> List[Tuple[str, str, str]]:
         """创建选择器选项"""
-        return [("", "请选择股票")] + [(stock.code, stock.name, format_pinyin_short(stock.pinyin)) for stock in stocks]
+        options = [("", "请选择股票", "")]
+        for stock in stocks:
+            pinyin_short = format_pinyin_short(stock.pinyin) if stock.pinyin else ""
+            options.append((stock.code, stock.name, pinyin_short))
+        return options
 
     def show_selector(self) -> None:
         """显示选择器"""
@@ -49,22 +53,63 @@ class StockSelectorManager:
                     prefix=self.config.prefix,
                     category=self.config.category.value
                 )
+                current_stock_key = get_session_key(
+                    SessionKeys.CURRENT_STOCK,
+                    prefix=self.config.prefix,
+                    category=self.config.category.value,
+                )
 
-                # 初始化 session state
+                # 初始化或同步 session state
+                # 如果 select_key 不存在，或者与 current_stock_key 不一致，需要更新
+                need_update = False
                 if select_key not in st.session_state:
-                    st.session_state[select_key] = options[0]  # 默认选择第一个选项（空选项）
+                    need_update = True
+                elif current_stock_key in st.session_state:
+                    # 检查当前选择是否与保存的股票代码一致
+                    current_selected = st.session_state.get(select_key, ("", ""))
+                    current_code = st.session_state[current_stock_key]
+                    if current_selected[0] != current_code:
+                        need_update = True
+                
+                if need_update:
+                    # 如果之前有选中的股票，尝试恢复选择
+                    if current_stock_key in st.session_state:
+                        current_code = st.session_state[current_stock_key]
+                        # 在 options 中查找匹配的选项
+                        matched_option = None
+                        for option in options:
+                            if option[0] == current_code:
+                                matched_option = option
+                                break
+                        if matched_option:
+                            st.session_state[select_key] = matched_option
+                        else:
+                            st.session_state[select_key] = options[0]  # 如果找不到匹配项，使用默认值
+                    else:
+                        st.session_state[select_key] = options[0]  # 默认选择第一个选项（空选项）
+
+                # 格式化函数
+                def format_option(x):
+                    if not x or len(x) < 2:
+                        return "请选择股票"
+                    if x[0] == "":
+                        return x[1]
+                    pinyin = x[2] if len(x) > 2 and x[2] else ""
+                    if pinyin:
+                        return f"{x[0]} ({x[1]}-{pinyin})"
+                    return f"{x[0]} ({x[1]})"
 
                 selected = st.selectbox(
                     "",
                     options=options,
-                    format_func=lambda x: x[1] if x[0] == "" else f"{x[0]} ({x[1]}-{x[2]})",
+                    format_func=format_option,
                     key=select_key,
                     on_change=self.handle_selection,
                     label_visibility="collapsed"
                 )
 
                 # 初始处理选择
-                if selected[0]:
+                if selected and selected[0]:
                     self.handle_selection()
 
         except Exception as e:
@@ -113,7 +158,6 @@ class StockSelectorManager:
                     stock = session.query(Stock).filter(
                         Stock.code == st.session_state[current_stock_key]
                     ).first()
-
                     if stock:
                         self.config.on_select(stock)
                     elif self.config.on_not_found:

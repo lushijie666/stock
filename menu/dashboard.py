@@ -1,10 +1,7 @@
-import pandas as pd
 import streamlit as st
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
 from enums.category import Category
-from service.history_data import show_chart_page, KEY_PREFIX, reload_by_category_date
-from utils.message import show_message
-from utils.session import get_session_key, SessionKeys
+from service.history_data import show_chart_page, KEY_PREFIX
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 
 
@@ -35,23 +32,17 @@ def show_main_metrics():
 
     with col1:
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    border-radius: 12px; padding: 1.5rem; 
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-                    text-align: center; color: white; height: 100%;">
-            <div style="font-size: 1.2rem; margin-bottom: 0.5rem; font-weight: 500;">总股票数</div>
-            <div style="font-size: 2rem; font-weight: 700;">{total_stocks:,}</div>
+        <div class="metric-card">
+            <div class="metric-label">总股票数</div>
+            <div class="metric-value">{total_stocks:,}</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
-                    border-radius: 12px; padding: 1.5rem; 
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-                    text-align: center; color: white; height: 100%;">
-            <div style="font-size: 1.2rem; margin-bottom: 0.5rem; font-weight: 500;">关注股票</div>
-            <div style="font-size: 2rem; font-weight: 700;">{followed_stocks}</div>
+        <div class="metric-card metric-card-secondary">
+            <div class="metric-label">关注股票</div>
+            <div class="metric-value">{followed_stocks}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -61,7 +52,6 @@ def show_kline_chart():
     tab_labels = [f"{category.value}" for category in categories]
 
     tabs = st.tabs(tab_labels)
-
     # 创建股票选择器字典
     selectors = {}
     for category in Category:
@@ -79,6 +69,5 @@ def show_kline_chart():
         with tab:
             # 股票选择
             selectors[category].show_selector()
-
             # 显示详情
             selectors[category].handle_current_stock()

@@ -333,9 +333,9 @@ def show_process_chart_page(stock):
 
                 # 显示处理信息表格
                 if processing_records:
-                    st.markdown("<h6 style='margin-bottom: 10px;'>包含关系信息</h6>", unsafe_allow_html=True)
+                    st.markdown("<h6 class='info-section-title'>包含关系信息</h6>", unsafe_allow_html=True)
                     st.markdown("""
-                       <div style='font-size: 12px;'>
+                       <div class='info-description'>
                        - 当两根K线互相包含时，根据前一根K线的趋势决定处理方向<br>
                        - 向上处理：取两根K线中较高的最高价和较高的最低价<br>
                        - 向下处理：取两根K线中较低的最高价和较低的最低价
@@ -370,7 +370,7 @@ def show_process_chart_page(stock):
                     st.markdown("---")
                 # 原有的分型信息表格
                 if patterns:
-                    st.markdown("<h6 style='margin-bottom: 10px;'>分型标记信息</h6>", unsafe_allow_html=True)
+                    st.markdown("<h6 class='info-section-title'>分型标记信息</h6>", unsafe_allow_html=True)
                     pattern_df = pd.DataFrame({
                         '日期': [p['date'] for p in patterns],
                         '类型': ["⬆顶分型" if p['type'] == Patterns.TOP else "⬇底分型" for p in patterns],
@@ -385,7 +385,7 @@ def show_process_chart_page(stock):
                     st.markdown("---")
                 # 显示笔信息表格
                 if strokes:
-                    st.markdown("<h6 style='margin-bottom: 10px;'>笔信息</h6>", unsafe_allow_html=True)
+                    st.markdown("<h6 class='info-section-title'>笔信息</h6>", unsafe_allow_html=True)
                     stroke_df = pd.DataFrame([
                         {
                             '起始日期': s['start_date'].strftime('%Y-%m-%d'),
@@ -405,7 +405,7 @@ def show_process_chart_page(stock):
                     st.markdown("---")
                 # 显示线段信息表格
                 if segments:
-                    st.markdown("<h6 style='margin-bottom: 10px;'>线段信息</h6>", unsafe_allow_html=True)
+                    st.markdown("<h6 class='info-section-title'>线段信息</h6>", unsafe_allow_html=True)
                     segment_df = pd.DataFrame([
                         {
                             '起始日期': s['start_date'].strftime('%Y-%m-%d'),
@@ -425,7 +425,7 @@ def show_process_chart_page(stock):
                     st.markdown("---")
                 # 显示中枢信息表格
                 if centers:
-                    st.markdown("<h6 style='margin-bottom: 10px;'>中枢信息</h6>", unsafe_allow_html=True)
+                    st.markdown("<h6 class='info-section-title'>中枢信息</h6>", unsafe_allow_html=True)
                     center_df = pd.DataFrame([
                         {
                             '起始日期': c['start_date'].strftime('%Y-%m-%d') if hasattr(c['start_date'],

@@ -261,8 +261,9 @@ def paginate_dataframe(
                 hide_index=False,
                 use_container_width=True
             )
-            # 分页导航控件和信息显示在同一行
-            col00, col0, col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 1, 1, 1, 1, 1, 2.5])
+            # 分页导航控件和信息显示在同一行 - 修复布局错位问题
+            col1, col2, col3, col4, col5, col6 = st.columns([1.5, 1, 1, 1, 1, 3])
+            
             with col1:
                 current_page = st.number_input(
                     "",
@@ -275,6 +276,7 @@ def paginate_dataframe(
                 if current_page != st.session_state[f"{key_prefix}_current_page"]:
                     st.session_state[f"{key_prefix}_current_page"] = current_page
                     st.rerun()
+            
             with col2:
                 if st.button("首页",
                              disabled=st.session_state[f"{key_prefix}_current_page"] == 1,
@@ -282,6 +284,7 @@ def paginate_dataframe(
                              use_container_width=True):
                     st.session_state[f"{key_prefix}_current_page"] = 1
                     st.rerun()
+            
             with col3:
                 if st.button("上一页",
                              disabled=st.session_state[f"{key_prefix}_current_page"] == 1,
@@ -289,6 +292,7 @@ def paginate_dataframe(
                              use_container_width=True):
                     st.session_state[f"{key_prefix}_current_page"] -= 1
                     st.rerun()
+            
             with col4:
                 if st.button("下一页",
                              disabled=st.session_state[f"{key_prefix}_current_page"] == paginator.total_pages,
@@ -296,6 +300,7 @@ def paginate_dataframe(
                              use_container_width=True):
                     st.session_state[f"{key_prefix}_current_page"] += 1
                     st.rerun()
+            
             with col5:
                 if st.button("末页",
                              disabled=st.session_state[f"{key_prefix}_current_page"] == paginator.total_pages,
@@ -303,13 +308,14 @@ def paginate_dataframe(
                              use_container_width=True):
                     st.session_state[f"{key_prefix}_current_page"] = paginator.total_pages
                     st.rerun()
+            
             # 显示记录范围信息
             with col6:
                 current_page = st.session_state[f"{key_prefix}_current_page"]
                 start_idx = (st.session_state[f"{key_prefix}_current_page"] - 1) * paginator.page_size + 1
                 end_idx = min(start_idx + paginator.page_size - 1, paginator.total_count)
                 st.markdown(
-                    f'<div class="pagination-info">显示 {start_idx}-{end_idx} 条, {current_page}/{paginator.total_pages} 页, 共 {paginator.total_count} 条 ',
+                    f'<div class="pagination-info">显示 {start_idx}-{end_idx} 条, {current_page}/{paginator.total_pages} 页, 共 {paginator.total_count} 条</div>',
                     unsafe_allow_html=True
                 )
         else:

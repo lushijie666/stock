@@ -219,20 +219,85 @@ def show_follow_page(category: Category):
                 st.info("暂无关注的股票")
                 return
 
-            # 手动渲染表格 + 按钮
-            st.markdown("<h5>已关注的股票</h5>", unsafe_allow_html=True)
-            for stock in stocks:
-                col1, col2 = st.columns([8, 1])
-                with col1:
-                    st.markdown(f"**{stock.name}** ({stock.code})")
-                    st.caption(f"全称: {stock.full_name}")
-                    st.caption(f"上市时间: {stock.ipo_at}")
-                    st.caption(f"行业: {stock.industry}")
-                    st.caption(f"关注时间: {stock.followed_at.strftime('%Y-%m-%d %H:%M:%S') if stock.followed_at else '-'}")
-                with col2:
-                    if st.button("移除关注", key=f"remove_{stock.code}", type="secondary"):
-                        remove_follow(category, stock.code)
-                        st.rerun()  # 刷新页面
+            # 添加搜索功能
+            st.markdown("""
+            <div class="search-section">
+                <h5 class="search-title">
+                    已关注的股票
+                </h5>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 搜索框
+            search_key = f"follow_search_{category.value}"
+            search_term = st.text_input(
+                "🔍 搜索股票（代码/名称/全称）",
+                key=search_key,
+                placeholder="输入股票代码、名称或全称进行搜索...",
+                label_visibility="collapsed"
+            )
+            
+            # 根据搜索词过滤股票
+            if search_term:
+                search_term_lower = search_term.lower()
+                filtered_stocks = [
+                    stock for stock in stocks
+                    if (search_term_lower in stock.code.lower() or
+                        search_term_lower in stock.name.lower() or
+                        (stock.full_name and search_term_lower in stock.full_name.lower()))
+                ]
+                stocks = filtered_stocks
+                
+                if not filtered_stocks:
+                    st.info(f"未找到包含 '{search_term}' 的股票")
+                    return
+            
+            # 显示搜索结果数量
+            if search_term:
+                st.caption(f"找到 {len(stocks)} 只股票")
+            
+            # 使用网格布局，每行显示多个股票卡片
+            for i in range(0, len(stocks), 3):
+                cols = st.columns(3)
+                for j, col in enumerate(cols):
+                    if i + j < len(stocks):
+                        stock = stocks[i + j]
+                        with col:
+                            followed_time = stock.followed_at.strftime('%Y-%m-%d %H:%M:%S') if stock.followed_at else '-'
+                            ipo_time = stock.ipo_at.strftime('%Y-%m-%d') if stock.ipo_at else '-'
+                            card_html = f"""
+                            <div class="stock-card">
+                                <div class="stock-card-header">
+                                    <div class="stock-card-title">
+                                        <span class="stock-name">{stock.name}</span>
+                                        <span class="stock-code">({stock.code})</span>
+                                    </div>
+                                </div>
+                                <div class="stock-card-body">
+                                    <div class="stock-info-row">
+                                        <span class="info-label">全称:</span>
+                                        <span class="info-value">{stock.full_name or '-'}</span>
+                                    </div>
+                                     <div class="stock-info-row">
+                                        <span class="info-label">关注时间:</span>
+                                        <span class="info-value">{followed_time}</span>
+                                    </div>
+                                    <div class="stock-info-row">
+                                        <span class="info-label">上市时间:</span>
+                                        <span class="info-value">{ipo_time}</span>
+                                    </div>
+                                     <div class="stock-info-row">
+                                        <span class="info-label">行业:</span>
+                                        <span class="info-value">{stock.industry or '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            """
+                            st.markdown(card_html, unsafe_allow_html=True)
+                            # 移除关注按钮
+                            if st.button("移除关注", key=f"remove_{stock.code}", type="secondary", use_container_width=True):
+                                remove_follow(category, stock.code)
+                                st.rerun()
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 

@@ -19,7 +19,7 @@ def show_message(message: str, type: str = "success", duration: int = 2):
         <div class="custom-message-container">
             <div class="custom-message custom-{type}">
                 <p class="message-content">
-                    <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icon}</span>
+                    <span class="message-icon">{icon}</span>
                     {message}
                 </p>
             </div>
