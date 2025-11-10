@@ -6,6 +6,7 @@ import akshare as ak
 import streamlit_echarts
 import logging
 import pandas as pd
+from datetime import datetime as dt
 import streamlit as st
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.functions import func
@@ -142,6 +143,65 @@ def show_page(category: Category):
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
+
+def show_follow_chart():
+    try:
+        with get_db_session() as session:
+            # 查询所有被关注的股票，按分类和代码排序
+            stocks = session.query(Stock).filter(
+                Stock.removed == False,
+                Stock.is_followed == True
+            ).order_by(Stock.category.asc(), Stock.code.asc()).all()
+
+            if not stocks:
+                st.info("暂无关注的股票")
+                return
+
+            # 按分类组织数据
+            category_stocks = {}
+            for stock in stocks:
+                category_enum = Category(stock.category)
+                category_name = category_enum.fullText
+                if category_name not in category_stocks:
+                    category_stocks[category_name] = []
+                category_stocks[category_name].append(stock)
+
+            # 使用 st.tabs 或直接显示多个表格来避免嵌套 expander
+            categories = list(category_stocks.keys())
+
+            tab_labels = [f"{category} - ({len(category_stocks[category])}只)" for category in categories]
+            tabs = st.tabs(tab_labels)
+            for i, (category_name, stocks_list) in enumerate(category_stocks.items()):
+                with tabs[i]:
+                    # 显示该分类下的关注股票
+                    data = [{
+                        'code': stock.code,
+                        'name': stock.name,
+                        'pinyin': format_pinyin_short(stock.pinyin),
+                        'full_name': stock.full_name or '-',
+                        'ipo_at': stock.ipo_at.strftime('%Y-%m-%d') if stock.ipo_at else '-',
+                        'industry': stock.industry or '-',
+                        'followed_at': stock.followed_at.strftime('%Y-%m-%d %H:%M:%S') if stock.followed_at else '-',
+                    } for stock in stocks_list]
+                    df = pd.DataFrame(data)
+                    st.dataframe(
+                        df,
+                        column_config={
+                            "code": st.column_config.TextColumn("股票代码"),
+                            "name": st.column_config.TextColumn("股票名称"),
+                            "pinyin": st.column_config.TextColumn("股票简拼"),
+                            "full_name": st.column_config.TextColumn("公司全称"),
+                            "ipo_at": st.column_config.TextColumn("上市时间"),
+                            "industry": st.column_config.TextColumn("行业"),
+                            "followed_at": st.column_config.TextColumn("关注时间"),
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                    )
+    except Exception as e:
+        st.error(f"加载关注股票数据失败：{str(e)}")
+
+
 def show_follow_page(category: Category):
     show_add_follow(category=category)
     st.divider()
@@ -168,6 +228,7 @@ def show_follow_page(category: Category):
                     st.caption(f"全称: {stock.full_name}")
                     st.caption(f"上市时间: {stock.ipo_at}")
                     st.caption(f"行业: {stock.industry}")
+                    st.caption(f"关注时间: {stock.followed_at.strftime('%Y-%m-%d %H:%M:%S') if stock.followed_at else '-'}")
                 with col2:
                     if st.button("移除关注", key=f"remove_{stock.code}", type="secondary"):
                         remove_follow(category, stock.code)
@@ -213,6 +274,7 @@ def add_follow(category: Category, stock_code: str):
             ).first()
             if stock:
                 stock.is_followed = True
+                stock.followed_at = dt.now()
                 session.commit()
                 show_message(f"已添加关注：{stock.name}({stock.code})", type="success")
             else:
@@ -229,6 +291,7 @@ def remove_follow(category: Category, stock_code: str):
             ).first()
             if stock:
                 stock.is_followed = False
+                stock.followed_at = None
                 session.commit()
                 show_message(f"已取消关注：{stock.name}({stock.code})", type="success")
                 st.rerun()  # 刷新页面以更新显示
@@ -290,3 +353,28 @@ def fetch(category: Category) -> list:
     except Exception as e:
         logging.error(f"Error fetching data: {str(e)}")
         return None
+
+
+def get_total_stocks_count():
+    """获取总股票数"""
+    try:
+        with get_db_session() as session:
+            count = session.query(func.count(Stock.id)).filter(Stock.removed == False).scalar()
+            return count or 0
+    except Exception as e:
+        logging.error(f"获取总股票数失败: {str(e)}")
+        return 0
+
+
+def get_followed_stocks_count():
+    """获取关注股票数"""
+    try:
+        with get_db_session() as session:
+            count = session.query(func.count(Stock.id)).filter(
+                Stock.removed == False,
+                Stock.is_followed == True
+            ).scalar()
+            return count or 0
+    except Exception as e:
+        logging.error(f"获取关注股票数失败: {str(e)}")
+        return 0

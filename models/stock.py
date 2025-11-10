@@ -34,6 +34,7 @@ class Stock(Base):
     flow_capital = Column(BigInteger, default=0) # 流通股本
     industry = Column(String(256), default=0) # 行业
     is_followed = Column(Boolean, default=False) # 是否关注
+    followed_at = Column(DateTime) # 关注时间
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
