@@ -22,48 +22,40 @@ if 'selected_page' not in st.session_state:
 
 # 自定义菜单组件
 def render_custom_menu():
-    """渲染现代化侧边栏菜单"""
+    """渲染侧边栏菜单"""
     with st.sidebar:
-        # 现代化侧边栏头部
+        # 侧边栏头部
         st.markdown("""
-        <div class="sidebar-header-modern">
-            <span class="sidebar-icon">💹</span>
-            <span class="sidebar-title">股票分析系统</span>
+        <div class="sidebar-header">
+            <div class="logo-container">
+                <h1 class="logo-text">股票数据分析系统</h1>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # 菜单项容器
-        st.markdown('<div class="menu-container">', unsafe_allow_html=True)
-
+        
+        # 创建直接的Streamlit按钮菜单
         page_names = Pages.get_page_names()
+        
         for page_name in page_names:
             page_config = Pages.configs[page_name]
-            icon = page_config.icon
-            
-            # 图标映射
-            icon_map = {
-                "house": "🏠",
-                "heart-fill": "❤️",
-                "grid": "📊",
-                "graph-up": "📈",
-                "clipboard2-data": "📋",
-                "terminal-split": "📄"
-            }
-            icon_emoji = icon_map.get(icon, "📌")
             
             # 判断是否选中
             is_selected = st.session_state.selected_page == page_name
-            button_key = f"menu_btn_{page_name}"
             
-            # 创建按钮，文本包含图标和菜单名称
-            button_text = f"{icon_emoji} {page_name}"
+            # 根据是否选中应用不同的按钮类型
             button_type = "primary" if is_selected else "secondary"
             
-            if st.button(button_text, key=button_key, use_container_width=True, type=button_type):
+            # 创建直接的Streamlit按钮
+            if st.button(
+                f"{page_name}",
+                key=f"menu_{page_name}",
+                use_container_width=True,
+                type=button_type
+            ):
+                # 按钮点击时更新状态并刷新页面
                 st.session_state.selected_page = page_name
                 st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
+    
 
 # 渲染菜单
 render_custom_menu()
