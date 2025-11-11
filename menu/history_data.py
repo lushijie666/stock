@@ -61,9 +61,6 @@ def index():
             # 股票选择
             selectors[category].show_selector()
 
-            # 添加间距
-            st.write("")
-            st.write("")
 
             # 显示详情
             selectors[category].handle_current_stock()

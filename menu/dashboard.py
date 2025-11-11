@@ -1,7 +1,7 @@
 import streamlit as st
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
 from enums.category import Category
-from service.history_data import show_chart_page, KEY_PREFIX
+from service.stock_chart import show_chart_page, KEY_PREFIX
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 
 
@@ -46,13 +46,9 @@ def show_main_metrics():
 
 
 def show_kline_chart():
-    categories = list(Category)
-    tab_labels = [f"{category.value}" for category in categories]
-
-    tabs = st.tabs(tab_labels)
-    # 创建股票选择器字典
     selectors = {}
-    for category in Category:
+    tabs = st.tabs(Category.fullTexts())
+    for tab, category in zip(tabs, Category):
         selector = create_stock_selector(
             category=category,
             prefix=KEY_PREFIX,
