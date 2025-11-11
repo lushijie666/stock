@@ -157,7 +157,8 @@ def show_follow_chart():
             if not stocks:
                 st.info("暂无关注的股票")
                 return
-            # 按分类组织数据
+            
+            # 按分类组织数据，使用字典存储每个分类的股票
             category_stocks = {}
             for stock in stocks:
                 category_enum = Category(stock.category)
@@ -166,19 +167,21 @@ def show_follow_chart():
                     category_stocks[category_name] = []
                 category_stocks[category_name].append(stock)
 
-            # 使用 st.tabs 或直接显示多个表格来避免嵌套 expander
-            categories = list(category_stocks.keys())
+            # 使用固定顺序创建 tabs，与 show_kline_chart 方法保持一致
+            tabs = st.tabs(Category.fullTexts())
+            for tab, category in zip(tabs, Category):
+                category_name = category.fullText
+                # 获取该分类下的股票列表，如果没有则为空列表
+                stocks_list = category_stocks.get(category_name, [])
+                with tab:
+                    original_category = category
+                    
+                    # 如果该分类下没有关注的股票，显示提示信息
+                    if not stocks_list:
+                        st.info(f"{category_name}分类下暂无关注的股票")
+                        continue
 
-            tab_labels = [f"{category} - ({len(category_stocks[category])}只)" for category in categories]
-            tabs = st.tabs(tab_labels)
-            for i, (category_name, stocks_list) in enumerate(category_stocks.items()):  # 修改变量名
-                with tabs[i]:
-                    original_category = None
-                    for stock_item in stocks_list:
-                        original_category = stock_item.category
-                        break
-
-                    search_key = f"follow_search_{original_category}" if original_category else f"follow_search_{i}"
+                    search_key = f"follow_search_{original_category}"
                     search_term = st.text_input(
                         "🔍 搜索股票（代码/名称/全称）",
                         key=search_key,
