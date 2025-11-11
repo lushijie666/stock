@@ -60,26 +60,27 @@ def show_category_pie_chart():
             data_pairs = [(cat, num) for cat, num in zip(df['分类'], df['数量'])]
 
             pie = ChartBuilder.create_pie_chart(data_pairs, total_stocks)
-            # 显示图表
-            streamlit_echarts.st_pyecharts(pie, height="500px")
+            # 使用 st.columns 并排显示饼图和表格
+            col1, col2 = st.columns([1, 1])  # 两个相等宽度的列
 
-            # 添加一个分隔线
-            st.markdown("---")
+            with col1:
+                # 显示图表
+                streamlit_echarts.st_pyecharts(pie, height="300px")
 
-            # 添加百分比列并显示数据表
-            df['占比'] = (df['数量'] / total_stocks * 100).round(1)
-            st.dataframe(
-                df,
-                column_config={
-                    "分类": st.column_config.TextColumn("分类"),
-                    "数量": st.column_config.NumberColumn("股票数量", format="%d"),
-                    "占比": st.column_config.NumberColumn("占比", format="%.1f%%"
-                    )
-                },
-                hide_index=True,
-                use_container_width=True
-            )
-
+            with col2:
+                # 添加百分比列并显示数据表
+                df['占比'] = (df['数量'] / total_stocks * 100).round(1)
+                st.dataframe(
+                    df,
+                    column_config={
+                        "分类": st.column_config.TextColumn("分类"),
+                        "数量": st.column_config.NumberColumn("股票数量", format="%d"),
+                        "占比": st.column_config.NumberColumn("占比", format="%.1f%%")
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    height=300
+                )
     except Exception as e:
         st.error(f"显示股票分类分布图表失败: {str(e)}")
 
@@ -156,7 +157,6 @@ def show_follow_chart():
             if not stocks:
                 st.info("暂无关注的股票")
                 return
-
             # 按分类组织数据
             category_stocks = {}
             for stock in stocks:
@@ -171,33 +171,82 @@ def show_follow_chart():
 
             tab_labels = [f"{category} - ({len(category_stocks[category])}只)" for category in categories]
             tabs = st.tabs(tab_labels)
-            for i, (category_name, stocks_list) in enumerate(category_stocks.items()):
+            for i, (category_name, stocks_list) in enumerate(category_stocks.items()):  # 修改变量名
                 with tabs[i]:
-                    # 显示该分类下的关注股票
-                    data = [{
-                        'code': stock.code,
-                        'name': stock.name,
-                        'pinyin': format_pinyin_short(stock.pinyin),
-                        'full_name': stock.full_name or '-',
-                        'ipo_at': stock.ipo_at.strftime('%Y-%m-%d') if stock.ipo_at else '-',
-                        'industry': stock.industry or '-',
-                        'followed_at': stock.followed_at.strftime('%Y-%m-%d %H:%M:%S') if stock.followed_at else '-',
-                    } for stock in stocks_list]
-                    df = pd.DataFrame(data)
-                    st.dataframe(
-                        df,
-                        column_config={
-                            "code": st.column_config.TextColumn("股票代码"),
-                            "name": st.column_config.TextColumn("股票名称"),
-                            "pinyin": st.column_config.TextColumn("股票简拼"),
-                            "full_name": st.column_config.TextColumn("公司全称"),
-                            "ipo_at": st.column_config.TextColumn("上市时间"),
-                            "industry": st.column_config.TextColumn("行业"),
-                            "followed_at": st.column_config.TextColumn("关注时间"),
-                        },
-                        hide_index=True,
-                        use_container_width=True
+                    original_category = None
+                    for stock_item in stocks_list:
+                        original_category = stock_item.category
+                        break
+
+                    search_key = f"follow_search_{original_category}" if original_category else f"follow_search_{i}"
+                    search_term = st.text_input(
+                        "🔍 搜索股票（代码/名称/全称）",
+                        key=search_key,
+                        placeholder="输入股票代码、名称",
+                        label_visibility="collapsed"
                     )
+                    # 根据搜索词过滤股票
+                    filtered_stocks = stocks_list  # 修改变量名
+                    if search_term:
+                        search_term_lower = search_term.lower()
+                        filtered_stocks = [
+                            stock for stock in stocks_list  # 修改变量名
+                            if (search_term_lower in stock.code.lower() or
+                                search_term_lower in stock.name.lower() or
+                                (stock.full_name and search_term_lower in stock.full_name.lower()))
+                        ]
+
+                        if not filtered_stocks:
+                            st.info(f"未找到包含 '{search_term}' 的股票")
+                            continue  # 修改为continue而不是return
+
+                    # 显示搜索结果数量
+                    if search_term:
+                        st.caption(f"找到 {len(filtered_stocks)} 只股票")
+
+                    # 使用网格布局，每行显示多个股票卡片
+                    for j in range(0, len(filtered_stocks), 3):  # 修改变量名
+                        cols = st.columns(3)
+                        for k, col in enumerate(cols):
+                            if j + k < len(filtered_stocks):
+                                stock = filtered_stocks[j + k]  # 修改变量名
+                                with col:
+                                    followed_time = stock.followed_at.strftime(
+                                        '%Y-%m-%d %H:%M:%S') if stock.followed_at else '-'
+                                    ipo_time = stock.ipo_at.strftime('%Y-%m-%d') if stock.ipo_at else '-'
+                                    card_html = f"""
+                                               <div class="stock-card">
+                                                   <div class="stock-card-header">
+                                                       <div class="stock-card-title">
+                                                           <span class="stock-name">{stock.name}</span>
+                                                           <span class="stock-code">({stock.code})</span>
+                                                       </div>
+                                                   </div>
+                                                   <div class="stock-card-body">
+                                                       <div class="stock-info-row">
+                                                           <span class="info-label">全称:</span>
+                                                           <span class="info-value">{stock.full_name or '-'}</span>
+                                                       </div>
+                                                        <div class="stock-info-row">
+                                                           <span class="info-label">关注时间:</span>
+                                                           <span class="info-value">{followed_time}</span>
+                                                       </div>
+                                                       <div class="stock-info-row">
+                                                           <span class="info-label">上市时间:</span>
+                                                           <span class="info-value">{ipo_time}</span>
+                                                       </div>
+                                                        <div class="stock-info-row">
+                                                           <span class="info-label">行业:</span>
+                                                           <span class="info-value">{stock.industry or '-'}</span>
+                                                       </div>
+                                                   </div>
+                                               </div>
+                                               """
+                                    st.markdown(card_html, unsafe_allow_html=True)
+                                    if st.button("K线图", key=f"remove_{stock.code}", type="secondary",
+                                                 use_container_width=True):
+                                        remove_follow(stock.category, stock.code)
+                                        st.rerun()
     except Exception as e:
         st.error(f"加载关注股票数据失败：{str(e)}")
 
@@ -233,7 +282,7 @@ def show_follow_page(category: Category):
             search_term = st.text_input(
                 "🔍 搜索股票（代码/名称/全称）",
                 key=search_key,
-                placeholder="输入股票代码、名称或全称进行搜索...",
+                placeholder="输入股票代码、名称",
                 label_visibility="collapsed"
             )
             

@@ -29,7 +29,6 @@ def show_main_metrics():
     followed_stocks = get_followed_stocks_count()
 
     col1, col2 = st.columns(2)
-
     with col1:
         st.markdown(f"""
         <div class="metric-card">
@@ -37,7 +36,6 @@ def show_main_metrics():
             <div class="metric-value">{total_stocks:,}</div>
         </div>
         """, unsafe_allow_html=True)
-
     with col2:
         st.markdown(f"""
         <div class="metric-card metric-card-secondary">
