@@ -348,19 +348,24 @@ def show_follow_page(category: Category):
                             </div>
                             """
                             st.markdown(card_html, unsafe_allow_html=True)
-                            # 移除关注按钮
-                            if st.button("移除关注", key=f"remove_{stock.code}", type="secondary", use_container_width=True):
-                                remove_follow(category, stock.code)
-                                st.rerun()
-                            if st.button("K线图", key=f"kline_{stock.code}", type="secondary", use_container_width=True):
-                                current_stock_key = get_session_key(
-                                    SessionKeys.CURRENT_STOCK,
-                                    prefix=chartKP,
-                                    category=stock.category
-                                )
-                                st.session_state[current_stock_key] = stock.code
-                                st.session_state.selected_page = "股票图表"
-                                st.rerun()
+                            # 并行展示按钮，使用不同颜色区分
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                # 移除关注按钮使用默认样式（灰色）
+                                if st.button("移除关注", key=f"remove_{stock.code}", use_container_width=True):
+                                    remove_follow(category, stock.code)
+                                    st.rerun()
+                            with col2:
+                                # 图表按钮使用primary样式（蓝色）
+                                if st.button("图表", key=f"kline_{stock.code}", type="primary", use_container_width=True):
+                                    current_stock_key = get_session_key(
+                                        SessionKeys.CURRENT_STOCK,
+                                        prefix=chartKP,
+                                        category=stock.category
+                                    )
+                                    st.session_state[current_stock_key] = stock.code
+                                    st.session_state.selected_page = "股票图表"
+                                    st.rerun()
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
