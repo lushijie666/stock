@@ -181,12 +181,14 @@ def paginate_dataframe(
                                         st.error("请输入正确的时间格式：YYYY-MM-DD HH:MM:SS")
                                         value = current_datetime
                         search_values[field.field] = value
-                    # 搜索按钮
+                    # 搜索按钮（幽灵按钮样式包裹）
                     with search_cols[-2]:
+                        st.markdown('<div class="btn-ghost">', unsafe_allow_html=True)
                         if st.button("搜索", icon="♻", key=f"{key_prefix}_search_button", use_container_width=True):
                             st.session_state[f"{key_prefix}_search_values"] = search_values.copy()
                             st.session_state[f"{key_prefix}_current_page"] = 1
                             st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
             # 操作区域
             with action_area:
                 if action_config:

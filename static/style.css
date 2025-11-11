@@ -12,6 +12,28 @@ header {visibility: hidden;}
     box-sizing: border-box;
 }
 
+/* 主题变量（可统一调风格浓淡与尺寸） */
+:root {
+    --color-bg: #ffffff;
+    --color-surface: #f8fafc;
+    --color-text: #1e293b;
+    --color-muted: #64748b;
+    --color-border: #e2e8f0;
+    --color-primary: #3b82f6;
+    --color-primary-strong: #2563eb;
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 6px 20px rgba(0,0,0,0.12);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --control-height: 32px;
+    --control-radius: 6px;
+    --control-font-size: 0.8rem;
+    --control-padding-y: 0.3rem;
+    --control-padding-x: 0.6rem;
+}
+
 /* 主容器样式 */
 .st-emotion-cache-1xgtwnd {
     display: flex;
@@ -612,16 +634,16 @@ div:has(.stock-card) + div .stButton > button {
     align-items: center;
     padding: 0.9rem 1rem;
     margin-bottom: 1rem;
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e2e8f0;
+    background: var(--color-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border);
 }
 
 .table-title {
     font-size: 1.2rem;
     font-weight: 700;
-    color: #1e293b;
+    color: var(--color-text);
     background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -643,7 +665,7 @@ div:has(.stock-card) + div .stButton > button {
 
 .meta-chip {
     background: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--color-border);
     color: #475569;
     font-size: 12px;
     padding: 4px 8px;
@@ -654,11 +676,83 @@ div:has(.stock-card) + div .stButton > button {
 
 /* Streamlit 数据表格样式 */
 [data-testid="stDataFrame"] {
-    border-radius: 12px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    transition: all 0.3s ease;
 }
 
+/* 表格悬停增强 */
+[data-testid="stDataFrame"]:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+/* 表格容器样式 */
+[data-testid="stDataFrame"] > div {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* 表头与单元格统一风格 */
+[data-testid="stDataFrame"] thead {
+    background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(37,99,235,0.08));
+    border-bottom: 2px solid var(--color-border);
+}
+
+[data-testid="stDataFrame"] thead th {
+    background: transparent !important;
+    color: var(--color-text) !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    padding: 1rem 0.75rem !important;
+    border-bottom: 2px solid var(--color-border) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* 表格行样式 */
+[data-testid="stDataFrame"] tbody tr {
+    transition: all 0.2s ease;
+    border-bottom: 1px solid #eef2f7;
+}
+
+[data-testid="stDataFrame"] tbody tr:hover {
+    background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(37,99,235,0.08)) !important;
+    transform: scale(1.005);
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.12);
+}
+
+[data-testid="stDataFrame"] tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+[data-testid="stDataFrame"] tbody tr:nth-child(even):hover {
+    background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(37,99,235,0.08)) !important;
+}
+
+/* 表格单元格样式 */
+[data-testid="stDataFrame"] tbody td {
+    padding: 0.875rem 0.75rem !important;
+    color: #334155 !important;
+    font-size: 0.9rem !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/* 索引列样式 */
+[data-testid="stDataFrame"] tbody td:first-child,
+[data-testid="stDataFrame"] thead th:first-child {
+    background: linear-gradient(135deg, rgba(124,58,237,0.05), rgba(37,99,235,0.05)) !important;
+    font-weight: 600 !important;
+    color: #64748b !important;
+    text-align: center !important;
+    width: 60px !important;
+}
 /* ============================================
    搜索区域样式
    ============================================ */
@@ -929,31 +1023,56 @@ div[data-testid="column"] {
    ============================================ */
 .stTabs [data-baseweb="tab-list"] {
     gap: 0.5rem;
-    background-color: #f8fafc;
+    background: linear-gradient(145deg, rgba(124,58,237,0.06), rgba(37,99,235,0.06));
     padding: 0.5rem;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
 }
 
 .stTabs [data-baseweb="tab"] {
-    border-radius: 8px;
-    padding: 0.75rem 1.5rem;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    position: relative;
+    border-radius: var(--radius-md);
+    padding: 0.6rem 1.2rem;
+    font-weight: 700;
+    transition: transform 0.18s ease, box-shadow 0.25s ease, color 0.18s ease, background 0.25s ease;
+    border: 1px solid transparent;
+    background: rgba(124,58,237,0.04);
+    color: var(--color-muted);
+    overflow: hidden;
 }
 
 .stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    color: white;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, #7c3aed 0%, #2563eb 55%, #22d3ee 100%);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 10px 24px rgba(124, 58, 237, 0.28);
+    transform: translateY(-1px);
+    border-color: rgba(124,58,237,0.35);
 }
 
 .stTabs [aria-selected="false"] {
-    color: #64748b;
+    color: var(--color-muted);
+    background: rgba(124,58,237,0.04);
+    border-color: var(--color-border);
 }
 
 .stTabs [aria-selected="false"]:hover {
-    background: rgba(59, 130, 246, 0.1);
-    color: #3b82f6;
+    background: linear-gradient(135deg, rgba(124,58,237,0.10), rgba(37,99,235,0.10));
+    color: var(--color-primary);
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.18);
+    transform: translateY(-1px);
+}
+
+/* 选中项底部霓虹指示条 */
+.stTabs [data-baseweb="tab"][aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    bottom: 6px;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #7c3aed, #2563eb, #22d3ee);
+    box-shadow: 0 0 12px rgba(124,58,237,0.55), 0 0 18px rgba(34,211,238,0.45);
 }
 
 /* ============================================

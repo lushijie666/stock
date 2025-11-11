@@ -243,7 +243,7 @@ def show_follow_chart():
                                                </div>
                                                """
                                     st.markdown(card_html, unsafe_allow_html=True)
-                                    if st.button("K线图", key=f"kline_{stock.code}", type="secondary", use_container_width=True):
+                                    if st.button("股票图表", key=f"kline_{stock.code}", type="secondary", use_container_width=True):
                                         current_stock_key = get_session_key(
                                             SessionKeys.CURRENT_STOCK,
                                             prefix=chartKP,
@@ -357,7 +357,7 @@ def show_follow_page(category: Category):
                                     st.rerun()
                             with col2:
                                 # 图表按钮使用primary样式（蓝色）
-                                if st.button("图表", key=f"kline_{stock.code}", type="primary", use_container_width=True):
+                                if st.button("股票图表", key=f"kline_{stock.code}", type="primary", use_container_width=True):
                                     current_stock_key = get_session_key(
                                         SessionKeys.CURRENT_STOCK,
                                         prefix=chartKP,

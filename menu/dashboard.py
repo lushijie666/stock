@@ -12,7 +12,7 @@ def index():
 
     st.markdown("---")
 
-    tab1, tab2, tab3 = st.tabs(["📊 股票分类  ", "❤️ 关注股票  ", "📈 图表  "])
+    tab1, tab2, tab3 = st.tabs(["📊 股票分类  ", "❤️ 关注股票  ", "📈 股票图表  "])
 
     with tab1:
         show_category_pie_chart()
