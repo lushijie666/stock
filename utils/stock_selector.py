@@ -14,14 +14,16 @@ from utils.table import format_pinyin_short
 
 T = TypeVar('T')
 
+
 @dataclass
 class StockSelectorConfig:
-    """股票选择器配置"""
     category: Category
     prefix: str
     on_select: Callable[[Stock], None]
+    hide_followed: bool = False  # 是否隐藏已关注的股票
     on_error: Optional[Callable[[Exception], None]] = None
     on_not_found: Optional[Callable[[], None]] = None
+
 
 class StockSelectorManager:
     def __init__(self, config: StockSelectorConfig):
@@ -29,17 +31,23 @@ class StockSelectorManager:
 
     def get_stocks(self, session: Session) -> List[Stock]:
         """获取股票列表"""
-        return session.query(Stock).filter(
+        query = session.query(Stock).filter(
             Stock.removed == False,
             Stock.category == self.config.category
-        ).order_by(Stock.code.asc()).all()
+        )
 
-    def create_options(self, stocks: List[Stock]) -> List[Tuple[str, str, str]]:
+        # 如果需要隐藏已关注的股票，则添加过滤条件
+        if self.config.hide_followed:
+            query = query.filter(Stock.is_followed == False)
+
+        return query.order_by(Stock.code.asc()).all()
+
+    def create_options(self, stocks: List[Stock]) -> List[Tuple[str, str, str, bool]]:
         """创建选择器选项"""
         options = [("", "请选择股票", "")]
         for stock in stocks:
             pinyin_short = format_pinyin_short(stock.pinyin) if stock.pinyin else ""
-            options.append((stock.code, stock.name, pinyin_short))
+            options.append((stock.code, stock.name, pinyin_short, stock.is_followed))
         return options
 
     def show_selector(self) -> None:
@@ -70,7 +78,7 @@ class StockSelectorManager:
                     current_code = st.session_state[current_stock_key]
                     if current_selected[0] != current_code:
                         need_update = True
-                
+
                 if need_update:
                     # 如果之前有选中的股票，尝试恢复选择
                     if current_stock_key in st.session_state:
@@ -95,9 +103,22 @@ class StockSelectorManager:
                     if x[0] == "":
                         return x[1]
                     pinyin = x[2] if len(x) > 2 and x[2] else ""
+                    # 检查是否已关注
+                    is_followed = x[3] if len(x) > 3 else False
+
+                    # 构建基础文本
                     if pinyin:
-                        return f"{x[0]} ({x[1]}-{pinyin})"
-                    return f"{x[0]} ({x[1]})"
+                        base_text = f"{x[0]} ({x[1]}-{pinyin})"
+                    else:
+                        base_text = f"{x[0]} ({x[1]})"
+
+                    # 对于已关注的股票，在末尾添加标记
+                    # 为了对齐，未关注的股票也保留相同长度的空格
+                    if is_followed:
+                        return f"{base_text} ⭐"
+                    else:
+                        # 添加相同数量的空格以保持对齐
+                        return f"{base_text}           "
 
                 selected = st.selectbox(
                     "",
@@ -130,7 +151,7 @@ class StockSelectorManager:
             current_stock_key = get_session_key(
                 SessionKeys.CURRENT_STOCK,
                 prefix=self.config.prefix,
-                category = self.config.category.value,
+                category=self.config.category.value,
             )
             # 安全地获取选择值
             selected = st.session_state.get(select_key, ("", ""))
@@ -151,7 +172,7 @@ class StockSelectorManager:
             current_stock_key = get_session_key(
                 SessionKeys.CURRENT_STOCK,
                 prefix=self.config.prefix,
-                category = self.config.category.value
+                category=self.config.category.value
             )
             if current_stock_key in st.session_state:
                 with get_db_session() as session:
@@ -167,10 +188,12 @@ class StockSelectorManager:
             if self.config.on_error:
                 self.config.on_error(e)
 
+
 def create_stock_selector(
         category: Category,
         prefix: str,
         on_select: Callable[[Stock], None],
+        hide_followed: bool = False,  # 是否隐藏已关注的股票
         on_error: Optional[Callable[[Exception], None]] = None,
         on_not_found: Optional[Callable[[], None]] = None
 ) -> StockSelectorManager:
@@ -178,14 +201,17 @@ def create_stock_selector(
         category=category,
         prefix=prefix,
         on_select=on_select,
+        hide_followed=hide_followed,
         on_error=on_error or (lambda e: st.error(f"加载股票失败: {str(e)}")),
         on_not_found=on_not_found or (lambda: st.warning("未找到选中的股票"))
     )
     return StockSelectorManager(config)
 
+
 def handle_error(e: Exception):
     """处理错误"""
     show_message(f"处理股票选择时出错: {str(e)}", type="error")
+
 
 def handle_not_found():
     """处理未找到股票的情况"""

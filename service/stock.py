@@ -243,21 +243,14 @@ def show_follow_chart():
                                                </div>
                                                """
                                     st.markdown(card_html, unsafe_allow_html=True)
-                                    if st.button("K线图", key=f"kline_{stock.code}", type="secondary",
-                                                 use_container_width=True):
-                                        # 直接跳转到K线图页面而不是切换标签页
-                                        # 首先设置当前选中的股票
+                                    if st.button("K线图", key=f"kline_{stock.code}", type="secondary", use_container_width=True):
                                         current_stock_key = get_session_key(
                                             SessionKeys.CURRENT_STOCK,
                                             prefix=chartKP,
                                             category=stock.category
                                         )
                                         st.session_state[current_stock_key] = stock.code
-                                        
-                                        # 然后直接跳转到历史行情页面，这里包含K线图
                                         st.session_state.selected_page = "股票图表"
-                                        
-                                        # 重新运行应用以更新UI
                                         st.rerun()
     except Exception as e:
         st.error(f"加载关注股票数据失败：{str(e)}")
@@ -359,6 +352,15 @@ def show_follow_page(category: Category):
                             if st.button("移除关注", key=f"remove_{stock.code}", type="secondary", use_container_width=True):
                                 remove_follow(category, stock.code)
                                 st.rerun()
+                            if st.button("K线图", key=f"kline_{stock.code}", type="secondary", use_container_width=True):
+                                current_stock_key = get_session_key(
+                                    SessionKeys.CURRENT_STOCK,
+                                    prefix=chartKP,
+                                    category=stock.category
+                                )
+                                st.session_state[current_stock_key] = stock.code
+                                st.session_state.selected_page = "股票图表"
+                                st.rerun()
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
@@ -374,7 +376,8 @@ def show_add_follow(category: Category):
             prefix=prefix,
             on_select=lambda stock: st.session_state.update({selected_stock_key: stock.code}),
             on_error=handle_error,
-            on_not_found=handle_not_found
+            on_not_found=handle_not_found,
+            hide_followed=True,
         )
         selector.show_selector()
         selector.handle_current_stock()
