@@ -119,12 +119,6 @@ def paginate_dataframe(
         if f"{key_prefix}_search_values" not in st.session_state:
             st.session_state[f"{key_prefix}_search_values"] = {}
 
-        st.markdown(f"""
-            <div class="table-header">
-                <div class="table-title">{title}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
         # 处理搜索和操作按钮区域
         if search_config or action_config:
 
@@ -216,6 +210,25 @@ def paginate_dataframe(
         paginator = Pagination(query, page_size, search_config)
         if search_config:
             paginator.apply_search(st.session_state[f"{key_prefix}_search_values"])
+
+        # 渲染表格标题（包含统计信息）
+        current_page_for_header = st.session_state[f"{key_prefix}_current_page"]
+        page_size_for_header = st.session_state[f"{key_prefix}_page_size"]
+        total_pages_for_header = max(1, paginator.total_pages)
+        total_count_for_header = paginator.total_count
+        st.markdown(
+            f"""
+            <div class="table-header">
+                <div class="table-title">{title}</div>
+                <div class="table-meta">
+                    <span class="meta-chip">共 {total_count_for_header} 条</span>
+                    <span class="meta-chip">每页 {page_size_for_header} 条</span>
+                    <span class="meta-chip">第 {current_page_for_header}/{total_pages_for_header} 页</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         if paginator.total_count == 0:
             st.info("没有找到数据")
