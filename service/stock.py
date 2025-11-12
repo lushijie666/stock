@@ -261,7 +261,6 @@ def show_follow_chart():
 
 def show_follow_page(category: Category):
     show_add_follow(category=category)
-    st.divider()
     try:
         with get_db_session() as session:
             query = session.query(Stock).filter(
@@ -278,7 +277,7 @@ def show_follow_page(category: Category):
 
             # 添加搜索功能
             st.markdown("""
-            <div class="search-section">
+            <div class="manual-header">
                 <h5 class="search-title">
                     已关注的股票
                 </h5>

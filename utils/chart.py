@@ -55,6 +55,80 @@ class ChartBuilder:
             .set_colors(colors)
         )
         return pie
+        
+    @staticmethod
+    def create_bar_chart(x_data, y_data, series_name, title="", subtitle=""):
+        """
+        创建柱状图
+        
+        Args:
+            x_data: x轴数据列表
+            y_data: y轴数据列表
+            series_name: 系列名称
+            title: 图表标题
+            subtitle: 图表副标题
+            
+        Returns:
+            Bar: pyecharts的Bar实例
+        """
+        bar = (
+            Bar(init_opts=opts.InitOpts(theme="white", bg_color="white"))
+            .add_xaxis(x_data)
+            .add_yaxis(
+                series_name=series_name,
+                y_axis=y_data,
+                itemstyle_opts=opts.ItemStyleOpts(
+                    color="#3b82f6",
+                    opacity=0.8
+                ),
+                label_opts=opts.LabelOpts(
+                    is_show=True,
+                    position="top",
+                    font_size=10,
+                    color="#333"
+                )
+            )
+            .set_global_opts(
+                title_opts=opts.TitleOpts(
+                    title=title,
+                    subtitle=subtitle,
+                    pos_left="center",
+                    pos_top="5%",
+                    title_textstyle_opts=opts.TextStyleOpts(
+                        font_size=16,
+                        font_weight="bold"
+                    ),
+                    subtitle_textstyle_opts=opts.TextStyleOpts(
+                        font_size=12
+                    )
+                ),
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    axislabel_opts=opts.LabelOpts(
+                        font_size=10,
+                        rotate=45
+                    )
+                ),
+                yaxis_opts=opts.AxisOpts(
+                    type_="value",
+                    name="数量",
+                    name_location="middle",
+                    name_gap=40,
+                    splitline_opts=opts.SplitLineOpts(
+                        is_show=True,
+                        linestyle_opts=opts.LineStyleOpts(
+                            color="#f0f0f0",
+                            type_="dashed"
+                        )
+                    )
+                ),
+                tooltip_opts=opts.TooltipOpts(
+                    trigger="axis",
+                    axis_pointer_type="shadow"
+                )
+            )
+        )
+        return bar
 
     @staticmethod
     def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None):

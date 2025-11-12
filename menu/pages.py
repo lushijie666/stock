@@ -32,7 +32,7 @@ class Pages:
             icon="heart-fill",
         ),
         "所有股票": PageConfig(
-            title="所有股票",
+            title="股票信息",
             handler=stock.index,
             icon="grid",
         ),

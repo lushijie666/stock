@@ -57,7 +57,8 @@ def get_all_models() -> List[Type]:
     from models.real_time_data import RealTimeData
     from models.history_data import HistoryDateData
     from models.history_transaction import HistoryTransaction
-    return [Stock, RealTimeData, HistoryDateData, HistoryTransaction]
+    from models.sync_history import SyncHistory  # 添加同步历史模型
+    return [Stock, RealTimeData, HistoryDateData, HistoryTransaction, SyncHistory]
 
 
 def check_tables(conn, tables: List[Type]) -> List[str]:

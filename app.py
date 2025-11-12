@@ -3,6 +3,9 @@ from menu import dashboard, real_time_data
 import logging
 from config.database import check_db
 from menu.pages import Pages
+# 导入模型以确保数据库表创建
+from models import stock, history_data, history_transaction, real_time_data
+from models.sync_history import SyncHistory  # 导入新的同步历史模型
 
 # 页面配置
 st.set_page_config(
@@ -73,7 +76,7 @@ except Exception as e:
 def main():
     selected = st.session_state.selected_page
     st.markdown(f"""
-    <div class="breadcrumb-container">
+    <div class="location-header">
         <div class="breadcrumb-content">
             <span class="breadcrumb-icon">📍</span>
             <span class="breadcrumb-label">当前位置</span>
