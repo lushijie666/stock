@@ -42,7 +42,17 @@ class SchedulerManager:
         while self.running:
             self.scheduler.run_pending()
             time.sleep(1)
-    
+
+    def add_interval_job(self, job_id: str, func: Callable, interval_minutes: int = 10, *args, **kwargs):
+        """添加间隔定时任务"""
+        # 如果任务已存在，先移除
+        if job_id in self.jobs:
+            self.jobs[job_id].cancel()
+
+        # 添加新任务
+        job = self.scheduler.every(interval_minutes).minutes.do(func, *args, **kwargs)
+        self.jobs[job_id] = job
+        logger.info(f"添加间隔定时任务: {job_id} 每 {interval_minutes} 分钟执行一次")
     def add_daily_job(self, job_id: str, func: Callable, hour: int, minute: int, *args, **kwargs):
         """添加每日定时任务"""
         # 如果任务已存在，先移除

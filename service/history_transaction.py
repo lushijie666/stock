@@ -10,6 +10,7 @@ from functools import partial
 
 from sqlalchemy.orm import Session
 
+from service.stock import get_codes
 from utils.convert import date_range_filter, parse_datetime
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
@@ -97,6 +98,13 @@ def show_stock_detail(stock):
     """显示详情"""
     show_page(stock)
 
+
+def reload_by_category(category: Category):
+    codes = get_codes(category)
+    for code in codes:
+        logging.info(f"开始处理[{code}]数据...")
+        reload(code)
+        logging.info(f"结束处理[{code}]数据...")
 # reload
 def reload(code: str) -> list:
     today_str = datetime.now().date().strftime('%Y-%m-%d')
@@ -161,3 +169,33 @@ def fetch(code: str, date_str: str) -> list:
     except Exception as e:
         logging.error(f"Error fetching data: {str(e)}")
         return None
+
+
+def sync_history_transactions() -> Dict[str, Any]:
+    success_count = 0
+    failed_count = 0
+    logging.info(f"开始同步历史分笔数据")
+    try:
+        categories = Category.get_all()
+        for category in categories:
+            try:
+                logging.info(f"处理分类 {category.fullText} 的历史分笔数据")
+                reload_by_category(category)
+                success_count += 1
+                logging.info(f"成功同步分类 {category.fullText} 的历史分笔数据")
+            except Exception as e:
+                failed_count += 1
+                logging.error(f"同步分类 {category.fullText} 的历史分笔数据失败: {str(e)}")
+
+        logging.info(f"历史分笔数据同步完成，成功: {success_count}, 失败: {failed_count}")
+        return {
+            "success_count": success_count,
+            "failed_count": failed_count
+        }
+
+    except Exception as e:
+        logging.error(f"历史分笔同步过程中发生错误: {str(e)}")
+        return {
+            "success_count": success_count,
+            "failed_count": failed_count
+        }

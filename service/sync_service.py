@@ -147,7 +147,6 @@ def sync_history_data(start_date=None, end_date=None):
 
 
 def sync_history_transaction():
-    """同步历史交易数据"""
     record_id = _create_sync_record(SyncType.HISTORY_TRANSACTION)
     success_count = 0
     failed_count = 0
@@ -155,7 +154,7 @@ def sync_history_transaction():
     
     try:
         logger.info("开始同步历史交易数据")
-        # 调用历史交易服务的同步方法
+        # 调用历史交易服务的同步方法，传递时间范围参数
         result = history_transaction.sync_history_transactions()
         success_count = result.get('success_count', 0)
         failed_count = result.get('failed_count', 0)

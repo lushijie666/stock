@@ -191,3 +191,33 @@ def fetch(category: Category) -> list:
     except Exception as e:
         logging.error(f"Error fetching data: {str(e)}")
         return None
+
+
+def sync_real_time_data() -> Dict[str, Any]:
+    success_count = 0
+    failed_count = 0
+    logging.info(f"开始同步实时数据")
+    try:
+        categories = Category.get_all()
+        for category in categories:
+            try:
+                logging.info(f"处理分类 {category.fullText}")
+                reload(category)
+                success_count += 1
+                logging.info(f"成功同步分类 {category.fullText} 的实时数据")
+            except Exception as e:
+                failed_count += 1
+                logging.error(f"同步分类 {category.fullText} 的实时数据失败: {str(e)}")
+
+        logging.info(f"实时数据同步完成，成功: {success_count}, 失败: {failed_count}")
+        return {
+            "success_count": success_count,
+            "failed_count": failed_count
+        }
+
+    except Exception as e:
+        logging.error(f"实时数据同步过程中发生错误: {str(e)}")
+        return {
+            "success_count": success_count,
+            "failed_count": failed_count
+        }
