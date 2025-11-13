@@ -16,10 +16,11 @@ class SyncType(enum.Enum):
     def display_name(self):
         """获取显示名称"""
         type_map = {
-            SyncType.STOCK: "股票基本数据",
-            SyncType.HISTORY_DATA: "历史数据",
-            SyncType.HISTORY_TRANSACTION: "历史交易",
-            SyncType.REAL_TIME_DATA: "实时数据"
+            SyncType.STOCK: "股票信息",
+            SyncType.REAL_TIME_DATA: "实时行情",
+            SyncType.HISTORY_DATA: "历史行情",
+            SyncType.HISTORY_TRANSACTION: "历史分笔",
+
         }
         return type_map.get(self, "未知")
 
@@ -31,6 +32,16 @@ class SyncStatus(enum.Enum):
     SUCCESS = "success"
     FAILED = "failed"
 
+    @property
+    def display_name(self):
+        """获取显示名称"""
+        status_map = {
+            SyncStatus.PENDING: "等待中",
+            SyncStatus.RUNNING: "运行中",
+            SyncStatus.SUCCESS: "成功",
+            SyncStatus.FAILED: "失败"
+        }
+        return status_map.get(self, "未知")
 
 class SyncHistory(Base):
     """同步历史记录模型"""
@@ -62,9 +73,10 @@ class SyncHistory(Base):
     def sync_type_display(self):
         """获取同步类型显示文本"""
         type_map = {
-            "stock": "股票基本数据",
-            "history_data": "历史数据",
-            "history_transaction": "历史交易",
-            "real_time_data": "实时数据"
+            "stock": "股票信息",
+            "real_time_data": "实时行情",
+            "history_data": "历史行情",
+            "history_transaction": "历史分笔",
+
         }
         return type_map.get(self.sync_type, "未知")

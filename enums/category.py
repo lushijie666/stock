@@ -67,14 +67,29 @@ class Category(StrEnum):
         if not code:
             return cls.X_XX
             # 上海证券交易所
-        if code.startswith(('600', '601', '603', '605', '688', '689')):
+        if code.startswith(('600', '601', '603', '605', '688', '689')):  # 主板 + 科创板
             return cls.A_SH
-            # 深圳证券交易所（包括主板、中小板和创业板）
-        elif code.startswith(('000', '001', '002', '300')):
+        elif code.startswith(('900')):  # 沪市B股
+            return cls.A_SH
+        elif code.startswith(('500', '550')):  # 沪市基金
+            return cls.A_SH
+        # 深圳证券交易所（包括主板、中小板和创业板）
+        elif code.startswith(('000', '001', '002', '003')):  # 主板（含原中小板）
             return cls.A_SZ
-            # 北京证券交易所
-        elif code.startswith(('830', '83')):
+        elif code.startswith(('300')):  # 创业板
+            return cls.A_SZ  # 创业板属于深市
+        elif code.startswith(('200')):  # 深市B股
+            return cls.A_SZ
+        elif code.startswith(('150', '160', '161', '162', '163')):  # 深市基金
+            return cls.A_SZ
+        # 北京证券交易所
+        elif code.startswith(('8', '43', '83', '87', '88', '920')):  # 北交所股票 + 新三板做市
             return cls.A_BJ
+        # 其他特殊情况（如债券、REITs等）
+        elif code.startswith(('10', '11', '12', '13')):  # 沪/深债券（需进一步细分）
+            return cls.X_XX
+        elif code.startswith(('18')):  # REITs（基础设施基金）
+            return cls.X_XX
         return cls.X_XX
 
     @classmethod

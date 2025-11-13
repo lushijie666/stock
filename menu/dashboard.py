@@ -1,4 +1,5 @@
 import time  # 在文件顶部导入
+from datetime import datetime
 
 import streamlit as st
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
@@ -269,6 +270,10 @@ def show_manual_sync_dashboard():
             time.sleep(5)
             st.rerun()
 
+
+
+
+
 def show_sync_dashboard():
     st.markdown("""
     <div class="manual-header">
@@ -280,21 +285,24 @@ def show_sync_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
-    try:
-        summary_data = get_sync_summary()
-        # 每日同步次数图表
-        show_daily_sync_chart(summary_data)
-        # 同步类型分布图表
+    summary_data = get_sync_summary()
+
+    show_sync_main_dashboard(summary_data)
+    st.divider()
+    # 并排展示同步类型和状态分布图表
+    col_chart1, col_chart2 = st.columns(2)
+    with col_chart1:
         show_sync_type_distribution_chart(summary_data)
-        # 同步状态分布图表
+    with col_chart2:
         show_sync_status_distribution_chart(summary_data)
-        # 同步记录
-        show_sync_history_records(summary_data)
+
+    # 每日同步次数图表
+    show_daily_sync_chart(summary_data)
+
+    # 同步记录
+    show_sync_history_records(summary_data)
         
-    except Exception as e:
-        st.error(f"生成图表失败: {str(e)}")
-        import traceback
-        st.exception(e)
+
 
 def show_daily_sync_chart(summary_data):
     st.markdown("""
@@ -325,6 +333,40 @@ def show_daily_sync_chart(summary_data):
     except Exception as e:
         st.error(f"生成每日同步图表失败: {str(e)}")
 
+def show_sync_main_dashboard(summary_data):
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+            <div class="metric-sub-card metric-card-1">
+                <div class="metric-label">总同步次数</div>
+                <div class="metric-value">{summary_data["total_count"]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+            <div class="metric-sub-card metric-card-2">
+                <div class="metric-label">成功次数</div>
+                <div class="metric-value">{summary_data["success_count"]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+            <div class="metric-sub-card metric-card-3">
+                <div class="metric-label">失败次数</div>
+                <div class="metric-value">{summary_data["failed_count"]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+            <div class="metric-sub-card metric-card-4">
+                <div class="metric-label">成功率</div>
+                <div class="metric-value">{summary_data["success_rate"]}%</div>
+            </div>
+            """, unsafe_allow_html=True)
 def show_sync_type_distribution_chart(summary_data):
     st.markdown("""
     <div class="chart-header">
@@ -339,21 +381,14 @@ def show_sync_type_distribution_chart(summary_data):
             st.warning("暂无数据")
             return
 
-        # 创建类型显示名称映射
-        type_display_names = {
-            'stock_data': '股票数据',
-            'history_data': '历史数据',
-            'history_transaction': '历史分笔',
-            'real_time_data': '实时行情',
-            'all': '全部数据'
-        }
         # 转换为图表所需格式，使用显示名称
         chart_data = []
         try:
             for item in type_counts_data:
                 # 添加类型检查，确保item有正确的属性
                 if hasattr(item, 'type') and hasattr(item, 'count'):
-                    display_name = type_display_names.get(item.type, item.type)
+                    type_enum = SyncType(item.type) if isinstance(item.type, str) else item.type
+                    display_name = type_enum.display_name
                     chart_data.append([display_name, item.count])
         except Exception as inner_e:
             st.warning(f"数据处理过程中出现错误: {str(inner_e)}")
@@ -381,18 +416,10 @@ def show_sync_status_distribution_chart(summary_data):
     try:
         # 使用传入的统计数据
         status_counts_data = summary_data.get('status_counts', [])
-
         if not status_counts_data:
             st.warning("暂无数据")
             return
 
-        # 创建状态显示名称和颜色映射
-        status_display_names = {
-            'success': '成功',
-            'failed': '失败',
-            'running': '运行中',
-            'waiting': '等待中'
-        }
         color_map = {
             'success': '#10b981',
             'failed': '#ef4444',
@@ -405,7 +432,8 @@ def show_sync_status_distribution_chart(summary_data):
         colors = []
         try:
             for item in status_counts_data:
-                display_name = status_display_names.get(item.status, item.status)
+                status_enum = SyncStatus(item.status) if isinstance(item.status, str) else item.status
+                display_name = status_enum.display_name
                 chart_data.append([display_name, item.count])
                 colors.append(color_map.get(item.status, '#6b7280'))
         except Exception as inner_e:
@@ -420,18 +448,25 @@ def show_sync_status_distribution_chart(summary_data):
     except Exception as e:
         st.error(f"生成同步状态分布图表失败: {str(e)}")
 
-def show_sync_history_records():
+def show_sync_history_records(summary_data):
     st.markdown("""
-    <div class="sync-section-header sync-history-section">
-        <div class="section-icon">📋</div>
+    <div class="chart-header">
+        <div class="chart-icon">📋</div>
         <div>
-            <h2 class="section-title">同步历史记录</h2>
-            <p class="section-description">查看和管理所有同步操作的详细记录</p>
+            <div class="chart-title">同步历史记录</div>
+            <div class="manual-subtitle">查看和管理所有同步操作的详细记录</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     try:
+        # 从summary_data获取DataFrame
+        df = summary_data.get('df', pd.DataFrame())
+        
+        if df.empty:
+            st.warning("暂无同步历史记录")
+            return
+        
         # 筛选控件 - 使用卡片容器
         with st.container(border=True, key="filter_container"):
             st.markdown("""
@@ -450,97 +485,30 @@ def show_sync_history_records():
             with col2:
                 status_filter = st.selectbox(
                     "选择同步状态",
-                    ["全部"] + [s.value for s in SyncStatus],
+                    ["全部"] + [s.display_name for s in SyncStatus],
                     key="status_filter"
                 )
-        
-        # 转换筛选条件
-        sync_type = None
-        if sync_type_filter != "全部":
-            sync_type_map = {t.display_name: t for t in SyncType}
-            sync_type = sync_type_map.get(sync_type_filter)
-        
-        # 获取同步历史记录
-        records = get_sync_history(limit=50, sync_type=sync_type)
-        
-        if records:
-            # 转换为DataFrame
-            records_data = [{
-                '时间': record.start_time.strftime('%Y-%m-%d %H:%M:%S'),
-                '类型': record.sync_type_display,
-                '状态': record.status_display,
-                '成功数': record.success_count,
-                '失败数': record.failed_count,
-                '耗时(秒)': record.duration or 0,
-                '错误信息': record.error
-            } for record in records if status_filter == "全部" or record.status.value == status_filter]
             
-            df = pd.DataFrame(records_data)
-            
-            # 显示表格
-            if not df.empty:
-                # 隐藏错误信息列，通过展开行显示
-                display_df = df.drop(columns=['错误信息'])
-                
-                # 美化表格显示
-                st.markdown(f"""
-                <div class="history-list-header">
-                    <span class="history-icon">📊</span>
-                    <span class="history-title">历史记录列表</span>
-                    <span class="history-count">(共 {len(df)} 条)</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.dataframe(display_df, use_container_width=True, hide_index=True)
-                
-                # 显示失败记录详情
-                failed_records = df[df['状态'] == '失败']
-                if not failed_records.empty:
-                    with st.expander(f"🔍 查看失败记录详情 ({len(failed_records)} 条)", expanded=False, key="failed_records_expander"):
-                        for idx, record in failed_records.iterrows():
-                            # 使用更美观的卡片显示错误详情
-                            st.markdown(f"""
-                            <div class="error-record-card" key="error_record_{idx}">
-                                <div class="error-record-header">
-                                    <div>
-                                        <div class="error-record-time">🕐 {record['时间']}</div>
-                                        <div class="error-record-badges">
-                                            <span class="error-badge-type">📦 {record['类型']}</span>
-                                            <span class="error-badge-status">❌ {record['状态']}</span>
-                                        </div>
-                                    </div>
-                                    <div class="error-record-duration">
-                                        <div class="duration-label">⏱️ 耗时</div>
-                                        <div class="duration-value">{record['耗时(秒)']}秒</div>
-                                    </div>
-                                </div>
-                                <div class="error-record-stats">
-                                    <div class="stat-item">
-                                        <span class="stat-label">✅ 成功:</span>
-                                        <span class="stat-value-success">{record['成功数']}</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">❌ 失败:</span>
-                                        <span class="stat-value-failed">{record['失败数']}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            if record['错误信息']:
-                                # 使用更好看的卡片样式显示错误信息
-                                st.markdown(f"""
-                                <div class="error-message-card">
-                                    <div class="error-message-header">
-                                        <span>⚠️</span>
-                                        <span>错误信息</span>
-                                    </div>
-                                    <div class="error-message-content">
-                                        {record['错误信息']}
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-        
+            # 应用筛选条件
+            filtered_df = df.copy()
+            if sync_type_filter != "全部":
+                filtered_df = filtered_df[filtered_df['类型'] == sync_type_filter]
+            if status_filter != "全部":
+                filtered_df = filtered_df[filtered_df['状态'] == status_filter]
+
+            st.dataframe(
+                filtered_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "日期": st.column_config.TextColumn("日期"),
+                    "类型": st.column_config.TextColumn("同步类型"),
+                    "状态": st.column_config.TextColumn("同步状态"),
+                    "成功数": st.column_config.NumberColumn("成功数"),
+                    "失败数": st.column_config.NumberColumn("失败数"),
+                    "耗时(秒)": st.column_config.NumberColumn("耗时(秒)")
+                }
+            )
     except Exception as e:
         st.error(f"显示历史记录失败: {str(e)}")
 

@@ -1506,6 +1506,50 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
     border-radius: 10px;
 }
 
+/* 指标容器样式 */
+.metrics-container {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(124,58,237,0.05);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(124,58,237,0.1);
+}
+
+.metrics-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.metrics-icon {
+    font-size: 1.25rem;
+    margin-right: 0.5rem;
+}
+
+.metrics-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+/* 表格头部样式 */
+.table-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.table-icon {
+    font-size: 1.1rem;
+    margin-right: 0.5rem;
+}
+
+.table-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
 .manual-title-text {
     font-weight: 700;
     color: #1e293b;

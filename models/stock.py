@@ -40,6 +40,12 @@ class Stock(Base):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    def __repr__(self):
+        return (f"Stock(code='{self.code}', name='{self.name}', category={self.category}, "
+                f"full_name='{self.full_name}', ipo_at={self.ipo_at}, "
+                f"total_capital={self.total_capital}, flow_capital={self.flow_capital}, "
+                f"industry='{self.industry}', pinyin='{self.pinyin}')")
+
     def generate_pinyin(self):
         """生成拼音"""
         # 完整拼音

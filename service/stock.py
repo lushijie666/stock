@@ -461,7 +461,7 @@ def fetch(category: Category) -> list:
             df = fetch_func()
             logging.info(f"成功获取[{KEY_PREFIX}]数据，分类: {category.text}, 共 {len(df)} 条记录")
             data = []
-            for _, row in df.iterrows():
+            for i, row in df.iterrows():
                 try:
                     code = get_column_value(row, "code")
                     s = Stock(
@@ -475,6 +475,7 @@ def fetch(category: Category) -> list:
                         industry=row.get("所属行业"),
                     )
                     s.pinyin = s.generate_pinyin()
+                    logging.info(f"获取[{KEY_PREFIX}]到的数据 第 {i} 条, 信息为: {s}")
                     data.append(s)
                 except Exception as row_error:
                     logging.error(f"Error processing row: {row}, Error: {str(row_error)}")
