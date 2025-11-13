@@ -16,15 +16,12 @@ from models.stock import Stock
 from utils.chart import ChartBuilder
 from utils.convert import get_column_value, clean_number_value,clean_name
 from utils.db import get_db_session
-from utils.session import get_session_key, SessionKeys
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
-
 from utils.pagination import paginate_dataframe, SearchConfig, SearchField, ActionConfig, ActionButton
 from utils.session import get_session_key, SessionKeys
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 from utils.table import  format_pinyin_short
-from utils.uuid import generate_key
 
 KEY_PREFIX = "stock"
 
@@ -514,3 +511,58 @@ def get_followed_stocks_count():
     except Exception as e:
         logging.error(f"获取关注股票数失败: {str(e)}")
         return 0
+
+
+def sync_all_stocks() -> Dict[str, int]:
+    """
+    同步所有分类的股票数据
+    
+    Returns:
+        Dict: 包含成功和失败计数的字典
+            {"success_count": int, "failed_count": int}
+    """
+    success_count = 0
+    failed_count = 0
+    
+    logging.info("开始同步所有股票数据")
+    
+    # 遍历所有支持的股票分类
+    for category in [Category.A_SH, Category.A_SZ, Category.A_BJ]:
+        try:
+            logging.info(f"正在同步分类股票数据: {category.fullText}")
+            
+            # 创建特定分类的过滤器函数
+            def build_filter(args: Dict[str, Any], session: Session) -> List:
+                return [
+                    Stock.category == category,
+                ]
+            
+            # 创建重载处理器
+            reload_handler = create_reload_handler(
+                model=Stock,
+                fetch_func=fetch,
+                unique_fields=['code'],
+                build_filter=build_filter,
+                mark_existing=True,
+            )
+        
+            result = reload_handler.refresh_with_stats(
+                category=category
+            )
+
+            # 更新计数
+            success_count += result['success_count']
+            failed_count += result['failed_count']
+            
+            logging.info(f"分类 {category.fullText} 同步完成，成功: {result['success_count']}, 失败: {result['failed_count']}")
+                
+        except Exception as category_error:
+            logging.error(f"同步分类 {category.fullText} 失败: {str(category_error)}")
+            failed_count += 1
+    
+    logging.info(f"所有股票数据同步完成，总计 - 成功: {success_count}, 失败: {failed_count}")
+    
+    return {
+        "success_count": success_count,
+        "failed_count": failed_count
+    }

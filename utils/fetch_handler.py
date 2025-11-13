@@ -159,6 +159,49 @@ class ReloadHandler(Generic[T, D]):
         except Exception as e:
             logging.error(f"Refresh error: {str(e)}")
             return None
+            
+    def refresh_with_stats(self, *args, **kwargs) -> Dict[str, int]:
+        """
+        刷新数据并返回统计信息，不显示UI消息
+        
+        Returns:
+            Dict: 包含成功和失败计数的字典
+                {"success_count": int, "failed_count": int}
+        """
+        try:
+            data = self.config.fetch_func(*args, **kwargs)
+            if not data:
+                return {"success_count": 0, "failed_count": 0}
+                
+            with get_db_session() as session:
+                if self.config.mark_existing:
+                    filter_conditions = self.config.build_filter(kwargs, session)
+                    session.query(self.config.model).filter(
+                        *filter_conditions,
+                        self.config.model.removed == False
+                    ).update({
+                        'removed': True,
+                        'updated_at': datetime.now()
+                    }, synchronize_session=False)
+                    session.commit()
+                    
+                # 调用 upsert_objects 获取详细统计信息
+                upsert_result = upsert_objects(
+                    objects=data,
+                    session=session,
+                    model=self.config.model,
+                    unique_fields=self.config.unique_fields,
+                    **kwargs.get('upsert_options', {})
+                )
+                
+                return {
+                    "success_count": upsert_result['processed'],
+                    "failed_count": upsert_result['failed']
+                }
+        except Exception as e:
+            logging.error(f"Refresh with stats error: {str(e)}")
+            return {"success_count": 0, "failed_count": 1}
+
 
 @dataclass
 class DateRangeConfig:

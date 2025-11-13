@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, Text, Boolean, Enum as SQLEnum
+from sqlalchemy import BigInteger,Column, String, DateTime, Integer, Text, Boolean
 from sqlalchemy.sql import func
 from config.database import Base
 import enum
@@ -36,9 +36,9 @@ class SyncHistory(Base):
     """同步历史记录模型"""
     __tablename__ = "sync_history"
     
-    id = Column(String, primary_key=True, index=True)
-    sync_type = Column(SQLEnum(SyncType), nullable=False, index=True)
-    status = Column(SQLEnum(SyncStatus), nullable=False, default=SyncStatus.PENDING)
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    sync_type = Column(String(50), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default=SyncStatus.PENDING.value)
     start_time = Column(DateTime(timezone=True), server_default=func.now())
     end_time = Column(DateTime(timezone=True), nullable=True)
     duration = Column(Integer, nullable=True)  # 单位：秒
@@ -51,10 +51,10 @@ class SyncHistory(Base):
     def status_display(self):
         """获取状态显示文本"""
         status_map = {
-            SyncStatus.PENDING: "等待中",
-            SyncStatus.RUNNING: "运行中",
-            SyncStatus.SUCCESS: "成功",
-            SyncStatus.FAILED: "失败"
+            "pending": "等待中",
+            "running": "运行中",
+            "success": "成功",
+            "failed": "失败"
         }
         return status_map.get(self.status, "未知")
     
@@ -62,9 +62,9 @@ class SyncHistory(Base):
     def sync_type_display(self):
         """获取同步类型显示文本"""
         type_map = {
-            SyncType.STOCK: "股票基本数据",
-            SyncType.HISTORY_DATA: "历史数据",
-            SyncType.HISTORY_TRANSACTION: "历史交易",
-            SyncType.REAL_TIME_DATA: "实时数据"
+            "stock": "股票基本数据",
+            "history_data": "历史数据",
+            "history_transaction": "历史交易",
+            "real_time_data": "实时数据"
         }
         return type_map.get(self.sync_type, "未知")

@@ -7,17 +7,8 @@ from utils.scheduler import scheduler
 from service.sync_service import sync_stock_data, sync_history_data, sync_history_transaction, sync_real_time_data, get_sync_history, SyncType, get_sync_summary
 from models.sync_history import SyncHistory, SyncStatus
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Union
-from sqlalchemy import func
-import plotly.express as px
-import plotly.graph_objects as go
-from pyecharts.charts import Bar, Pie, Line
-from pyecharts import options as opts
-from pyecharts.commons.utils import JsCode
-from pyecharts.globals import ThemeType, ChartType
-from streamlit_echarts import st_echarts
+import streamlit_echarts
+from utils.chart import ChartBuilder
 
 
 
@@ -30,22 +21,35 @@ def index():
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 股票分类  ", "❤️ 关注股票  ", "📈 股票图表  ", "⏰ 定时同步  ", "📥 手动同步  ", "📈 同步图表  "])
 
     with tab1:
-        show_stock_category_dashboard()
+        # show_category_pie_chart()
+        #show_stock_category_dashboard()
+        #show_category_pie_chart_wrapper()
+        st.warning("注意：请勿重复点击同步按钮，否则可能会导致数据错误")
 
     with tab2:
         show_follow_stock_dashboard()
 
     with tab3:
         show_stock_dashboard()
-    
+
     with tab4:
         show_scheduler_sync_dashboard()
-    
+
     with tab5:
         show_manual_sync_dashboard()
 
     with tab6:
-        show_sync_dashboard()
+        show_category_pie_chart()
+        # show_category_pie_chart_wrapper()
+
+def show_category_pie_chart_wrapper():
+    # 创建一个与tab1不同的容器，避免图表冲突
+    with st.container(border=True, key="category_pie_chart_tab6_unique"):
+        # 确保只导入和调用一次函数
+        from service.stock import show_category_pie_chart
+        show_category_pie_chart()  # 只调用一次，避免重复渲染
+
+        
 
 def show_main_dashboard():
     total_stocks = get_total_stocks_count()
@@ -88,7 +92,7 @@ def show_stock_category_dashboard():
         </div>
     </div>
     """, unsafe_allow_html=True)
-    show_category_pie_chart()
+    #show_category_pie_chart()
 
 def show_follow_stock_dashboard():
     st.markdown("""
@@ -232,6 +236,13 @@ def show_manual_sync_dashboard():
         ("💼", "历史分笔", sync_history_transaction, "历史分笔", "sync-card-orange"),
     ]
     
+    # 创建同步状态变量（使用st.session_state确保按钮置灰效果）
+    if "is_syncing" not in st.session_state:
+        st.session_state.is_syncing = False
+    if "sync_data_type" not in st.session_state:
+        st.session_state.sync_data_type = None
+    
+    # 显示同步按钮
     sync_cols = st.columns(4)
     for idx, (icon, title, sync_func, data_type, color_class) in enumerate(sync_buttons):
         with sync_cols[idx]:
@@ -246,17 +257,37 @@ def show_manual_sync_dashboard():
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button(f"立即同步", use_container_width=True, type="primary", key=f"sync_btn_{idx}"):
-                with st.spinner(f"正在同步{data_type}..."):
-                    result = sync_func()
-                    if result["success"]:
-                        st.success(f"✅ 同步成功！成功: {result['success_count']}, 失败: {result['failed_count']}")
-                    else:
-                        st.error(f"❌ 同步失败: {result['error']}")
+            # 按钮置灰：当任何同步操作正在进行时，禁用所有按钮
+            if st.button(f"立即同步", use_container_width=True, type="primary", 
+                       key=f"sync_btn_{idx}", disabled=st.session_state.is_syncing):
+                # 标记为正在同步，并保存数据类型
+                st.session_state.is_syncing = True
+                st.session_state.sync_data_type = data_type
+                # 触发页面重新加载以更新按钮状态
+                st.rerun()
+    
+    # 在列外部显示同步结果（占据整行）
+    if st.session_state.is_syncing and st.session_state.sync_data_type:
+        try:
+            # 执行同步操作
+            result = sync_buttons[[btn[3] for btn in sync_buttons].index(st.session_state.sync_data_type)][2]()
+            
+            # 显示结果
+            if result["success"]:
+                st.success(f"✅ {st.session_state.sync_data_type}同步成功！成功: {result['success_count']}, 失败: {result['failed_count']}")
+            else:
+                st.error(f"❌ {st.session_state.sync_data_type}同步失败: {result['error']}")
+        finally:
+            # 同步完成后，重置状态
+            st.session_state.is_syncing = False
+            st.session_state.sync_data_type = None
+            
+            # st.rerun() todo 等待一会
 
 
 
 def show_sync_dashboard():
+
     st.markdown("""
     <div class="manual-header">
         <span class="manual-icon">📈</span>
@@ -283,6 +314,8 @@ def show_sync_dashboard():
         st.exception(e)
 
 def show_daily_sync_chart(summary_data):
+
+
     with st.container(border=True, key="daily_sync_chart_container_unique"):
         st.markdown("""
         <div class="chart-header">
@@ -290,30 +323,52 @@ def show_daily_sync_chart(summary_data):
             <span class="chart-title">每日同步次数</span>
         </div>
         """, unsafe_allow_html=True)
-        
+
         try:
-            # 使用传入的统计数据
             daily_counts_data = summary_data.get('daily_counts', [])
             if not daily_counts_data:
                 # 如果没有数据，直接显示警告信息
                 st.warning("暂无数据")
                 return
+
             # 转换为图表所需格式
-            dates = [str(item.date) for item in daily_counts_data]
-            counts = [item.count for item in daily_counts_data]
-            
-            # 使用ChartBuilder中的create_bar_chart方法创建柱状图
-            from utils.chart import ChartBuilder
-            bar = ChartBuilder.create_bar_chart(
-                x_data=dates,
-                y_data=counts,
-                series_name="同步次数",
-                title="每日同步数量"
-            )
+            try:
+                dates = [str(item.date) if hasattr(item, 'date') else str(item[0]) for item in daily_counts_data]
+                counts = [item.count if hasattr(item, 'count') else item[1] for item in daily_counts_data]
+            except Exception as data_error:
+                st.error(f"数据转换失败: {str(data_error)}")
+                return
+
+            # 导入st_pyecharts函数
+            from streamlit_echarts import st_pyecharts
+
+            # 创建柱状图
+            try:
+                bar = ChartBuilder.create_bar_chart(
+                    x_data=dates,
+                    y_data=counts,
+                    series_name="同步次数",
+                    title="每日同步数量"
+                )
+                st.write(f"图表创建成功, bar类型: {type(bar)}")
+            except Exception as chart_error:
+                st.error(f"图表创建失败: {str(chart_error)}")
+                import traceback
+                st.exception(chart_error)
+                return
+
             # 显示图表
-            st_echarts(options=bar.dump_options(), height="300px", key="daily_sync_chart_unique")
+            try:
+                st.write("调用st_pyecharts显示图表...")
+                st_pyecharts(bar, height="300px")
+            except Exception as render_error:
+                st.error(f"图表渲染失败: {str(render_error)}")
+                import traceback
+                st.exception(render_error)
         except Exception as e:
             st.error(f"生成每日同步图表失败: {str(e)}")
+            import traceback
+            st.exception(e)
             st.warning("暂无数据")
 
 def _show_sync_type_distribution_chart(summary_data):
@@ -361,14 +416,13 @@ def _show_sync_type_distribution_chart(summary_data):
                 st.warning("暂无数据")
                 return
             
-            # 使用ChartBuilder中的create_pie_chart方法创建饼图
-            from utils.chart import ChartBuilder
             pie_chart = ChartBuilder.create_pie_chart(
                 data_pairs=chart_data,
                 total=sum(count for _, count in chart_data)
             )
             
-            st_echarts(options=pie_chart.dump_options(), height="300px", key="sync_type_chart_unique")
+            # 显示图表（使用与stock.py相同的st_pyecharts方法）
+            streamlit_echarts.st_pyecharts(pie_chart, height="300px")
         except Exception as e:
             st.error(f"生成同步类型分布图表失败: {str(e)}")
             st.warning("暂无数据")
@@ -434,7 +488,8 @@ def _show_sync_status_distribution_chart(summary_data):
             # 设置自定义颜色
             status_pie.set_colors(colors)
             
-            st_echarts(options=status_pie.dump_options(), height="300px", key="sync_status_chart_unique")
+            # 显示图表（使用与stock.py相同的st_pyecharts方法）
+            streamlit_echarts.st_pyecharts(status_pie, height="300px")
         except Exception as e:
             st.error(f"生成同步状态分布图表失败: {str(e)}")
             st.warning("暂无数据")
