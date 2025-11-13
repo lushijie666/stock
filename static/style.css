@@ -1319,7 +1319,7 @@ hr {
 }
 
 .metric-value {
-    font-size: 2.5rem;
+    font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
     text-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -2142,4 +2142,46 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
+}
+
+
+div[data-testid="stRadio"] {
+    gap: 0.5rem;
+    background: linear-gradient(145deg, rgba(124,58,237,0.06), rgba(37,99,235,0.06));
+    border-radius: var(--radius-lg);
+    padding: 0.6rem 0.6rem;
+}
+
+div[data-testid="stRadio"] > div {
+    display: flex;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+/* Tab 按钮样式 */
+div[data-testid="stRadio"] > div > label {
+    padding: 0.3rem 1rem;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    border-radius: 0.5rem;
+    background: rgba(124,58,237,0.04);
+    border-color: var(--color-border);
+}
+
+/* 悬停效果 */
+div[data-testid="stRadio"] > div > label:hover {
+    background: linear-gradient(135deg, rgba(124,58,237,0.10), rgba(37,99,235,0.10));
+    color: var(--color-primary);
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.18);
+    transform: translateY(-1px);
+}
+
+/* 选中状态的样式 */
+div[data-testid="stRadio"] > div > label:has(input:checked) {
+    background: linear-gradient(135deg, #7c3aed 0%, #2563eb 55%, #22d3ee 100%);
+    color: #ffffff !important;
+    font-weight: 700;
+    box-shadow: 0 10px 24px rgba(124, 58, 237, 0.28);
+    transform: translateY(-1px);
+    border-color: rgba(124,58,237,0.35);
+    border-radius: 10px;
 }

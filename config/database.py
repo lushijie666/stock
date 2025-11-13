@@ -28,7 +28,11 @@ DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.
 engine = create_engine(
     DATABASE_URL,
     echo=False,  # 不使用SQLAlchemy的内置日志
-    connect_args={'client_encoding': 'utf8'}
+    connect_args={'client_encoding': 'utf8'},
+    pool_size=10,  # 连接池大小
+    max_overflow=5,  # 最大溢出连接数
+    pool_pre_ping=True,  # 连接池健康检查
+    pool_recycle=3600  # 连接回收时间（秒）
 )
 
 # SQL执行监听器

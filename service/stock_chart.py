@@ -18,19 +18,18 @@ from utils.uuid import generate_key
 
 KEY_PREFIX = "stock_chart"
 def show_detail(stock):
-    tab1, tab2 = st.tabs([
-        f"K线图",
-        f"K线图处理"
-    ])
-
-    # 在第一个标签页中显示普通K线图
-    with tab1:
-        show_chart_page(stock)
-
-    # 在第二个标签页中显示包含&分型处理后的K线图
-    with tab2:
-        show_process_chart_page(stock)
-
+    chart_type = st.radio(
+        "",
+        ["K线图", "K线图处理"],
+        horizontal=True,
+        key=f"chart_type_{stock.code}",
+        label_visibility="collapsed"
+    )
+    chart_handlers = {
+        "K线图": lambda: show_chart_page(stock),
+        "K线图处理": lambda: show_process_chart_page(stock)
+    }
+    chart_handlers.get(chart_type, lambda: None)()
 
 def show_chart_page(stock):
     try:

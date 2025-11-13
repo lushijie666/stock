@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 import pandas as pd
 from sqlalchemy import func, extract, text
@@ -274,30 +274,38 @@ def get_sync_summary() -> Dict[str, Any]:
                 'success_count': last_sync_record.success_count,
                 'failed_count': last_sync_record.failed_count
             } if last_sync_record else None
-            
-            # 4. 获取每日同步次数统计
+
+            # 4. 获取每日同步次数统计（近90天）
             daily_counts_query = session.query(
                 func.date(SyncHistory.start_time).label('date'),
                 func.count(SyncHistory.id).label('count')
+            ).filter(
+                SyncHistory.start_time >= datetime.now(timezone.utc) - timedelta(days=90)
             ).group_by(func.date(SyncHistory.start_time)).order_by('date')
             daily_counts_data = daily_counts_query.all()
-            
-            # 5. 获取同步类型分布
+
+            # 5. 获取同步类型分布（近90天）
             type_counts_query = session.query(
                 SyncHistory.sync_type.label('type'),
                 func.count(SyncHistory.id).label('count')
+            ).filter(
+                SyncHistory.start_time >= datetime.now(timezone.utc) - timedelta(days=90)
             ).group_by(SyncHistory.sync_type)
             type_counts_data = type_counts_query.all()
-            
-            # 6. 获取同步状态分布
+
+            # 6. 获取同步状态分布（近90天）
             status_counts_query = session.query(
                 SyncHistory.status.label('status'),
                 func.count(SyncHistory.id).label('count')
+            ).filter(
+                SyncHistory.start_time >= datetime.now(timezone.utc) - timedelta(days=90)
             ).group_by(SyncHistory.status)
             status_counts_data = status_counts_query.all()
-            
-            # 7. 获取最近的同步记录（限制50条用于基本信息显示）
-            recent_records = session.query(SyncHistory).order_by(SyncHistory.start_time.desc()).limit(50).all()
+
+            # 7. 获取最近的同步记录（近90天，限制50条用于基本信息显示）
+            recent_records = session.query(SyncHistory).filter(
+                SyncHistory.start_time >= datetime.now(timezone.utc) - timedelta(days=90)
+            ).order_by(SyncHistory.start_time.desc()).limit(50).all()
             
             # 8. 创建用于图表显示的基础DataFrame
             if recent_records:

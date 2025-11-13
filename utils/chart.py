@@ -57,20 +57,23 @@ class ChartBuilder:
         return pie
         
     @staticmethod
-    def create_bar_chart(x_data, y_data, series_name, title="", subtitle=""):
+    def create_bar_chart(x_data, y_data, series_name, colors=None):
         """
         创建柱状图
-        
+
         Args:
             x_data: x轴数据列表
             y_data: y轴数据列表
             series_name: 系列名称
-            title: 图表标题
-            subtitle: 图表副标题
-            
+            colors: 颜色列表，用于设置柱子颜色
+
         Returns:
             Bar: pyecharts的Bar实例
         """
+        if colors is None:
+            colors = ["#3b82f6", "#87CEFA", "#98FB98", "#DDA0DD", "#F0E68C",
+                      "#E6E6FA", "#FFA07A", "#B0E0E6", "#FFDAB9", "#D8BFD8"]
+
         bar = (
             Bar(init_opts=opts.InitOpts(theme="white", bg_color="white"))
             .add_xaxis(x_data)
@@ -78,7 +81,12 @@ class ChartBuilder:
                 series_name=series_name,
                 y_axis=y_data,
                 itemstyle_opts=opts.ItemStyleOpts(
-                    color="#3b82f6",
+                    color=JsCode(f"""
+                        function(params) {{
+                            var colorList = {str(colors)};
+                            return colorList[params.dataIndex % colorList.length];
+                        }}
+                    """),
                     opacity=0.8
                 ),
                 label_opts=opts.LabelOpts(
@@ -90,10 +98,10 @@ class ChartBuilder:
             )
             .set_global_opts(
                 title_opts=opts.TitleOpts(
-                    title=title,
-                    subtitle=subtitle,
-                    pos_left="center",
-                    pos_top="5%",
+                    title="",
+                    subtitle="",
+                    pos_left="left",
+                    pos_bottom="5%",
                     title_textstyle_opts=opts.TextStyleOpts(
                         font_size=16,
                         font_weight="bold"

@@ -1,3 +1,5 @@
+import time  # 在文件顶部导入
+
 import streamlit as st
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
 from enums.category import Category
@@ -18,37 +20,22 @@ def index():
 
     st.markdown("---")
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 股票分类  ", "❤️ 关注股票  ", "📈 股票图表  ", "⏰ 定时同步  ", "📥 手动同步  ", "📈 同步图表  "])
-
-    with tab1:
-        # show_category_pie_chart()
-        #show_stock_category_dashboard()
-        #show_category_pie_chart_wrapper()
-        st.warning("注意：请勿重复点击同步按钮，否则可能会导致数据错误")
-
-    with tab2:
-        show_follow_stock_dashboard()
-
-    with tab3:
-        show_stock_dashboard()
-
-    with tab4:
-        show_scheduler_sync_dashboard()
-
-    with tab5:
-        show_manual_sync_dashboard()
-
-    with tab6:
-        show_category_pie_chart()
-        # show_category_pie_chart_wrapper()
-
-def show_category_pie_chart_wrapper():
-    # 创建一个与tab1不同的容器，避免图表冲突
-    with st.container(border=True, key="category_pie_chart_tab6_unique"):
-        # 确保只导入和调用一次函数
-        from service.stock import show_category_pie_chart
-        show_category_pie_chart()  # 只调用一次，避免重复渲染
-
+    dashboard_type = st.radio(
+        "",
+        ["📊 股票分类  ", "❤️ 关注股票  ", "📈 股票图表  ", "⏰ 定时同步  ", "📥 手动同步  ", "📈 同步图表  "],
+        horizontal=True,
+        key=f"dashboard_type",
+        label_visibility="collapsed"
+    )
+    dashboard_handlers = {
+        "📊 股票分类  ": lambda: show_stock_category_dashboard(),
+        "❤️ 关注股票  ": lambda: show_follow_stock_dashboard(),
+        "📈 股票图表  ": lambda: show_stock_dashboard(),
+        "⏰ 定时同步  ": lambda: show_scheduler_sync_dashboard(),
+        "📥 手动同步  ": lambda: show_manual_sync_dashboard(),
+        "📈 同步图表  ": lambda: show_sync_dashboard(),
+    }
+    dashboard_handlers.get(dashboard_type, lambda: None)()
         
 
 def show_main_dashboard():
@@ -92,7 +79,7 @@ def show_stock_category_dashboard():
         </div>
     </div>
     """, unsafe_allow_html=True)
-    #show_category_pie_chart()
+    show_category_pie_chart()
 
 def show_follow_stock_dashboard():
     st.markdown("""
@@ -212,8 +199,6 @@ def show_scheduler_sync_dashboard():
     st.markdown("""
     </div>
     """, unsafe_allow_html=True)
-    
-
 
 
 def show_manual_sync_dashboard():
@@ -231,7 +216,7 @@ def show_manual_sync_dashboard():
 
     sync_buttons = [
         ("📊", "股票信息", sync_stock_data, "股票信息", "sync-card-purple"),
-        ("⚡", "实时行情", sync_real_time_data, "实时行情", "sync-card-blue"),
+        ("⚡",  "实时行情", sync_real_time_data, "实时行情", "sync-card-blue"),
         ("📈", "历史行情", sync_history_data, "历史行情", "sync-card-green"),
         ("💼", "历史分笔", sync_history_transaction, "历史分笔", "sync-card-orange"),
     ]
@@ -281,13 +266,10 @@ def show_manual_sync_dashboard():
             # 同步完成后，重置状态
             st.session_state.is_syncing = False
             st.session_state.sync_data_type = None
-            
-            # st.rerun() todo 等待一会
-
-
+            time.sleep(5)
+            st.rerun()
 
 def show_sync_dashboard():
-
     st.markdown("""
     <div class="manual-header">
         <span class="manual-icon">📈</span>
@@ -302,11 +284,12 @@ def show_sync_dashboard():
         summary_data = get_sync_summary()
         # 每日同步次数图表
         show_daily_sync_chart(summary_data)
-
-        _show_sync_type_distribution_chart(summary_data)
-        
+        # 同步类型分布图表
+        show_sync_type_distribution_chart(summary_data)
         # 同步状态分布图表
-        _show_sync_status_distribution_chart(summary_data)
+        show_sync_status_distribution_chart(summary_data)
+        # 同步记录
+        show_sync_history_records(summary_data)
         
     except Exception as e:
         st.error(f"生成图表失败: {str(e)}")
@@ -314,189 +297,130 @@ def show_sync_dashboard():
         st.exception(e)
 
 def show_daily_sync_chart(summary_data):
+    st.markdown("""
+    <div class="chart-header">
+        <span class="chart-icon">📅</span>
+        <span class="chart-title">每日同步次数    (近90天)</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-
-    with st.container(border=True, key="daily_sync_chart_container_unique"):
-        st.markdown("""
-        <div class="chart-header">
-            <span class="chart-icon">📅</span>
-            <span class="chart-title">每日同步次数</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        try:
-            daily_counts_data = summary_data.get('daily_counts', [])
-            if not daily_counts_data:
-                # 如果没有数据，直接显示警告信息
-                st.warning("暂无数据")
-                return
-
-            # 转换为图表所需格式
-            try:
-                dates = [str(item.date) if hasattr(item, 'date') else str(item[0]) for item in daily_counts_data]
-                counts = [item.count if hasattr(item, 'count') else item[1] for item in daily_counts_data]
-            except Exception as data_error:
-                st.error(f"数据转换失败: {str(data_error)}")
-                return
-
-            # 导入st_pyecharts函数
-            from streamlit_echarts import st_pyecharts
-
-            # 创建柱状图
-            try:
-                bar = ChartBuilder.create_bar_chart(
-                    x_data=dates,
-                    y_data=counts,
-                    series_name="同步次数",
-                    title="每日同步数量"
-                )
-                st.write(f"图表创建成功, bar类型: {type(bar)}")
-            except Exception as chart_error:
-                st.error(f"图表创建失败: {str(chart_error)}")
-                import traceback
-                st.exception(chart_error)
-                return
-
-            # 显示图表
-            try:
-                st.write("调用st_pyecharts显示图表...")
-                st_pyecharts(bar, height="300px")
-            except Exception as render_error:
-                st.error(f"图表渲染失败: {str(render_error)}")
-                import traceback
-                st.exception(render_error)
-        except Exception as e:
-            st.error(f"生成每日同步图表失败: {str(e)}")
-            import traceback
-            st.exception(e)
+    try:
+        daily_counts_data = summary_data.get('daily_counts', [])
+        if not daily_counts_data:
             st.warning("暂无数据")
-
-def _show_sync_type_distribution_chart(summary_data):
-    """显示同步类型分布图表"""
-    with st.container(border=True, key="sync_type_chart_container_unique"):
-        st.markdown("""
-        <div class="chart-header">
-            <span class="chart-icon">🎯</span>
-            <span class="chart-title">同步类型分布</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
+            return
+        # 转换为图表所需格式
         try:
-            # 使用传入的统计数据
-            type_counts_data = summary_data.get('type_counts', [])
-            
-            if not type_counts_data:
-                # 如果没有数据，直接显示警告信息
-                st.warning("暂无数据")
-                return
-            
-            # 创建类型显示名称映射
-            type_display_names = {
-                'stock_data': '股票数据',
-                'history_data': '历史数据',
-                'history_transaction': '历史分笔',
-                'real_time_data': '实时行情',
-                'all': '全部数据'
-            }
-            
-            # 转换为图表所需格式，使用显示名称
-            chart_data = []
-            try:
-                for item in type_counts_data:
-                    # 添加类型检查，确保item有正确的属性
-                    if hasattr(item, 'type') and hasattr(item, 'count'):
-                        display_name = type_display_names.get(item.type, item.type)
-                        chart_data.append([display_name, item.count])
-            except Exception as inner_e:
-                st.warning(f"数据处理过程中出现错误: {str(inner_e)}")
-                st.warning("暂无数据")
-                return
-            
-            if not chart_data:
-                st.warning("暂无数据")
-                return
-            
-            pie_chart = ChartBuilder.create_pie_chart(
-                data_pairs=chart_data,
-                total=sum(count for _, count in chart_data)
-            )
-            
-            # 显示图表（使用与stock.py相同的st_pyecharts方法）
-            streamlit_echarts.st_pyecharts(pie_chart, height="300px")
-        except Exception as e:
-            st.error(f"生成同步类型分布图表失败: {str(e)}")
+            dates = [str(item.date) if hasattr(item, 'date') else str(item[0]) for item in daily_counts_data]
+            counts = [item.count if hasattr(item, 'count') else item[1] for item in daily_counts_data]
+        except Exception as data_error:
+            st.error(f"数据处理过程中出现错误: {str(data_error)}")
+            return
+        bar_chart = ChartBuilder.create_bar_chart(
+            x_data=dates,
+            y_data=counts,
+            series_name=""
+        )
+        streamlit_echarts.st_pyecharts(bar_chart, height="300px")
+    except Exception as e:
+        st.error(f"生成每日同步图表失败: {str(e)}")
+
+def show_sync_type_distribution_chart(summary_data):
+    st.markdown("""
+    <div class="chart-header">
+        <span class="chart-icon">🎯</span>
+        <span class="chart-title">同步类型分布    (近90天)</span>
+    </div>
+    """, unsafe_allow_html=True)
+    try:
+        # 使用传入的统计数据
+        type_counts_data = summary_data.get('type_counts', [])
+        if not type_counts_data:
             st.warning("暂无数据")
+            return
 
-def _show_sync_status_distribution_chart(summary_data):
-    """显示同步状态分布图表"""
-    with st.container(border=True, key="sync_status_chart_container_unique"):
-        st.markdown("""
-        <div class="chart-header">
-            <span class="chart-icon">📊</span>
-            <span class="chart-title">同步状态分布</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
+        # 创建类型显示名称映射
+        type_display_names = {
+            'stock_data': '股票数据',
+            'history_data': '历史数据',
+            'history_transaction': '历史分笔',
+            'real_time_data': '实时行情',
+            'all': '全部数据'
+        }
+        # 转换为图表所需格式，使用显示名称
+        chart_data = []
         try:
-            # 使用传入的统计数据
-            status_counts_data = summary_data.get('status_counts', [])
-            
-            if not status_counts_data:
-                # 如果没有数据，直接显示警告信息
-                st.warning("暂无数据")
-                return
-            
-            # 创建状态显示名称和颜色映射
-            status_display_names = {
-                'success': '成功',
-                'failed': '失败',
-                'running': '运行中',
-                'waiting': '等待中'
-            }
-            
-            color_map = {
-                'success': '#10b981',
-                'failed': '#ef4444',
-                'running': '#3b82f6',
-                'waiting': '#f59e0b'
-            }
-            
-            # 转换为图表所需格式，使用显示名称
-            chart_data = []
-            colors = []
-            try:
-                for item in status_counts_data:
-                    display_name = status_display_names.get(item.status, item.status)
+            for item in type_counts_data:
+                # 添加类型检查，确保item有正确的属性
+                if hasattr(item, 'type') and hasattr(item, 'count'):
+                    display_name = type_display_names.get(item.type, item.type)
                     chart_data.append([display_name, item.count])
-                    colors.append(color_map.get(item.status, '#6b7280'))
-            except Exception as inner_e:
-                st.warning(f"数据处理过程中出现错误: {str(inner_e)}")
-                st.warning("暂无数据")
-                return
-            
-            if not chart_data:
-                st.warning("暂无数据")
-                return
-            
-            # 使用ChartBuilder中的create_pie_chart方法创建饼图
-            from utils.chart import ChartBuilder
-            status_pie = ChartBuilder.create_pie_chart(
-                data_pairs=chart_data,
-                total=sum(count for _, count in chart_data)
-            )
-            
-            # 设置自定义颜色
-            status_pie.set_colors(colors)
-            
-            # 显示图表（使用与stock.py相同的st_pyecharts方法）
-            streamlit_echarts.st_pyecharts(status_pie, height="300px")
-        except Exception as e:
-            st.error(f"生成同步状态分布图表失败: {str(e)}")
+        except Exception as inner_e:
+            st.warning(f"数据处理过程中出现错误: {str(inner_e)}")
+            return
+        if not chart_data:
             st.warning("暂无数据")
+            return
+        pie_chart = ChartBuilder.create_pie_chart(
+            data_pairs=chart_data,
+            total=sum(count for _, count in chart_data)
+        )
+        streamlit_echarts.st_pyecharts(pie_chart, height="300px")
+    except Exception as e:
+        st.error(f"生成同步类型分布图表失败: {str(e)}")
 
-def _show_sync_history_records():
-    """显示同步历史记录和筛选控件"""
-    # 第三行：同步历史记录标题
+def show_sync_status_distribution_chart(summary_data):
+    """显示同步状态分布图表"""
+    st.markdown("""
+    <div class="chart-header">
+        <span class="chart-icon">📊</span>
+        <span class="chart-title">同步状态分布</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    try:
+        # 使用传入的统计数据
+        status_counts_data = summary_data.get('status_counts', [])
+
+        if not status_counts_data:
+            st.warning("暂无数据")
+            return
+
+        # 创建状态显示名称和颜色映射
+        status_display_names = {
+            'success': '成功',
+            'failed': '失败',
+            'running': '运行中',
+            'waiting': '等待中'
+        }
+        color_map = {
+            'success': '#10b981',
+            'failed': '#ef4444',
+            'running': '#3b82f6',
+            'waiting': '#f59e0b'
+        }
+
+        # 转换为图表所需格式，使用显示名称
+        chart_data = []
+        colors = []
+        try:
+            for item in status_counts_data:
+                display_name = status_display_names.get(item.status, item.status)
+                chart_data.append([display_name, item.count])
+                colors.append(color_map.get(item.status, '#6b7280'))
+        except Exception as inner_e:
+            st.warning(f"数据处理过程中出现错误: {str(inner_e)}")
+            return
+        status_pie = ChartBuilder.create_pie_chart(
+            data_pairs=chart_data,
+            total=sum(count for _, count in chart_data),
+            colors=colors
+        )
+        streamlit_echarts.st_pyecharts(status_pie, height="300px")
+    except Exception as e:
+        st.error(f"生成同步状态分布图表失败: {str(e)}")
+
+def show_sync_history_records():
     st.markdown("""
     <div class="sync-section-header sync-history-section">
         <div class="section-icon">📋</div>
@@ -619,6 +543,4 @@ def _show_sync_history_records():
         
     except Exception as e:
         st.error(f"显示历史记录失败: {str(e)}")
-        import traceback
-        st.exception(e)
 
