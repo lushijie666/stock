@@ -515,20 +515,14 @@ def get_followed_stocks_count():
 
 
 def sync_all_stocks() -> Dict[str, int]:
-    """
-    同步所有分类的股票数据
-    
-    Returns:
-        Dict: 包含成功和失败计数的字典
-            {"success_count": int, "failed_count": int}
-    """
     success_count = 0
     failed_count = 0
     
     logging.info("开始同步所有股票数据")
     
     # 遍历所有支持的股票分类
-    for category in [Category.A_SH, Category.A_SZ, Category.A_BJ]:
+    categories = Category.get_all()
+    for category in categories:
         try:
             logging.info(f"正在同步分类股票数据: {category.fullText}")
             

@@ -105,8 +105,7 @@ def sync_stock_data():
         return {"success": False, "error": error_msg}
 
 
-def sync_history_data():
-    """同步历史数据"""
+def sync_history_data(start_date=None, end_date=None):
     record_id = _create_sync_record(SyncType.HISTORY_DATA)
     success_count = 0
     failed_count = 0
@@ -114,8 +113,8 @@ def sync_history_data():
     
     try:
         logger.info("开始同步历史数据")
-        # 调用历史数据服务的同步方法
-        result = history_data.sync_history_data()
+        # 调用历史数据服务的同步方法，传递时间范围参数
+        result = history_data.sync_history_data(start_date=start_date, end_date=end_date)
         success_count = result.get('success_count', 0)
         failed_count = result.get('failed_count', 0)
         

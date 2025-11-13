@@ -1,5 +1,5 @@
 from enum import Enum, StrEnum
-from typing import Tuple
+from typing import Tuple, List
 
 
 class Category(StrEnum):
@@ -99,3 +99,7 @@ class Category(StrEnum):
         code = full_code[2:]
         category = cls.from_stock_code(code)
         return category, code
+
+    @classmethod
+    def get_all(cls) -> List['Category']:
+        return [cls.A_SH, cls.A_SZ, cls.A_BJ]

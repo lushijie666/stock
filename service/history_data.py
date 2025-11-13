@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Any, List
 from functools import partial
 from sqlalchemy.orm import Session
+from datetime import date, timedelta
 
 
 from service.stock import get_codes
@@ -196,3 +197,44 @@ def fetch_by_date(code: str, start_date: str, end_date: str) -> list:
     except Exception as e:
         logging.error(f"Error fetching data: {str(e)}")
         return None
+
+
+def sync_history_data(start_date=None, end_date=None) -> Dict[str, Any]:
+    success_count = 0
+    failed_count = 0
+    # 如果没有提供时间范围，默认为近7天
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = end_date - timedelta(days=7)
+
+    # 转换为字符串格式
+    start_date_str = start_date.strftime('%Y-%m-%d')
+    end_date_str = end_date.strftime('%Y-%m-%d')
+
+    logging.info(f"开始同步历史数据，时间范围：{start_date_str} 至 {end_date_str}")
+
+    try:
+        categories = Category.get_all()
+        for category in categories:
+            try:
+                logging.info(f"处理分类 {category.fullText}")
+                reload_by_category_date(category, start_date_str, end_date_str)
+                success_count += 1
+                logging.info(f"成功同步分类 {category.fullText} 的历史数据")
+            except Exception as e:
+                failed_count += 1
+                logging.error(f"同步分类 {category.fullText} 的历史数据失败: {str(e)}")
+
+        logging.info(f"历史数据同步完成，成功: {success_count}, 失败: {failed_count}")
+        return {
+            "success_count": success_count,
+            "failed_count": failed_count
+        }
+
+    except Exception as e:
+        logging.error(f"历史数据同步过程中发生错误: {str(e)}")
+        return {
+            "success_count": success_count,
+            "failed_count": failed_count
+        }

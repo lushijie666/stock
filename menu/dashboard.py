@@ -215,11 +215,14 @@ def show_manual_sync_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
+    end_date = pd.Timestamp.now().date()
+    start_date = end_date - pd.Timedelta(days=30)
+
     sync_buttons = [
-        ("📊", "股票信息", sync_stock_data, "股票信息", "sync-card-purple"),
-        ("⚡",  "实时行情", sync_real_time_data, "实时行情", "sync-card-blue"),
-        ("📈", "历史行情", sync_history_data, "历史行情", "sync-card-green"),
-        ("💼", "历史分笔", sync_history_transaction, "历史分笔", "sync-card-orange"),
+        ("📊", "股票信息", "同步所有股票", sync_stock_data, "股票信息", "sync-card-purple"),
+        ("⚡",  "实时行情", "同步所有股票近30天的数据", sync_real_time_data, "实时行情", "sync-card-blue"),
+        ("📈", "历史行情", "同步所有股票近30天的数据", lambda: sync_history_data(start_date, end_date), "历史行情", "sync-card-green"),
+        ("💼", "历史分笔", "同步所有股票近30天的数据", sync_history_transaction, "历史分笔", "sync-card-orange"),
     ]
     
     # 创建同步状态变量（使用st.session_state确保按钮置灰效果）
@@ -230,7 +233,7 @@ def show_manual_sync_dashboard():
     
     # 显示同步按钮
     sync_cols = st.columns(4)
-    for idx, (icon, title, sync_func, data_type, color_class) in enumerate(sync_buttons):
+    for idx, (icon, title, desc, sync_func, data_type, color_class) in enumerate(sync_buttons):
         with sync_cols[idx]:
             st.markdown(f"""
             <div class="sync-button-card {color_class}">
@@ -239,13 +242,13 @@ def show_manual_sync_dashboard():
                 </div>
                 <div class="sync-card-content">
                     <div class="sync-card-title">{title}</div>
+                    <div class="sync-card-desc">{desc}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
             # 按钮置灰：当任何同步操作正在进行时，禁用所有按钮
-            if st.button(f"立即同步", use_container_width=True, type="primary", 
-                       key=f"sync_btn_{idx}", disabled=st.session_state.is_syncing):
+            if st.button(f"立即同步", use_container_width=True, type="primary", key=f"sync_btn_{idx}", disabled=st.session_state.is_syncing):
                 # 标记为正在同步，并保存数据类型
                 st.session_state.is_syncing = True
                 st.session_state.sync_data_type = data_type
@@ -256,8 +259,7 @@ def show_manual_sync_dashboard():
     if st.session_state.is_syncing and st.session_state.sync_data_type:
         try:
             # 执行同步操作
-            result = sync_buttons[[btn[3] for btn in sync_buttons].index(st.session_state.sync_data_type)][2]()
-            
+            result = sync_buttons[[btn[4] for btn in sync_buttons].index(st.session_state.sync_data_type)][3]()
             # 显示结果
             if result["success"]:
                 st.success(f"✅ {st.session_state.sync_data_type}同步成功！成功: {result['success_count']}, 失败: {result['failed_count']}")
