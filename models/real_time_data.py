@@ -1,7 +1,7 @@
 from datetime import datetime as dt
 
 from config.database import Base
-from sqlalchemy import Column, BigInteger, String, Numeric, DateTime, Boolean, UniqueConstraint, Index
+from sqlalchemy import Column, BigInteger, String, Numeric, DateTime, Boolean, UniqueConstraint, Index, Date
 
 
 class RealTimeData(Base):
@@ -21,6 +21,8 @@ class RealTimeData(Base):
 
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
+
+    date = Column(Date)  # 日期
 
     # 价格相关
     current_price = Column(Numeric(10, 3))  # 最新价

@@ -7,7 +7,7 @@ from sqlalchemy import func, extract, text
 from utils.uuid import generate_key as generate_uuid
 from models.sync_history import SyncHistory, SyncType, SyncStatus
 from utils.db import get_db_session
-from service import stock, history_data, history_transaction, real_time_data
+from service import stock, history_data, history_transaction_data, real_time_data
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

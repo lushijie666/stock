@@ -159,6 +159,7 @@ def fetch(category: Category) -> list:
                     data.append(RealTimeData(
                         category=category,
                         code=code,
+                        data=dt.now(),
                         #name=row.get("名称"),
                         current_price=current_price,
                         change_percent=row.get("涨跌幅"),

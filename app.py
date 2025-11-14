@@ -4,7 +4,7 @@ import logging
 from config.database import check_db
 from menu.pages import Pages
 # 导入模型以确保数据库表创建
-from models import stock, history_data, history_transaction, real_time_data
+from models import stock, history_data, history_transaction_data, real_time_data
 from models.sync_history import SyncHistory  # 导入新的同步历史模型
 
 # 页面配置

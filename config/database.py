@@ -60,9 +60,9 @@ def get_all_models() -> List[Type]:
     from models.stock import Stock
     from models.real_time_data import RealTimeData
     from models.history_data import HistoryDateData
-    from models.history_transaction import HistoryTransaction
+    from models.history_transaction_data import HistoryTransactionData
     from models.sync_history import SyncHistory  # 添加同步历史模型
-    return [Stock, RealTimeData, HistoryDateData, HistoryTransaction, SyncHistory]
+    return [Stock, RealTimeData, HistoryDateData, HistoryTransactionData, SyncHistory]
 
 
 def check_tables(conn, tables: List[Type]) -> List[str]:

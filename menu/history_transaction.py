@@ -2,7 +2,7 @@ import json
 import streamlit as st
 
 from enums.category import Category
-from service.history_transaction import show_stock_detail, KEY_PREFIX
+from service.history_transaction_data import show_stock_detail, KEY_PREFIX
 from utils.session import get_session_key, SessionKeys
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 

@@ -14,23 +14,23 @@ from service.stock import get_codes
 from utils.convert import date_range_filter, parse_datetime
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
-from models.history_transaction import HistoryTransaction
+from models.history_transaction_data import HistoryTransactionData
 from enums.category import Category
 from utils.db import get_db_session, upsert_objects
 from datetime import date, timedelta
 from utils.pagination import paginate_dataframe, SearchConfig, SearchField, ActionButton, ActionConfig
 from utils.session import SessionKeys, get_session_key
 
-KEY_PREFIX = "history_transaction"
+KEY_PREFIX = "history_transaction_data"
 
 def show_page(stock):
     try:
         with get_db_session() as session:
             # 构建查询
-            query = session.query(HistoryTransaction).filter(
-                HistoryTransaction.code == stock.code,
-                HistoryTransaction.removed == False
-            ).order_by(HistoryTransaction.turnover_time.desc())
+            query = session.query(HistoryTransactionData).filter(
+                HistoryTransactionData.code == stock.code,
+                HistoryTransactionData.removed == False
+            ).order_by(HistoryTransactionData.turnover_time.desc())
             paginate_dataframe(
                 query,
                 10,
@@ -110,10 +110,10 @@ def reload(code: str) -> list:
     today_str = datetime.now().date().strftime('%Y-%m-%d')
     def build_filter(args: Dict[str, Any], session: Session) -> List:
         return [
-            HistoryTransaction.code == code,
+            HistoryTransactionData.code == code,
         ]
     history_handler = create_reload_handler(
-        model=HistoryTransaction,
+        model=HistoryTransactionData,
         fetch_func=fetch,
         unique_fields=['code', 'turnover_time'],
         build_filter=build_filter,
@@ -149,7 +149,7 @@ def fetch(code: str, date_str: str) -> list:
                     turnover_time = parse_datetime(date_str, time_str)
                     if not turnover_time:
                         continue
-                    data.append(HistoryTransaction(
+                    data.append(HistoryTransactionData(
                         category=category,
                         code=code,
                         turnover_time=turnover_time,

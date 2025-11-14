@@ -4,13 +4,13 @@ from config.database import Base
 from sqlalchemy import Column, BigInteger, String, Numeric, DateTime, Boolean, UniqueConstraint, Index
 
 
-class HistoryTransaction(Base):
-    __tablename__ = "history_transaction"
+class HistoryTransactionData(Base):
+    __tablename__ = "history_transaction_data"
 
     # 添加唯一约束
     __table_args__ = (
-        UniqueConstraint( 'code', 'turnover_time', name='uix_history_transaction_code_turnover_time'),
-        Index('idx_history_transaction_code_turnover_time', 'code', 'turnover_time'),
+        UniqueConstraint( 'code', 'turnover_time', name='uix_history_transaction_data_code_turnover_time'),
+        Index('idx_history_transaction_data_code_turnover_time', 'code', 'turnover_time'),
     )
 
     # 基础信息

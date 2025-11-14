@@ -4,7 +4,7 @@ from datetime import datetime
 import streamlit as st
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
 from enums.category import Category
-from service.stock_chart import show_history_kline_chart, KEY_PREFIX
+from service.stock_chart import show_chart_page, KEY_PREFIX
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 from utils.scheduler import scheduler
 from service.sync_service import sync_stock_data, sync_history_data, sync_history_transaction, sync_real_time_data, get_sync_history, SyncType, get_sync_summary
@@ -110,7 +110,7 @@ def show_stock_dashboard():
         selector = create_stock_selector(
             category=category,
             prefix=KEY_PREFIX,
-            on_select=show_history_kline_chart,
+            on_select=show_chart_page,
             on_error=handle_error,
             on_not_found=handle_not_found
         )
@@ -161,22 +161,22 @@ def show_scheduler_sync_dashboard():
     # 显示定时任务列表
     if is_running:
         st.markdown("""
-            <div class="scheduled-jobs-list">
+            <div class="scheduled-jobs-list" style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
                 <div class="job-item">
-                    <span class="job-time">08:30</span>
+                    <span class="job-time">09:30</span>
                     <span class="job-name">📊 股票信息</span>
                 </div>
                 <div class="job-item">
-                    <span class="job-time">每5分钟</span>
+                    <span class="job-time" style="font-weight: bold; margin-right: 8px; color: #2563eb;">11:00</span>
                     <span class="job-name">⚡ 实时行情</span>
                 </div>
                 <div class="job-item">
-                    <span class="job-time">9:00</span>
+                    <span class="job-time">10:00</span>
                     <span class="job-name">📈 历史行情</span>
                 </div>
                 <div class="job-item">
-                    <span class="job-time">17:00</span>
-                    <span class="job-name">💼 历史分笔</span>
+                    <span class="job-time">10:30</span>
+                    <span class="job-name">💼 同步分笔</span>
                 </div>
                
             </div>
@@ -191,10 +191,10 @@ def show_scheduler_sync_dashboard():
         if st.button("▶ 启动", use_container_width=True, type="primary", key="scheduler_start"):
             scheduler.start()
             # 添加定时任务
-            scheduler.add_daily_job("sync_stock", sync_stock_data, 8, 30)
-            scheduler.add_interval_job("sync_realtime", sync_real_time_data, 5)
-            scheduler.add_daily_job("sync_history", sync_history_data, 9, 0)
-            scheduler.add_daily_job("sync_transaction", sync_history_transaction, 17, 0)
+            scheduler.add_daily_job("sync_stock", sync_stock_data, 9, 30)
+            scheduler.add_daily_job("sync_realtime", sync_real_time_data, 11, 0)
+            scheduler.add_daily_job("sync_history", sync_history_data, 10, 0)
+            scheduler.add_daily_job("sync_transaction", sync_history_transaction, 10, 30)
             st.rerun()
     
     st.markdown("""
@@ -222,7 +222,7 @@ def show_manual_sync_dashboard():
         ("📊", "股票信息", "同步所有股票", sync_stock_data, "股票信息", "sync-card-purple"),
         ("⚡",  "实时行情", "同步所有股票近30天的数据", sync_real_time_data, "实时行情", "sync-card-blue"),
         ("📈", "历史行情", "同步所有股票近30天的数据", lambda: sync_history_data(start_date, end_date), "历史行情", "sync-card-green"),
-        ("💼", "历史分笔", "同步所有股票今天的数据", sync_history_transaction, "历史分笔", "sync-card-orange"),
+        ("💼", "历史分笔", "同步所有股票近30天的数据", sync_history_transaction, "历史分笔", "sync-card-orange"),
     ]
     
     # 创建同步状态变量（使用st.session_state确保按钮置灰效果）
