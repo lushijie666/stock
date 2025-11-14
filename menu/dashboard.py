@@ -4,7 +4,7 @@ from datetime import datetime
 import streamlit as st
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
 from enums.category import Category
-from service.stock_chart import show_chart_page, KEY_PREFIX
+from service.stock_chart import show_history_kline_chart, KEY_PREFIX
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 from utils.scheduler import scheduler
 from service.sync_service import sync_stock_data, sync_history_data, sync_history_transaction, sync_real_time_data, get_sync_history, SyncType, get_sync_summary
@@ -110,7 +110,7 @@ def show_stock_dashboard():
         selector = create_stock_selector(
             category=category,
             prefix=KEY_PREFIX,
-            on_select=show_chart_page,
+            on_select=show_history_kline_chart,
             on_error=handle_error,
             on_not_found=handle_not_found
         )

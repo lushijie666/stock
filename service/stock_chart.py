@@ -20,18 +20,18 @@ KEY_PREFIX = "stock_chart"
 def show_detail(stock):
     chart_type = st.radio(
         "",
-        ["K线图", "K线图处理"],
+        ["历史K线图", "历史K线图处理"],
         horizontal=True,
         key=f"chart_type_{stock.code}",
         label_visibility="collapsed"
     )
     chart_handlers = {
-        "K线图": lambda: show_chart_page(stock),
-        "K线图处理": lambda: show_process_chart_page(stock)
+        "历史K线图": lambda: show_history_kline_chart(stock),
+        "历史K线图处理": lambda: show_history_kline_process_chart(stock)
     }
     chart_handlers.get(chart_type, lambda: None)()
 
-def show_chart_page(stock):
+def show_history_kline_chart(stock):
     try:
         with get_db_session() as session:
             # 获取该股票的最早和最晚日期
@@ -51,9 +51,9 @@ def show_chart_page(stock):
             default_start_date = max(max_date - timedelta(days=90), min_date)
 
             # 使用固定的 key 前缀来保持日期选择器状态
-            chart_key_prefix = f"chart_page_{stock.code}"
+            chart_key_prefix = f"history_kline_chart_{stock.code}"
 
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_chart',category=stock.category)
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_history_chart',category=stock.category)
             start_date_key = f"{key_prefix}_start_date"
             end_date_key = f"{key_prefix}_end_date"
 
@@ -153,7 +153,7 @@ def show_chart_page(stock):
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
-def show_process_chart_page(stock):
+def show_history_kline_process_chart(stock):
     try:
         with get_db_session() as session:
             # 获取该股票的最早和最晚日期
@@ -173,7 +173,7 @@ def show_process_chart_page(stock):
             default_start_date = max(max_date - timedelta(days=90), min_date)
 
             # 使用统一的 key_prefix 方式
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_process_chart', category=stock.category)
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_process_history_chart', category=stock.category)
 
             # 初始化 session state 中的日期值
             start_date_key = f"{key_prefix}_start_date"
