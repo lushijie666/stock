@@ -179,7 +179,7 @@ def show_follow_chart():
                 stocks_list = category_stocks.get(category_name, [])
                 with tab:
                     original_category = category
-                    
+
                     # 如果该分类下没有关注的股票，显示提示信息
                     if not stocks_list:
                         st.info(f"{category_name}分类下暂无关注的股票")
@@ -250,7 +250,7 @@ def show_follow_chart():
                                                </div>
                                                """
                                     st.markdown(card_html, unsafe_allow_html=True)
-                                    if st.button("股票图表", key=f"kline_{stock.code}", type="secondary", use_container_width=True):
+                                    if st.button("股票图表", key=f"chart_{stock.code}", type="secondary", use_container_width=True):
                                         current_stock_key = get_session_key(
                                             SessionKeys.CURRENT_STOCK,
                                             prefix=chartKP,

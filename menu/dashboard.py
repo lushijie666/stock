@@ -31,7 +31,7 @@ def index():
     dashboard_handlers = {
         "📊 股票分类  ": lambda: show_stock_category_dashboard(),
         "❤️ 关注股票  ": lambda: show_follow_stock_dashboard(),
-        "📈 股票图表  ": lambda: show_stock_dashboard(),
+        "📈 股票图表  ": lambda: show_stock_chart_dashboard(),
         "⏰ 定时同步  ": lambda: show_scheduler_sync_dashboard(),
         "📥 手动同步  ": lambda: show_manual_sync_dashboard(),
         "📈 同步图表  ": lambda: show_sync_dashboard(),
@@ -94,7 +94,7 @@ def show_follow_stock_dashboard():
     """, unsafe_allow_html=True)
     show_follow_chart()
 
-def show_stock_dashboard():
+def show_stock_chart_dashboard():
     st.markdown("""
     <div class="manual-header">
         <span class="manual-icon">📈</span>
