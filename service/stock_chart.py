@@ -11,11 +11,17 @@ from utils.k_line_processor import KLineProcessor
 
 
 from utils.db import get_db_session
-from datetime import date, timedelta
+from datetime import  timedelta
 from utils.session import get_session_key, SessionKeys, get_date_range
 from utils.uuid import generate_key
 
 KEY_PREFIX = "stock_chart"
+
+
+@st.dialog("股票图表", width="large")
+def show_detail_dialog(stock):
+    show_detail(stock)
+
 def show_detail(stock):
     t = st.radio(
         "",
