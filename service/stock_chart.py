@@ -3,14 +3,13 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import func
 import streamlit_echarts
-
+from models.stock_history import get_history_model
+from enums.history_type import StockHistoryType
 from enums.patterns import Patterns
 from utils.chart import ChartBuilder, calculate_macd, calculate_macd_signals, calculate_sma_signals
 from utils.k_line_processor import KLineProcessor
-from utils.table import format_pinyin_short
 
 
-from models.history_data import HistoryDateData
 from utils.db import get_db_session
 from datetime import date, timedelta
 from utils.session import get_session_key, SessionKeys, get_date_range
@@ -18,42 +17,63 @@ from utils.uuid import generate_key
 
 KEY_PREFIX = "stock_chart"
 def show_detail(stock):
+    t = st.radio(
+        "",
+        ["天", "周", "月", "30分钟"],
+        horizontal=True,
+        key=f"{KEY_PREFIX}_{stock.code}_radio",
+        label_visibility="collapsed"
+    )
+    handlers = {
+        "天": lambda: show_page(stock, StockHistoryType.D),
+        "周": lambda: show_page(stock, StockHistoryType.W),
+        "月": lambda: show_page(stock, StockHistoryType.M),
+        "30分钟": lambda: show_page(stock, StockHistoryType.THIRTY_M),
+    }
+    handlers.get(t, lambda: None)()
+
+def show_page(stock, t: StockHistoryType):
     chart_type = st.radio(
         "",
         ["历史K线图", "历史K线图处理"],
         horizontal=True,
-        key=f"chart_type_{stock.code}",
+        key=f"{KEY_PREFIX}_{stock.code}_radio2",
         label_visibility="collapsed"
     )
     chart_handlers = {
-        "历史K线图": lambda: show_history_kline_chart(stock),
-        "历史K线图处理": lambda: show_history_kline_process_chart(stock)
+        "历史K线图": lambda: show_kline_chart(stock, t),
+        "历史K线图处理": lambda: show_kline_process_chart(stock, t)
     }
     chart_handlers.get(chart_type, lambda: None)()
 
-def show_history_kline_chart(stock):
+def show_kline_chart(stock, t: StockHistoryType):
+    st.markdown(
+        f"""
+               <div class="table-header">
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - 「{t.text}」</div>
+               </div>
+               """,
+        unsafe_allow_html=True
+    )
+
+    model = get_history_model(t)
     try:
         with get_db_session() as session:
             # 获取该股票的最早和最晚日期
             date_range = session.query(
-                func.min(HistoryDateData.date),
-                func.max(HistoryDateData.date)
+                func.min(model.date),
+                func.max(model.date)
             ).filter(
-                HistoryDateData.code == stock.code,
-                HistoryDateData.removed == False
+                model.code == stock.code,
+                model.removed == False
             ).first()
-
             if not date_range or None in date_range:
                 st.warning("没有找到数据")
                 return
-
             min_date, max_date = date_range
             default_start_date = max(max_date - timedelta(days=90), min_date)
 
-            # 使用固定的 key 前缀来保持日期选择器状态
-            chart_key_prefix = f"history_kline_chart_{stock.code}"
-
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_history_chart',category=stock.category)
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_history_chart',category=stock.category)
             start_date_key = f"{key_prefix}_start_date"
             end_date_key = f"{key_prefix}_end_date"
 
@@ -84,18 +104,18 @@ def show_history_kline_chart(stock):
                     st.session_state[end_date_key] = end_date
             # 从数据库获取数据
             query = session.query(
-                HistoryDateData.date,
-                HistoryDateData.opening,
-                HistoryDateData.highest,
-                HistoryDateData.lowest,
-                HistoryDateData.closing,
-                HistoryDateData.turnover_count
+                model.date,
+                model.opening,
+                model.highest,
+                model.lowest,
+                model.closing,
+                model.turnover_count
             ).filter(
-                HistoryDateData.code == stock.code,
-                HistoryDateData.removed == False,
-                HistoryDateData.date >= start_date,
-                HistoryDateData.date <= end_date
-            ).order_by(HistoryDateData.date)
+                model.code == stock.code,
+                model.removed == False,
+                model.date >= start_date,
+                model.date <= end_date
+            ).order_by(model.date)
 
             # 读取数据到DataFrame
             df = pd.read_sql(query.statement, session.bind)
@@ -136,7 +156,7 @@ def show_history_kline_chart(stock):
             grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
             # 显示K线图
-            streamlit_echarts.st_pyecharts(grid, theme="white", height="800px", key=f"{chart_key_prefix}_chart")
+            streamlit_echarts.st_pyecharts(grid, theme="white", height="800px", key=f"{key_prefix}_kline")
             # 显示 MACD 图
             macd_chart = ChartBuilder.create_macd_chart(
                 dates=macd_dates,
@@ -148,33 +168,30 @@ def show_history_kline_chart(stock):
                 signal_period=9,
                 title="MACD"
             )
-            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="400px", key=f"{chart_key_prefix}_macd")
+            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="400px", key=f"{key_prefix}_macd")
 
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
-def show_history_kline_process_chart(stock):
+def show_kline_process_chart(stock, t: StockHistoryType):
+    model = get_history_model(t)
     try:
         with get_db_session() as session:
             # 获取该股票的最早和最晚日期
             date_range = session.query(
-                func.min(HistoryDateData.date),
-                func.max(HistoryDateData.date)
+                func.min(model.date),
+                func.max(model.date)
             ).filter(
-                HistoryDateData.code == stock.code,
-                HistoryDateData.removed == False
+                model.code == stock.code,
+                model.removed == False
             ).first()
-
             if not date_range or None in date_range:
                 st.warning("没有找到数据")
                 return
-
             min_date, max_date = date_range
             default_start_date = max(max_date - timedelta(days=90), min_date)
 
-            # 使用统一的 key_prefix 方式
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_process_history_chart', category=stock.category)
-
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_process_history_chart', category=stock.category)
             # 初始化 session state 中的日期值
             start_date_key = f"{key_prefix}_start_date"
             end_date_key = f"{key_prefix}_end_date"
@@ -207,18 +224,18 @@ def show_history_kline_process_chart(stock):
 
             # 从数据库获取数据
             query = session.query(
-                HistoryDateData.date,
-                HistoryDateData.opening,
-                HistoryDateData.highest,
-                HistoryDateData.lowest,
-                HistoryDateData.closing,
-                HistoryDateData.turnover_count
+                model.date,
+                model.opening,
+                model.highest,
+                model.lowest,
+                model.closing,
+                model.turnover_count
             ).filter(
-                HistoryDateData.code == stock.code,
-                HistoryDateData.removed == False,
-                HistoryDateData.date >= start_date,
-                HistoryDateData.date <= end_date
-            ).order_by(HistoryDateData.date)
+                model.code == stock.code,
+                model.removed == False,
+                model.date >= start_date,
+                model.date <= end_date
+            ).order_by(model.date)
 
             # 读取数据到DataFrame
             df = pd.read_sql(query.statement, session.bind)
@@ -375,8 +392,6 @@ def show_history_kline_process_chart(stock):
                     )
             except ValueError as e:
                 st.error(f"数据处理失败：{str(e)}")
-
-
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 

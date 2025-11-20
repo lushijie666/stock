@@ -71,3 +71,22 @@ class Stock(Base):
         except Exception as e:
             logging.error(f"获取{category.text}股票代码列表失败: {str(e)}")
             return []
+
+    @classmethod
+    def get_followed_codes_by_category(cls, session, category: Category) -> List[str]:
+        try:
+            codes = (
+                session.query(cls.code)
+                .filter(
+                    cls.category == category,
+                    cls.is_followed == True,
+                    cls.removed == False
+                )
+                .order_by(cls.code.asc())  # 按代码排序
+                .all()
+            )
+            # 将结果转换为简单的列表
+            return [code[0] for code in codes]
+        except Exception as e:
+            logging.error(f"获取{category.text}股票代码列表失败: {str(e)}")
+            return []

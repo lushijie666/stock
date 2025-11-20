@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Dict
-from menu import dashboard, stock, real_time_data, history_data, history_transaction
+from menu import dashboard, stock, stock_history
 from utils import message
 
 @dataclass
@@ -31,27 +31,16 @@ class Pages:
             handler=stock.chartIndex,
             icon="heart-fill",
         ),
-        "所有股票": PageConfig(
+        "股票信息": PageConfig(
             title="股票信息",
             handler=stock.index,
             icon="grid",
         ),
-        "实时行情": PageConfig(
-            title="实时行情",
-            handler=real_time_data.index,
-            icon="graph-up",
-        ),
-        "历史行情": PageConfig(
-            title="历史行情",
-            handler=history_data.index,
+        "历史数据": PageConfig(
+            title="历史数据",
+            handler=stock_history.index,
             icon="clipboard2-data",
         ),
-        "历史分笔": PageConfig(
-            title="历史分笔",
-            handler=history_transaction.index,
-            icon="terminal-split",
-        ),
-        # icon="bar-chart",
     }
 
     @classmethod

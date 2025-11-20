@@ -89,7 +89,7 @@ class ReloadHandler(Generic[T, D]):
             self.show_loading()
             data = self.config.fetch_func(*args, **kwargs)
             if not data:
-                show_message("获取数据为空！", "warning")
+                #show_message("获取数据为空！", "warning")
                 return False
 
             with get_db_session() as session:

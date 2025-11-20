@@ -1,18 +1,18 @@
-import time  # 在文件顶部导入
-from datetime import datetime
+import time
 
 import streamlit as st
+from datetime import date, timedelta
+from enums.history_type import StockHistoryType
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
 from enums.category import Category
-from service.stock_chart import show_chart_page, KEY_PREFIX
+from service.stock_chart import show_detail, KEY_PREFIX
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 from utils.scheduler import scheduler
-from service.sync_service import sync_stock_data, sync_history_data, sync_history_transaction, sync_real_time_data, get_sync_history, SyncType, get_sync_summary
-from models.sync_history import SyncHistory, SyncStatus
+from service.sync import sync_stock, sync_stock_history,SyncHistoryType, get_sync_summary
+from models.sync_history import SyncStatus
 import pandas as pd
 import streamlit_echarts
 from utils.chart import ChartBuilder
-
 
 
 def index():
@@ -110,7 +110,7 @@ def show_stock_dashboard():
         selector = create_stock_selector(
             category=category,
             prefix=KEY_PREFIX,
-            on_select=show_chart_page,
+            on_select=show_detail,
             on_error=handle_error,
             on_not_found=handle_not_found
         )
@@ -161,24 +161,19 @@ def show_scheduler_sync_dashboard():
     # 显示定时任务列表
     if is_running:
         st.markdown("""
-            <div class="scheduled-jobs-list" style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
+            <div class="scheduled-jobs-list" style="gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
                 <div class="job-item">
-                    <span class="job-time">09:30</span>
+                    <span class="job-time">每天06:00</span>
                     <span class="job-name">📊 股票信息</span>
                 </div>
                 <div class="job-item">
-                    <span class="job-time" style="font-weight: bold; margin-right: 8px; color: #2563eb;">11:00</span>
-                    <span class="job-name">⚡ 实时行情</span>
+                    <span class="job-time">每天18:10</span>
+                    <span class="job-name">📈 历史数据(天)</span>
                 </div>
                 <div class="job-item">
-                    <span class="job-time">10:00</span>
-                    <span class="job-name">📈 历史行情</span>
-                </div>
-                <div class="job-item">
-                    <span class="job-time">10:30</span>
-                    <span class="job-name">💼 同步分笔</span>
-                </div>
-               
+                    <span class="job-time">每天18:30</span>
+                    <span class="job-name">📈 历史数据(30分钟)</span>
+                </div>   
             </div>
             """, unsafe_allow_html=True)
 
@@ -191,10 +186,9 @@ def show_scheduler_sync_dashboard():
         if st.button("▶ 启动", use_container_width=True, type="primary", key="scheduler_start"):
             scheduler.start()
             # 添加定时任务
-            scheduler.add_daily_job("sync_stock", sync_stock_data, 9, 30)
-            scheduler.add_daily_job("sync_realtime", sync_real_time_data, 11, 0)
-            scheduler.add_daily_job("sync_history", sync_history_data, 10, 0)
-            scheduler.add_daily_job("sync_transaction", sync_history_transaction, 10, 30)
+            scheduler.add_daily_job("sync_stock", sync_stock, 6, 0)
+            scheduler.add_daily_job("sync_stock_history_d",  lambda: sync_stock_history(StockHistoryType.D, True, date.today(),  date.today()) , 18, 10)
+            scheduler.add_daily_job("sync_stock_history_30m", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(),  date.today()) , 18, 30)
             st.rerun()
     
     st.markdown("""
@@ -216,55 +210,73 @@ def show_manual_sync_dashboard():
     """, unsafe_allow_html=True)
 
     end_date = pd.Timestamp.now().date()
-    start_date = end_date - pd.Timedelta(days=30)
+    start_date = end_date - pd.Timedelta(days=90)
 
     sync_buttons = [
-        ("📊", "股票信息", "同步所有股票", sync_stock_data, "股票信息", "sync-card-purple"),
-        ("⚡",  "实时行情", "同步所有股票近30天的数据", sync_real_time_data, "实时行情", "sync-card-blue"),
-        ("📈", "历史行情", "同步所有股票近30天的数据", lambda: sync_history_data(start_date, end_date), "历史行情", "sync-card-green"),
-        ("💼", "历史分笔", "同步所有股票近30天的数据", sync_history_transaction, "历史分笔", "sync-card-orange"),
+        [
+            ("📊", "股票信息", "同步所有股票", sync_stock, "[股票信息]", "sync-card-purple"),
+        ],
+        [
+            ("📈", "历史数据(天)", "同步关注的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, False, start_date, end_date), "[历史数据-天-关注]", "sync-card-blue"),
+            ("💼", "历史数据(天)", "同步所有的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, True, start_date, end_date), "[历史数据-天-全部]","sync-card-orange"),
+        ],
+        [
+            ("📈", "历史数据(周)", "同步关注的股票近90天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, False, start_date, end_date), "[历史数据-周-关注]", "sync-card-blue"),
+            ("💼", "历史数据(周)", "同步所有的股票近90天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, True, start_date, end_date), "[历史数据-周-全部]", "sync-card-orange"),
+        ],
+        [
+            ("📈", "历史数据(月)", "同步关注的股票近90天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, False, start_date, end_date), "[历史数据-月-关注]", "sync-card-blue"),
+            ("💼", "历史数据(月)", "同步所有的股票近90天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, True, start_date, end_date), "[历史数据-月-全部]","sync-card-orange"),
+        ],
+        [
+            ("📈", "历史数据(30分钟)", "同步关注的股票近90天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, False, start_date, end_date), "[历史数据-30分钟-关注]", "sync-card-blue"),
+            ("💼", "历史数据(30分钟)", "同步所有的股票近90天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, start_date, end_date), "[历史数据-30分钟-全部]","sync-card-orange"),
+        ],
     ]
-    
+
     # 创建同步状态变量（使用st.session_state确保按钮置灰效果）
     if "is_syncing" not in st.session_state:
         st.session_state.is_syncing = False
     if "sync_data_type" not in st.session_state:
         st.session_state.sync_data_type = None
+    if "sync_func" not in st.session_state:
+        st.session_state.sync_func = None
     
     # 显示同步按钮
-    sync_cols = st.columns(4)
-    for idx, (icon, title, desc, sync_func, data_type, color_class) in enumerate(sync_buttons):
-        with sync_cols[idx]:
-            st.markdown(f"""
-            <div class="sync-button-card {color_class}">
-                <div class="sync-card-icon {color_class}">
-                    <span class="sync-icon-large">{icon}</span>
+    for row_idx, button_row in enumerate(sync_buttons):
+        sync_cols = st.columns(len(button_row))
+        for col_idx, (icon, title, desc, sync_func, data_type, color_class) in enumerate(button_row):
+            with sync_cols[col_idx]:
+                st.markdown(f"""
+                <div class="sync-button-card {color_class}">
+                    <div class="sync-card-icon {color_class}">
+                        <span class="sync-icon-large">{icon}</span>
+                    </div>
+                    <div class="sync-card-content">
+                        <div class="sync-card-title">{title}</div>
+                        <div class="sync-card-desc">{desc}</div>
+                    </div>
                 </div>
-                <div class="sync-card-content">
-                    <div class="sync-card-title">{title}</div>
-                    <div class="sync-card-desc">{desc}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # 按钮置灰：当任何同步操作正在进行时，禁用所有按钮
-            if st.button(f"立即同步", use_container_width=True, type="primary", key=f"sync_btn_{idx}", disabled=st.session_state.is_syncing):
-                # 标记为正在同步，并保存数据类型
-                st.session_state.is_syncing = True
-                st.session_state.sync_data_type = data_type
-                # 触发页面重新加载以更新按钮状态
-                st.rerun()
+                """, unsafe_allow_html=True)
+                # 按钮置灰：当任何同步操作正在进行时，禁用所有按钮
+                if st.button(f"立即同步", use_container_width=True, type="primary", key=f"sync_btn_{row_idx}_{col_idx}", disabled=st.session_state.is_syncing):
+                    # 标记为正在同步，并保存数据类型
+                    st.session_state.is_syncing = True
+                    st.session_state.sync_data_type = data_type
+                    st.session_state.sync_func = sync_func
+                    # 触发页面重新加载以更新按钮状态
+                    st.rerun()
     
     # 在列外部显示同步结果（占据整行）
     if st.session_state.is_syncing and st.session_state.sync_data_type:
         try:
             # 执行同步操作
-            result = sync_buttons[[btn[4] for btn in sync_buttons].index(st.session_state.sync_data_type)][3]()
+            result = st.session_state.sync_func()
             # 显示结果
             if result["success"]:
-                st.success(f"✅ {st.session_state.sync_data_type}同步成功！成功: {result['success_count']}, 失败: {result['failed_count']}")
+                st.success(f"✅ {st.session_state.sync_data_type} 同步成功！成功: {result['success_count']}, 失败: {result['failed_count']}")
             else:
-                st.error(f"❌ {st.session_state.sync_data_type}同步失败: {result['error']}")
+                st.error(f"❌ {st.session_state.sync_data_type} 同步失败: {result['error']}")
         finally:
             # 同步完成后，重置状态
             st.session_state.is_syncing = False
@@ -389,7 +401,7 @@ def show_sync_type_distribution_chart(summary_data):
             for item in type_counts_data:
                 # 添加类型检查，确保item有正确的属性
                 if hasattr(item, 'type') and hasattr(item, 'count'):
-                    type_enum = SyncType(item.type) if isinstance(item.type, str) else item.type
+                    type_enum = SyncHistoryType(item.type) if isinstance(item.type, str) else item.type
                     display_name = type_enum.display_name
                     chart_data.append([display_name, item.count])
         except Exception as inner_e:
@@ -466,7 +478,7 @@ def show_sync_history_records(summary_data):
         df = summary_data.get('df', pd.DataFrame())
         
         if df.empty:
-            st.warning("暂无同步历史记录")
+            st.warning("暂无数据")
             return
         
         # 筛选控件 - 使用卡片容器
@@ -481,7 +493,7 @@ def show_sync_history_records(summary_data):
             with col1:
                 sync_type_filter = st.selectbox(
                     "选择同步类型",
-                    ["全部"] + [t.display_name for t in SyncType],
+                    ["全部"] + [t.display_name for t in SyncHistoryType],
                     key="sync_type_filter"
                 )
             with col2:
@@ -508,7 +520,8 @@ def show_sync_history_records(summary_data):
                     "状态": st.column_config.TextColumn("同步状态"),
                     "成功数": st.column_config.NumberColumn("成功数"),
                     "失败数": st.column_config.NumberColumn("失败数"),
-                    "耗时(秒)": st.column_config.NumberColumn("耗时(秒)")
+                    "耗时(秒)": st.column_config.NumberColumn("耗时(秒)"),
+                    "创建时间": st.column_config.TextColumn("创建时间")
                 }
             )
     except Exception as e:

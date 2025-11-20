@@ -1,20 +1,15 @@
-import asyncio
-import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 import pandas as pd
-from sqlalchemy import func, extract, text
-from utils.uuid import generate_key as generate_uuid
-from models.sync_history import SyncHistory, SyncType, SyncStatus
+from sqlalchemy import func
+
+from enums.history_type import StockHistoryType
+from enums.sync_type import SyncHistoryType
+from models.sync_history import SyncHistory, SyncStatus
 from utils.db import get_db_session
-from service import stock, history_data, history_transaction_data, real_time_data
-
-# 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-
-def _create_sync_record(sync_type: SyncType) -> int:
+from service import stock, stock_history
+import logging
+def _create_sync_record(sync_type: SyncHistoryType) -> int:
     """创建同步记录，返回记录ID"""
     try:
         with get_db_session() as session:
@@ -29,7 +24,7 @@ def _create_sync_record(sync_type: SyncType) -> int:
             session.refresh(record)
             return record.id  
     except Exception as e:
-        logger.error(f"创建同步记录失败: {str(e)}")
+        logging.error(f"创建同步记录失败: {str(e)}")
         raise
 
 
@@ -60,43 +55,36 @@ def _update_sync_record(record_id: int, data: Dict[str, Any]):
                 
                 session.commit()
     except Exception as e:
-        logger.error(f"更新同步记录失败: {str(e)}")
+        logging.error(f"更新同步记录失败: {str(e)}")
 
-
-def sync_stock_data():
-    """同步股票基本数据"""
-    record_id = _create_sync_record(SyncType.STOCK)
+def _execute_sync(sync_type: SyncHistoryType, sync_func, *args, **kwargs) -> Dict[str, Any]:
+    """执行同步任务的公共方法"""
+    record_id = _create_sync_record(sync_type)
     success_count = 0
     failed_count = 0
     error_msg = None
-    
     try:
-        logger.info("开始同步股票基本数据")
-        # 调用股票服务的同步方法
-        result = stock.sync_all_stocks()
+        result = sync_func(*args, **kwargs)
         success_count = result.get('success_count', 0)
         failed_count = result.get('failed_count', 0)
-        
+
         _update_sync_record(
             record_id,
             {
                 'status': SyncStatus.SUCCESS.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
+                'end_time': datetime.now(timezone.utc),
                 'success_count': success_count,
                 'failed_count': failed_count
             }
         )
-        logger.info(f"股票基本数据同步完成，成功: {success_count}, 失败: {failed_count}")
         return {"success": True, "success_count": success_count, "failed_count": failed_count}
-        
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"股票基本数据同步失败: {error_msg}")
         _update_sync_record(
             record_id,
             {
                 'status': SyncStatus.FAILED.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
+                'end_time': datetime.now(timezone.utc),
                 'error': error_msg,
                 'success_count': success_count,
                 'failed_count': failed_count
@@ -105,146 +93,26 @@ def sync_stock_data():
         return {"success": False, "error": error_msg}
 
 
-def sync_history_data(start_date=None, end_date=None):
-    record_id = _create_sync_record(SyncType.HISTORY_DATA)
-    success_count = 0
-    failed_count = 0
-    error_msg = None
-    
-    try:
-        logger.info("开始同步历史数据")
-        # 调用历史数据服务的同步方法，传递时间范围参数
-        result = history_data.sync_history_data(start_date=start_date, end_date=end_date)
-        success_count = result.get('success_count', 0)
-        failed_count = result.get('failed_count', 0)
-        
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.SUCCESS.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        logger.info(f"历史数据同步完成，成功: {success_count}, 失败: {failed_count}")
-        return {"success": True, "success_count": success_count, "failed_count": failed_count}
-        
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"历史数据同步失败: {error_msg}")
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.FAILED.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
-                'error': error_msg,
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        return {"success": False, "error": error_msg}
+def sync_stock():
+    return _execute_sync(SyncHistoryType.STOCK, stock.sync)
 
 
-def sync_history_transaction():
-    record_id = _create_sync_record(SyncType.HISTORY_TRANSACTION)
-    success_count = 0
-    failed_count = 0
-    error_msg = None
-    
-    try:
-        logger.info("开始同步历史交易数据")
-        # 调用历史交易服务的同步方法，传递时间范围参数
-        result = history_transaction.sync_history_transactions()
-        success_count = result.get('success_count', 0)
-        failed_count = result.get('failed_count', 0)
-        
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.SUCCESS.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        logger.info(f"历史交易数据同步完成，成功: {success_count}, 失败: {failed_count}")
-        return {"success": True, "success_count": success_count, "failed_count": failed_count}
-        
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"历史交易数据同步失败: {error_msg}")
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.FAILED.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
-                'error': error_msg,
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        return {"success": False, "error": error_msg}
+def sync_stock_history(t: StockHistoryType, is_all: bool = False, start_date=None, end_date=None):
+    return _execute_sync(t.sync_history_type, stock_history.sync, t=t, is_all=is_all, start_date=start_date, end_date=end_date)
 
 
-def sync_real_time_data():
-    """同步实时数据"""
-    record_id = _create_sync_record(SyncType.REAL_TIME_DATA)
-    success_count = 0
-    failed_count = 0
-    error_msg = None
-    
-    try:
-        logger.info("开始同步实时数据")
-        # 调用实时数据服务的同步方法
-        result = real_time_data.sync_real_time_data()
-        success_count = result.get('success_count', 0)
-        failed_count = result.get('failed_count', 0)
-        
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.SUCCESS.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        logger.info(f"实时数据同步完成，成功: {success_count}, 失败: {failed_count}")
-        return {"success": True, "success_count": success_count, "failed_count": failed_count}
-        
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"实时数据同步失败: {error_msg}")
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.FAILED.value,
-                'end_time': datetime.now(timezone.utc),  # 添加时区信息
-                'error': error_msg,
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        return {"success": False, "error": error_msg}
-
-
-def get_sync_history(limit: int = 50, offset: int = 0, sync_type: SyncType = None) -> List[SyncHistory]:
+def get_sync_history(limit: int = 50, offset: int = 0, sync_type: SyncHistoryType = None) -> List[SyncHistory]:
     """获取同步历史记录"""
     try:
         with get_db_session() as session:
             query = session.query(SyncHistory)
-            
             if sync_type:
                 query = query.filter(SyncHistory.sync_type == sync_type.value)  # 使用枚举值
-            
             records = query.order_by(SyncHistory.start_time.desc()).limit(limit).offset(offset).all()
             return records
     except Exception as e:
-        logger.error(f"获取同步历史失败: {str(e)}")
+        logging.error(f"获取同步历史失败: {str(e)}")
         return []
-
-
 
 
 def get_sync_summary() -> Dict[str, Any]:
@@ -313,11 +181,12 @@ def get_sync_summary() -> Dict[str, Any]:
                     '状态': record.status_display,
                     '成功数': record.success_count,
                     '失败数': record.failed_count,
-                    '耗时(秒)': record.duration or 0
+                    '耗时(秒)': record.duration or 0,
+                    '创建时间': record.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                 } for record in recent_records]
                 df = pd.DataFrame(records_data)
             else:
-                df = pd.DataFrame(columns=['日期', '类型', '状态', '成功数', '失败数', '耗时(秒)'])
+                df = pd.DataFrame(columns=['日期', '类型', '状态', '成功数', '失败数', '耗时(秒)', '创建时间'])
             
             return {
                 "total_count": total_count,
@@ -331,7 +200,7 @@ def get_sync_summary() -> Dict[str, Any]:
                 "df": df
             }
     except Exception as e:
-        logger.error(f"获取同步统计摘要失败: {str(e)}")
+        logging.error(f"获取同步统计摘要失败: {str(e)}")
         # 返回空数据
         return {
             "total_count": 0,

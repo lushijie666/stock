@@ -5,26 +5,6 @@ import enum
 from datetime import datetime
 
 
-class SyncType(enum.Enum):
-    """同步类型枚举"""
-    STOCK = "stock"
-    HISTORY_DATA = "history_data"
-    HISTORY_TRANSACTION = "history_transaction"
-    REAL_TIME_DATA = "real_time_data"
-    
-    @property
-    def display_name(self):
-        """获取显示名称"""
-        type_map = {
-            SyncType.STOCK: "股票信息",
-            SyncType.REAL_TIME_DATA: "实时行情",
-            SyncType.HISTORY_DATA: "历史行情",
-            SyncType.HISTORY_TRANSACTION: "历史分笔",
-
-        }
-        return type_map.get(self, "未知")
-
-
 class SyncStatus(enum.Enum):
     """同步状态枚举"""
     PENDING = "pending"
@@ -74,9 +54,9 @@ class SyncHistory(Base):
         """获取同步类型显示文本"""
         type_map = {
             "stock": "股票信息",
-            "real_time_data": "实时行情",
-            "history_data": "历史行情",
-            "history_transaction": "历史分笔",
-
+            "stock_history_d": "历史数据-天",
+            "stock_history_w": "历史数据-周",
+            "stock_history_m": "历史数据-月",
+            "stock_history_30m": "历史数据-30分钟",
         }
         return type_map.get(self.sync_type, "未知")

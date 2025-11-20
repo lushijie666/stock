@@ -34,6 +34,13 @@ def get_codes(category: Category) -> List[str]:
         logging.error(f"获取股票失败: {str(e)}")
         return []
 
+def get_followed_codes(category: Category) -> List[str]:
+    try:
+        with get_db_session() as session:
+            return Stock.get_followed_codes_by_category(session, category)
+    except Exception as e:
+        logging.error(f"获取股票失败: {str(e)}")
+        return []
 
 def show_category_pie_chart():
     try:
@@ -100,12 +107,12 @@ def show_page(category: Category):
                     'code': st.column_config.TextColumn('股票代码', help="股票代码"),
                     'name': st.column_config.TextColumn('股票名称', help="股票名称"),
                     'pinyin': st.column_config.TextColumn('股票简拼', help="股票拼音简称"),
-                    'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
                     'full_name': st.column_config.TextColumn('全称', help="公司名称"),
                     'ipo_at': st.column_config.DatetimeColumn('上市时间', help="上市时间"),
                     'total_capital': st.column_config.TextColumn('总股本(股)', help="总股本"),
                     'flow_capital': st.column_config.TextColumn('流通股本(股)', help="流通股本"),
                     'industry': st.column_config.TextColumn('行业', help="行业"),
+                    'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
                 },
                 # 格式化函数
                 format_funcs={
@@ -182,7 +189,7 @@ def show_follow_chart():
                     search_term = st.text_input(
                         "🔍 搜索股票（代码/名称/全称）",
                         key=search_key,
-                        placeholder="输入股票代码、名称",
+                        placeholder="输入股票代码/名称/简拼",
                         label_visibility="collapsed"
                     )
                     # 根据搜索词过滤股票
@@ -274,10 +281,10 @@ def show_follow_page(category: Category):
 
             # 添加搜索功能
             st.markdown("""
-            <div class="manual-header">
-                <h5 class="search-title">
+            <div class="table-header">
+                <div class="table-title">
                     已关注的股票
-                </h5>
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -286,7 +293,7 @@ def show_follow_page(category: Category):
             search_term = st.text_input(
                 "🔍 搜索股票（代码/名称/全称）",
                 key=search_key,
-                placeholder="输入股票代码、名称",
+                placeholder="输入股票代码/名称/简拼",
                 label_visibility="collapsed"
             )
             
@@ -459,7 +466,7 @@ def fetch(category: Category) -> list:
         if fetch_func := fetch_functions.get(category):
             logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
             df = fetch_func()
-            logging.info(f"成功获取[{KEY_PREFIX}]数据，分类: {category.text}, 共 {len(df)} 条记录")
+            logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, 共 {len(df)} 条记录")
             data = []
             for i, row in df.iterrows():
                 try:
@@ -475,17 +482,15 @@ def fetch(category: Category) -> list:
                         industry=row.get("所属行业"),
                     )
                     s.pinyin = s.generate_pinyin()
-                    logging.info(f"获取[{KEY_PREFIX}]到的数据 第 {i} 条, 信息为: {s}")
+                    logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {s}")
                     data.append(s)
                 except Exception as row_error:
-                    logging.error(f"Error processing row: {row}, Error: {str(row_error)}")
+                    logging.error(f"获取[{KEY_PREFIX}]到的数据异常, 信息: {row}, 错误: {str(row_error)}")
                     continue
             return data
-        else:
-            show_message(f"不支持的分类: {category}", type="error")
-            return None
+        return None
     except Exception as e:
-        logging.error(f"Error fetching data: {str(e)}")
+        logging.error(f"获取[{KEY_PREFIX}]到的数据异常: {str(e)}")
         return None
 
 
@@ -514,49 +519,19 @@ def get_followed_stocks_count():
         return 0
 
 
-def sync_all_stocks() -> Dict[str, int]:
+def sync() -> Dict[str, int]:
     success_count = 0
     failed_count = 0
-    
-    logging.info("开始同步所有股票数据")
-    
-    # 遍历所有支持的股票分类
+    logging.info(f"开始同步{KEY_PREFIX}数据")
     categories = Category.get_all()
     for category in categories:
         try:
-            logging.info(f"正在同步分类股票数据: {category.fullText}")
-            
-            # 创建特定分类的过滤器函数
-            def build_filter(args: Dict[str, Any], session: Session) -> List:
-                return [
-                    Stock.category == category,
-                ]
-            
-            # 创建重载处理器
-            reload_handler = create_reload_handler(
-                model=Stock,
-                fetch_func=fetch,
-                unique_fields=['code'],
-                build_filter=build_filter,
-                mark_existing=True,
-            )
-        
-            result = reload_handler.refresh_with_stats(
-                category=category
-            )
-
-            # 更新计数
-            success_count += result['success_count']
-            failed_count += result['failed_count']
-            
-            logging.info(f"分类 {category.fullText} 同步完成，成功: {result['success_count']}, 失败: {result['failed_count']}")
-                
-        except Exception as category_error:
-            logging.error(f"同步分类 {category.fullText} 失败: {str(category_error)}")
+            reload(category)
+            success_count += 1
+        except Exception as e:
             failed_count += 1
-    
-    logging.info(f"所有股票数据同步完成，总计 - 成功: {success_count}, 失败: {failed_count}")
-    
+        logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}")
+    logging.info(f"同步[{KEY_PREFIX}]数据完成，成功数: {success_count}, 失败数: {failed_count}")
     return {
         "success_count": success_count,
         "failed_count": failed_count

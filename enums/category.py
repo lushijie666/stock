@@ -27,7 +27,7 @@ class Category(StrEnum):
             Category.X_XX: f"{Category.X_XX.text} {Category.X_XX}",
         }.get(self, "未知")
 
-    def get_full_code(self, code: str) -> str:
+    def get_full_code(self, code: str, separator: str) -> str:
         """
         根据分类和股票代码生成完整代码
         例如：传入 000001 返回 sz000001
@@ -42,7 +42,7 @@ class Category(StrEnum):
         prefix = prefix_map.get(self, "")
         if not prefix:
             return code
-        return f"{prefix}{code}"
+        return f"{prefix}{separator}{code}"
 
     @classmethod
     def values(cls) -> list[str]:
@@ -102,4 +102,4 @@ class Category(StrEnum):
 
     @classmethod
     def get_all(cls) -> List['Category']:
-        return [cls.A_SH, cls.A_SZ, cls.A_BJ]
+        return [cls.A_SH, cls.A_SZ, cls.A_BJ, cls.X_XX]

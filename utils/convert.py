@@ -110,3 +110,27 @@ def convert_date_format(date_str: str) -> str:
     except Exception as e:
         logging.error(f"Error converting date format: {date_str}, error: {str(e)}")
         return None
+
+
+def parse_baostock_datetime(datetime_str: str) -> datetime:
+    """
+    解析 baostock 返回的时间字符串格式 YYYYMMDDHHMMSSsss
+    :param datetime_str: baostock 时间字符串 (YYYYMMDDHHMMSSsss)
+    :return: datetime 对象
+    """
+    try:
+        if not datetime_str or len(datetime_str) < 14:
+            return None
+        # 提取各个时间组件
+        year = datetime_str[0:4]
+        month = datetime_str[4:6]
+        day = datetime_str[6:8]
+        hour = datetime_str[8:10]
+        minute = datetime_str[10:12]
+        second = datetime_str[12:14]
+        # 构造标准时间字符串并解析
+        formatted_datetime_str = f"{year}-{month}-{day} {hour}:{minute}:{second}"
+        return datetime.strptime(formatted_datetime_str, '%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        logging.error(f"Error parsing baostock datetime: {datetime_str}, error: {str(e)}")
+        return None
