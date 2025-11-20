@@ -176,6 +176,45 @@ def show_kline_chart(stock, t: StockHistoryType):
             )
             streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="400px", key=f"{key_prefix}_macd")
 
+            # 显示信号数据表格
+            if all_signals:
+                st.markdown("---")
+                st.markdown("<h6 class='info-section-title'>交易信号信息</h6>", unsafe_allow_html=True)
+                # 创建信号DataFrame
+                signal_df = pd.DataFrame([
+                    {
+                        '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str(s['date']),
+                        '信号类型': '买入' if s['signal_type'] == 'buy' else '卖出',
+                        '信号强度': '强' if s['strength'] == 'strong' else '弱',
+                        '价格': round(s['price'], 2)
+                    }
+                    for s in all_signals
+                ]).sort_values('日期')
+
+                st.dataframe(
+                    signal_df,
+                    height=min(len(signal_df) * 35 + 38, 400),
+                    use_container_width=True
+                )
+
+            # 显示MACD数据表格
+            if not macd_df.empty:
+                st.markdown("---")
+                st.markdown("<h6 class='info-section-title'>MACD指标数据</h6>", unsafe_allow_html=True)
+
+                # 创建MACD数据DataFrame
+                macd_display_df = pd.DataFrame({
+                    '日期': df['date'].astype(str),
+                    'DIFF': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DIFF']],
+                    'DEA': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DEA']],
+                    'MACD': [round(x, 4) if not pd.isna(x) else None for x in macd_df['MACD_hist']]
+                })
+
+                st.dataframe(
+                    macd_display_df,
+                    height=min(len(macd_display_df) * 35 + 38, 400),
+                    use_container_width=True
+                )
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
