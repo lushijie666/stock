@@ -708,11 +708,66 @@ def show_backtest_analysis(stock, t: StockHistoryType):
 
             # 读取数据到DataFrame
             df = pd.read_sql(query.statement, session.bind)
-
-
             if df.empty:
                 st.warning("所选日期范围内没有数据")
                 return
+
+            st.markdown("""
+              <div class="chart-header">
+                  <span class="chart-icon">🔧</span>
+                  <span class="chart-title">参数设置</span>
+              </div>
+            """, unsafe_allow_html=True)
+            col_config1, col_config2, col_config3 = st.columns(3)
+
+            with col_config1:
+                initial_capital = st.number_input(
+                    "初始资金 (¥)",
+                    min_value=1000.0,
+                    value=100000.0,
+                    step=1000.0,
+                    key=f"{KEY_PREFIX}_{stock.code}_{t}_initial_capital"
+                )
+
+            with col_config2:
+                buy_ratio_default = {'strong': 0.8, 'weak': 0.5}
+                buy_ratio_strong = st.number_input(
+                    "强买比例",
+                    min_value=0.1,
+                    max_value=1.0,
+                    value=0.8,
+                    step=0.1,
+                    key=f"{KEY_PREFIX}_{stock.code}_{t}_buy_ratio_strong"
+                )
+                buy_ratio_weak = st.number_input(
+                    "弱买比例",
+                    min_value=0.1,
+                    max_value=1.0,
+                    value=0.5,
+                    step=0.1,
+                    key=f"{KEY_PREFIX}_{stock.code}_{t}_buy_ratio_weak"
+                )
+                buy_ratios = {'strong': buy_ratio_strong, 'weak': buy_ratio_weak}
+
+            with col_config3:
+                sell_ratio_default = {'strong': 0.8, 'weak': 0.5}
+                sell_ratio_strong = st.number_input(
+                    "强卖比例",
+                    min_value=0.1,
+                    max_value=1.0,
+                    value=0.8,
+                    step=0.1,
+                    key=f"{KEY_PREFIX}_{stock.code}_{t}_sell_ratio_strong"
+                )
+                sell_ratio_weak = st.number_input(
+                    "弱卖比例",
+                    min_value=0.1,
+                    max_value=1.0,
+                    value=0.5,
+                    step=0.1,
+                    key=f"{KEY_PREFIX}_{stock.code}_{t}_sell_ratio_weak"
+                )
+                sell_ratios = {'strong': sell_ratio_strong, 'weak': sell_ratio_weak}
 
             # 计算所有信号
             all_signals = calculate_all_signals(df)
@@ -722,7 +777,13 @@ def show_backtest_analysis(stock, t: StockHistoryType):
                 return
 
             # 执行回测
-            backtest_result = backtest_strategy(df, all_signals)
+            backtest_result = backtest_strategy(
+                df,
+                all_signals,
+                initial_capital=initial_capital,
+                buy_ratios=buy_ratios,
+                sell_ratios=sell_ratios
+            )
             if not backtest_result:
                 st.warning("回测失败")
                 return

@@ -1769,15 +1769,17 @@ def calculate_all_signals(df):
     return all_signals
 
 
-def backtest_strategy(df, signals, initial_capital=100000):
+def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, sell_ratios=None):
     """
     基于生成的信号进行回测
     """
     if not signals:
         return None
 
-    # 按日期排序信号
-    signals = sorted(signals, key=lambda x: x['date'])
+    if buy_ratios is None:
+        buy_ratios = {'strong': 0.8, 'weak': 0.5}
+    if sell_ratios is None:
+        sell_ratios = {'strong': 0.8, 'weak': 0.5}
 
     # 初始化回测参数
     capital = initial_capital
@@ -1801,7 +1803,7 @@ def backtest_strategy(df, signals, initial_capital=100000):
         # 买入信号
         if signal_type == 'buy' and position == 0:
             # 根据信号强度决定买入比例
-            buy_ratio = 0.8 if strength == 'strong' else 0.5
+            buy_ratio = buy_ratios.get(strength, 0.5)  # 默认使用弱信号比例
             amount_to_invest = capital * buy_ratio
             shares_to_buy = int(amount_to_invest / current_price)
 
@@ -1824,7 +1826,7 @@ def backtest_strategy(df, signals, initial_capital=100000):
         # 卖出信号
         elif signal_type == 'sell' and position > 0:
             # 根据信号强度决定卖出比例
-            sell_ratio = 0.8 if strength == 'strong' else 0.5
+            sell_ratio = sell_ratios.get(strength, 0.5)  # 默认使用弱信号比例
             shares_to_sell = int(position * sell_ratio)
 
             if shares_to_sell > 0:
