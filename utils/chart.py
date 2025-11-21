@@ -585,7 +585,7 @@ class ChartBuilder:
                 )
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
-                title="K线图",
+                title="",
                 pos_left="left",
             ),
             legend_opts=opts.LegendOpts(
@@ -666,7 +666,7 @@ class ChartBuilder:
                     type_="scroll",
                     pos_top="80%",
                     pos_left="right",
-                    orient="horizontal",
+                    orient="vertical",
                     textstyle_opts=opts.TextStyleOpts(color="#000000")
                 ),
                 xaxis_opts=opts.AxisOpts(
@@ -769,7 +769,7 @@ class ChartBuilder:
                 open_prices,
                 symbol="none",
                 color="#ffa940",
-                linestyle_opts=opts.LineStyleOpts(width=3),  # 稍微加粗线条
+                linestyle_opts=opts.LineStyleOpts(width=2),  # 稍微加粗线条
             )
 
         # 添加最高价横线
@@ -779,7 +779,7 @@ class ChartBuilder:
                 high_prices,
                 symbol="none",
                 color="#cc053f",
-                linestyle_opts=opts.LineStyleOpts(width=3, type_="dashed")
+                linestyle_opts=opts.LineStyleOpts(width=2, type_="dashed")
             )
 
         # 添加最低价横线
@@ -789,7 +789,7 @@ class ChartBuilder:
                 low_prices,
                 symbol="none",
                 color="#6feca5",
-                linestyle_opts=opts.LineStyleOpts(width=3, type_="dashed")
+                linestyle_opts=opts.LineStyleOpts(width=2, type_="dashed")
             )
 
         # 添加收盘价折线
@@ -799,7 +799,7 @@ class ChartBuilder:
                 close_prices,
                 symbol="none",
                 color="#1f77b4",
-                linestyle_opts=opts.LineStyleOpts(width=3)
+                linestyle_opts=opts.LineStyleOpts(width=2)
             )
 
         # 添加买卖点标记
@@ -847,7 +847,7 @@ class ChartBuilder:
                     label_opts=opts.LabelOpts(
                         is_show=True,
                         position="top",
-                        distance=10,  # 增加标签与标记的距离
+                        distance=5,  # 增加标签与标记的距离
                         font_size=9,
                         color='#8B0000',
                         formatter="MB\n(强)"
@@ -868,7 +868,7 @@ class ChartBuilder:
                     label_opts=opts.LabelOpts(
                         is_show=True,
                         position="top",
-                        distance=10,
+                        distance=5,
                         font_size=9,
                         color='#FF7F7F',
                         formatter="MB\n(弱)"
@@ -889,7 +889,7 @@ class ChartBuilder:
                     label_opts=opts.LabelOpts(
                         is_show=True,
                         position="bottom",
-                        distance=10,
+                        distance=5,
                         font_size=9,
                         color='#006400',
                         formatter="MS\n(强)"
@@ -910,7 +910,7 @@ class ChartBuilder:
                     label_opts=opts.LabelOpts(
                         is_show=True,
                         position="bottom",
-                        distance=10,
+                        distance=5,
                         font_size=9,
                         color='#90EE90',
                         formatter="MS\n(弱)"
@@ -920,7 +920,7 @@ class ChartBuilder:
         # 设置图表选项
         line_chart.set_global_opts(
             title_opts=opts.TitleOpts(
-                title="标记图",
+                title="",
                 pos_left="left",
             ),
             legend_opts=opts.LegendOpts(
@@ -978,12 +978,406 @@ class ChartBuilder:
         return line_chart
 
     @staticmethod
-    def create_macd_chart(dates: list, diff: list, dea: list, hist: list,
-                          fast_period=12, slow_period=26, signal_period=9,
-                          title: str = "MACD"):
-        # 动态生成标题
-        full_title = f"{title} ({fast_period},{slow_period},{signal_period})"
+    def create_backtest_performance_chart(dates, strategy_values, benchmark_values):
+        """
+        创建回测表现对比图
+        """
+        line = Line()
+        line.add_xaxis(dates)
 
+        # 添加策略收益线
+        line.add_yaxis(
+            "策略收益",
+            strategy_values,
+            is_smooth=True,
+            color="#2e7ed6",
+            linestyle_opts=opts.LineStyleOpts(width=3),
+            symbol="none"
+        )
+
+        # 添加基准收益线
+        line.add_yaxis(
+            "基准收益",
+            benchmark_values,
+            is_smooth=True,
+            color="#2caf18",
+            linestyle_opts=opts.LineStyleOpts(width=3, type_="dashed"),
+            symbol="none"
+        )
+        line.set_global_opts(
+            title_opts=opts.TitleOpts(
+                title="",
+                pos_left="left",
+            ),
+            legend_opts=opts.LegendOpts(
+                type_="scroll",
+                pos_top="50%",
+                pos_left="right",
+                orient="vertical",  # 改为垂直排列
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="axis",
+                axis_pointer_type="cross",
+                background_color="rgba(245, 245, 245, 0.8)",
+                border_width=1,
+                border_color="#ccc",
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+            ),
+            xaxis_opts=opts.AxisOpts(
+                type_="category",
+                is_scale=True,
+                boundary_gap=False,
+                axisline_opts=opts.AxisLineOpts(
+                    is_on_zero=False,
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
+                ),
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
+                min_="dataMin",
+                max_="dataMax"
+            ),
+            yaxis_opts=opts.AxisOpts(
+                is_scale=True,
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+            ),
+            datazoom_opts=[
+                opts.DataZoomOpts(
+                    is_show=True,
+                    type_="slider",
+                    pos_top="0%",  # 放在顶部
+                    pos_left="10%",  # 左侧边距
+                    pos_right="10%",  # 右侧边距
+                    xaxis_index=[0, 1],
+                    range_start=0,
+                    range_end=100,
+                ),
+            ]
+        )
+        return line
+
+    @staticmethod
+    def create_backtest_trade_points_chart(dates, open_prices=None, high_prices=None, low_prices=None, close_prices=None, signals=None, trades=None):
+        """
+        创建带交易标记的回测图表
+        """
+        line_chart = Line()
+        line_chart.add_xaxis(dates)
+
+        # 添加开盘价横线
+        if open_prices is not None:
+            line_chart.add_yaxis(
+                "开盘价",
+                open_prices,
+                symbol="none",
+                color="#ffa940",
+                linestyle_opts=opts.LineStyleOpts(width=2),  # 稍微加粗线条
+            )
+
+        # 添加最高价横线
+        if high_prices is not None:
+            line_chart.add_yaxis(
+                "最高价",
+                high_prices,
+                symbol="none",
+                color="#cc053f",
+                linestyle_opts=opts.LineStyleOpts(width=2, type_="dashed")
+            )
+
+        # 添加最低价横线
+        if low_prices is not None:
+            line_chart.add_yaxis(
+                "最低价",
+                low_prices,
+                symbol="none",
+                color="#6feca5",
+                linestyle_opts=opts.LineStyleOpts(width=2, type_="dashed")
+            )
+
+        # 添加收盘价折线
+        if close_prices is not None:
+            line_chart.add_yaxis(
+                "收盘价",
+                close_prices,
+                symbol="none",
+                color="#1f77b4",
+                linestyle_opts=opts.LineStyleOpts(width=2)
+            )
+
+        # 添加买卖信号标记
+        if signals:
+            buy_dates = []
+            buy_prices = []
+            sell_dates = []
+            sell_prices = []
+
+            for signal in signals:
+                date_str = signal['date'].strftime('%Y-%m-%d') if hasattr(signal['date'], 'strftime') else str(
+                    signal['date'])
+                price = float(signal['price'])
+
+                if signal['signal_type'] == 'buy':
+                    buy_dates.append(date_str)
+                    buy_prices.append(price)
+                else:
+                    sell_dates.append(date_str)
+                    sell_prices.append(price)
+
+            # 买入信号散点
+            if buy_dates:
+                buy_scatter = Scatter()
+                buy_scatter.add_xaxis(buy_dates)
+                buy_scatter.add_yaxis(
+                    "买入信号",
+                    buy_prices,
+                    symbol="triangle",
+                    symbol_size=12,
+                    color="#ff0000",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="top",
+                        distance=5,
+                        font_size=9,
+                        formatter="MB"
+                    )
+                )
+                line_chart = line_chart.overlap(buy_scatter)
+
+            # 卖出信号散点
+            if sell_dates:
+                sell_scatter = Scatter()
+                sell_scatter.add_xaxis(sell_dates)
+                sell_scatter.add_yaxis(
+                    "卖出信号",
+                    sell_prices,
+                    symbol="triangle",
+                    symbol_size=12,
+                    color="#00ff00",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="bottom",
+                        distance=5,
+                        font_size=9,
+                        formatter="MS"
+                    )
+                )
+                line_chart = line_chart.overlap(sell_scatter)
+
+        # 添加实际交易标记
+        if trades:
+            actual_buy_dates = []
+            actual_buy_prices = []
+            actual_sell_dates = []
+            actual_sell_prices = []
+
+            for trade in trades:
+                date_str = trade['date'].strftime('%Y-%m-%d') if hasattr(trade['date'], 'strftime') else str(
+                    trade['date'])
+                price = float(trade['price'])
+
+                if trade['action'] == '买入':
+                    actual_buy_dates.append(date_str)
+                    actual_buy_prices.append(price)
+                else:
+                    actual_sell_dates.append(date_str)
+                    actual_sell_prices.append(price)
+
+            # 实际买入交易
+            if actual_buy_dates:
+                actual_buy_scatter = Scatter()
+                actual_buy_scatter.add_xaxis(actual_buy_dates)
+                actual_buy_scatter.add_yaxis(
+                    "实际买入",
+                    actual_buy_prices,
+                    symbol="triangle",
+                    symbol_size=20,
+                    color="#8B0000",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="top",
+                        distance=12,
+                        font_size=14,
+                        formatter="❤️"
+                    )
+                )
+                line_chart = line_chart.overlap(actual_buy_scatter)
+
+            # 实际卖出交易
+            if actual_sell_dates:
+                actual_sell_scatter = Scatter()
+                actual_sell_scatter.add_xaxis(actual_sell_dates)
+                actual_sell_scatter.add_yaxis(
+                    "实际卖出",
+                    actual_sell_prices,
+                    symbol="diamond",
+                    symbol_size=20,
+                    color="#006400",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="bottom",
+                        distance=12,
+                        font_size=14,
+                        formatter="❤️"
+                    )
+                )
+                line_chart = line_chart.overlap(actual_sell_scatter)
+
+        line_chart.set_global_opts(
+            title_opts=opts.TitleOpts(
+                title="",
+                pos_left="left",
+            ),
+            legend_opts=opts.LegendOpts(
+                type_="scroll",
+                pos_top="30%",
+                pos_left="right",
+                orient="vertical",  # 改为垂直排列
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="axis",
+                axis_pointer_type="cross",
+                background_color="rgba(245, 245, 245, 0.8)",
+                border_width=1,
+                border_color="#ccc",
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+            ),
+            xaxis_opts=opts.AxisOpts(
+                type_="category",
+                is_scale=True,
+                boundary_gap=False,
+                axisline_opts=opts.AxisLineOpts(
+                    is_on_zero=False,
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
+                ),
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
+                min_="dataMin",
+                max_="dataMax"
+            ),
+            yaxis_opts=opts.AxisOpts(
+                is_scale=True,
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+            ),
+            datazoom_opts=[
+                opts.DataZoomOpts(
+                    is_show=True,
+                    type_="slider",
+                    pos_top="0%",  # 放在顶部
+                    pos_left="10%",  # 左侧边距
+                    pos_right="10%",  # 右侧边距
+                    xaxis_index=[0, 1],
+                    range_start=0,
+                    range_end=100,
+                ),
+            ]
+        )
+        return line_chart
+
+    @staticmethod
+    def create_position_chart(dates, positions, cash_values):
+        """
+        创建持仓变化图表
+        """
+        line_chart = Line()
+        line_chart.add_xaxis(dates)
+
+        # 持仓价值线
+        line_chart.add_yaxis(
+            "持仓价值",
+            positions,
+            is_smooth=True,
+            color="#2ca02c",
+            linestyle_opts=opts.LineStyleOpts(width=3),
+            symbol="none"
+        )
+
+        # 现金价值线
+        line_chart.add_yaxis(
+            "现金价值",
+            cash_values,
+            is_smooth=True,
+            color="#d62728",
+            linestyle_opts=opts.LineStyleOpts(width=3),
+            symbol="none"
+        )
+
+        line_chart.set_global_opts(
+            title_opts=opts.TitleOpts(
+                title="",
+                pos_left="left",
+            ),
+            legend_opts=opts.LegendOpts(
+                type_="scroll",
+                pos_top="50%",
+                pos_left="right",
+                orient="vertical",  # 改为垂直排列
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="axis",
+                axis_pointer_type="cross",
+                background_color="rgba(245, 245, 245, 0.8)",
+                border_width=1,
+                border_color="#ccc",
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+            ),
+            xaxis_opts=opts.AxisOpts(
+                type_="category",
+                is_scale=True,
+                boundary_gap=False,
+                axisline_opts=opts.AxisLineOpts(
+                    is_on_zero=False,
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
+                ),
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
+                min_="dataMin",
+                max_="dataMax"
+            ),
+            yaxis_opts=opts.AxisOpts(
+                is_scale=True,
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+            ),
+            datazoom_opts=[
+                opts.DataZoomOpts(
+                    is_show=True,
+                    type_="slider",
+                    pos_top="0%",  # 放在顶部
+                    pos_left="10%",  # 左侧边距
+                    pos_right="10%",  # 右侧边距
+                    xaxis_index=[0, 1],
+                    range_start=0,
+                    range_end=100,
+                ),
+            ]
+        )
+        return line_chart
+
+    @staticmethod
+    def create_macd_chart(dates: list, diff: list, dea: list, hist: list,
+                          fast_period=12, slow_period=26, signal_period=9):
         # 计算Y轴范围
         y_min = min(min(diff or [0]), min(dea or [0]), min(hist or [0])) * 1.1
         y_max = max(max(diff or [0]), max(dea or [0]), max(hist or [0])) * 1.1
@@ -1043,7 +1437,7 @@ class ChartBuilder:
 
         # 设置全局选项（最简化可靠配置）
         overlap.set_global_opts(
-            title_opts=opts.TitleOpts(title=full_title),
+            title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
                 pos_top="45%",
                 pos_left="right",
@@ -1081,7 +1475,7 @@ class ChartBuilder:
             ),
             datazoom_opts=opts.DataZoomOpts(is_show=True,
                     type_="slider",
-                    pos_bottom="3%",
+                    pos_top="0%",
                     pos_left="10%",  # 左侧边距
                     pos_right="10%",  # 右侧边距
                     xaxis_index=[0, 1],
@@ -1373,3 +1767,272 @@ def calculate_all_signals(df):
             return filtered_signals
         return merged_signals
     return all_signals
+
+
+def backtest_strategy(df, signals, initial_capital=100000):
+    """
+    基于生成的信号进行回测
+    """
+    if not signals:
+        return None
+
+    # 按日期排序信号
+    signals = sorted(signals, key=lambda x: x['date'])
+
+    # 初始化回测参数
+    capital = initial_capital
+    position = 0  # 持仓数量
+    trades = []  # 交易记录
+
+    # 处理交易信号
+    for signal in signals:
+        signal_date = signal['date']
+        signal_price = signal['price']
+        signal_type = signal['signal_type']
+        strength = signal['strength']
+
+        # 获取信号日期对应的数据行
+        if signal_date in df['date'].values:
+            row = df[df['date'] == signal_date].iloc[0]
+            current_price = row['closing']
+        else:
+            current_price = signal_price
+
+        # 买入信号
+        if signal_type == 'buy' and position == 0:
+            # 根据信号强度决定买入比例
+            buy_ratio = 0.8 if strength == 'strong' else 0.5
+            amount_to_invest = capital * buy_ratio
+            shares_to_buy = int(amount_to_invest / current_price)
+
+            if shares_to_buy > 0:
+                cost = shares_to_buy * current_price
+                capital -= cost
+                position += shares_to_buy
+
+                trades.append({
+                    'date': signal_date,
+                    'action': '买入',
+                    'price': current_price,
+                    'shares': shares_to_buy,
+                    'amount': cost,
+                    'strength': strength,
+                    'capital': capital,
+                    'position': position
+                })
+
+        # 卖出信号
+        elif signal_type == 'sell' and position > 0:
+            # 根据信号强度决定卖出比例
+            sell_ratio = 0.8 if strength == 'strong' else 0.5
+            shares_to_sell = int(position * sell_ratio)
+
+            if shares_to_sell > 0:
+                revenue = shares_to_sell * current_price
+                capital += revenue
+                position -= shares_to_sell
+                trades.append({
+                    'date': signal_date,
+                    'action': '卖出',
+                    'price': current_price,
+                    'shares': shares_to_sell,
+                    'amount': revenue,
+                    'strength': strength,
+                    'capital': capital,
+                    'position': position
+                })
+
+    # 计算最终价值（包括持仓）
+    final_date = df['date'].max()
+    final_price = df[df['date'] == final_date]['closing'].iloc[0]
+    final_value = capital + position * final_price
+    total_return = (final_value - initial_capital) / initial_capital * 100
+
+    return {
+        'initial_capital': initial_capital,
+        'final_value': final_value,
+        'total_return': total_return,
+        'trades': trades,
+        'capital': capital,
+        'position': position,
+        'final_price': final_price
+    }
+
+
+def calculate_strategy_metrics(df, signals):
+    """
+    计算策略指标
+    """
+    if not signals:
+        return None
+
+    # 按日期排序
+    signals = sorted(signals, key=lambda x: x['date'])
+
+    # 计算胜率
+    buy_signals = [s for s in signals if s['signal_type'] == 'buy']
+    sell_signals = [s for s in signals if s['signal_type'] == 'sell']
+
+    # 计算平均持股天数
+    holding_periods = []
+    buy_dates = {}
+
+    for signal in signals:
+        if signal['signal_type'] == 'buy':
+            buy_dates[signal['date']] = signal['price']
+        elif signal['signal_type'] == 'sell' and buy_dates:
+            # 简单匹配最近的买入信号
+            if buy_dates:
+                last_buy_date = list(buy_dates.keys())[-1]
+                holding_days = (signal['date'] - last_buy_date).days
+                if holding_days > 0:
+                    holding_periods.append(holding_days)
+                del buy_dates[last_buy_date]
+
+    avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
+
+    return {
+        'total_signals': len(signals),
+        'buy_signals': len(buy_signals),
+        'sell_signals': len(sell_signals),
+        'avg_holding_period': avg_holding_period
+    }
+
+
+def generate_trading_advice(df, signals, current_date=None):
+    """
+    生成交易建议
+    """
+    if not signals:
+        return "当前无明确交易信号"
+    if current_date is None:
+        current_date = df['date'].max()
+    # 获取最近的信号
+    recent_signals = [s for s in signals if s['date'] <= current_date]
+    if not recent_signals:
+        return "当前无历史交易信号"
+    # 按日期排序，获取最新的信号
+    recent_signals.sort(key=lambda x: x['date'], reverse=True)
+    latest_signal = recent_signals[0]
+    # 获取当前价格
+    current_price = df[df['date'] == current_date]['closing'].iloc[0] if current_date in df['date'].values else \
+        latest_signal['price']
+    advice = ""
+    if latest_signal['signal_type'] == 'buy':
+        if latest_signal['strength'] == 'strong':
+            advice = f"🔴 🔥 MB（强烈买入），当前价格：¥{current_price:.2f}"
+        else:
+            advice = f"🔴 🥀 MB（建议买入），当前价格：¥{current_price:.2f}"
+    else:  # sell signal
+        if latest_signal['strength'] == 'strong':
+            advice = f"🟢 🔥 MS（强烈买入），当前价格：¥{current_price:.2f}"
+        else:
+            advice = f"🟢 🥀 MS（建议买入），当前价格：¥{current_price:.2f}"
+    return advice
+
+
+def calculate_risk_metrics(df, signals):
+    """
+    计算风险指标
+    """
+    if len(df) < 2 or not signals:
+        return None
+    # 计算股票收益率波动率
+    df = df.copy()
+    df['returns'] = df['closing'].pct_change()
+    volatility = df['returns'].std() * (252 ** 0.5)  # 年化波动率
+
+    # 计算最大回撤
+    df['cummax'] = df['closing'].cummax()
+    df['drawdown'] = (df['closing'] - df['cummax']) / df['cummax']
+    max_drawdown = df['drawdown'].min()
+
+    # 计算夏普比率(假设无风险利率为3%)
+    risk_free_rate = 0.03
+    sharpe_ratio = (df['returns'].mean() * 252 - risk_free_rate) / (df['returns'].std() * (252 ** 0.5)) if df['returns'].std() > 0 else 0
+
+    return {
+        'volatility': volatility,
+        'max_drawdown': max_drawdown,
+        'sharpe_ratio': sharpe_ratio
+    }
+
+
+def calculate_strategy_performance(df, all_signals, backtest_result):
+    """
+    基于实际交易记录计算策略收益和基准收益
+    """
+    df_sorted = df.sort_values('date')
+    dates = df_sorted['date'].tolist()
+    prices = df_sorted['closing'].tolist()
+
+    # 初始化策略收益序列
+    strategy_values = []
+    current_capital = backtest_result['initial_capital']
+    current_position = 0
+
+    # 按日期排序交易记录
+    trades = sorted(backtest_result['trades'], key=lambda x: x['date'])
+    trade_index = 0
+
+    # 计算策略每日价值
+    for i, (date, price) in enumerate(zip(dates, prices)):
+        # 检查是否有在该日期的交易
+        while trade_index < len(trades) and trades[trade_index]['date'] == date:
+            trade = trades[trade_index]
+            current_capital = trade['capital']
+            current_position = trade['position']
+            trade_index += 1
+
+        # 计算当前总价值（现金 + 持仓价值）
+        current_value = current_capital + current_position * price
+        strategy_values.append(current_value)
+
+    # 转换策略收益为百分比收益
+    strategy_cumulative = [(value / backtest_result['initial_capital'] - 1) * 100
+                           for value in strategy_values]
+    # 计算基准收益（买入持有）
+    initial_price = prices[0]
+    benchmark_cumulative = [(price / initial_price - 1) * 100 for price in prices]
+    return strategy_cumulative, benchmark_cumulative
+
+
+def calculate_position_and_cash_values(df, backtest_result):
+    """
+    计算回测过程中的持仓价值和现金价值数据，用于展示资金分布变化图表
+
+    Args:
+        df: 包含股票价格数据的DataFrame
+        backtest_result: 回测结果字典，包含交易记录等信息
+
+    Returns:
+        tuple: (position_values, cash_values)
+    """
+    # 准备持仓价值和现金价值数据
+    position_values = []
+    cash_values = []
+
+    # 初始化资金和持仓
+    daily_capital = backtest_result['initial_capital']
+    daily_position = 0
+
+    # 按日期排序的交易记录
+    sorted_trades = sorted(backtest_result['trades'], key=lambda x: x['date'])
+    trade_idx = 0
+
+    # 遍历每天的数据
+    for i, (date, price) in enumerate(zip(df['date'], df['closing'])):
+        # 更新当天的资金和持仓情况
+        while trade_idx < len(sorted_trades) and sorted_trades[trade_idx]['date'] == date:
+            daily_capital = sorted_trades[trade_idx]['capital']
+            daily_position = sorted_trades[trade_idx]['position']
+            trade_idx += 1
+
+        # 计算持仓价值和现金价值
+        position_value = daily_position * price
+        cash_value = daily_capital
+
+        position_values.append(position_value)
+        cash_values.append(cash_value)
+
+    return position_values, cash_values
