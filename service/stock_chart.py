@@ -6,7 +6,8 @@ import streamlit_echarts
 from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
 from enums.patterns import Patterns
-from utils.chart import ChartBuilder, calculate_macd, calculate_macd_signals, calculate_sma_signals
+from utils.chart import ChartBuilder, calculate_macd, calculate_macd_signals, calculate_sma_signals, \
+    calculate_all_signals
 from utils.k_line_processor import KLineProcessor
 
 
@@ -41,14 +42,15 @@ def show_detail(stock):
 def show_page(stock, t: StockHistoryType):
     chart_type = st.radio(
         "",
-        ["历史K线图", "历史K线图处理"],
+        ["K线图", "K线图处理", "买卖点分析"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_radio2",
         label_visibility="collapsed"
     )
     chart_handlers = {
-        "历史K线图": lambda: show_kline_chart(stock, t),
-        "历史K线图处理": lambda: show_kline_process_chart(stock, t)
+        "K线图": lambda: show_kline_chart(stock, t),
+        "K线图处理": lambda: show_kline_process_chart(stock, t),
+        "买卖点分析": lambda: show_trade_points_chart(stock, t)
     }
     chart_handlers.get(chart_type, lambda: None)()
 
@@ -56,12 +58,11 @@ def show_kline_chart(stock, t: StockHistoryType):
     st.markdown(
         f"""
                <div class="table-header">
-                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - 「{t.text}」</div>
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图</div>
                </div>
                """,
         unsafe_allow_html=True
     )
-
     model = get_history_model(t)
     try:
         with get_db_session() as session:
@@ -131,19 +132,14 @@ def show_kline_chart(stock, t: StockHistoryType):
                 return
 
             ma_lines = {}
-            default_ma_periods = [5, 10, 30, 250]
+            default_ma_periods = [5, 10, 30, 250] # 5日移动平均线，10日移动平均线，30日移动平均线，250日移动平均线
             for period in default_ma_periods:
                 ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
 
             # 计算 MACD
             macd_df = calculate_macd(df)
-            # 计算信号标记
-            signals = calculate_macd_signals(df, macd_df)
-
-            # 计算SMA信号
-            sma_signals = calculate_sma_signals(df, ma_lines)
-            # 合并信号
-            all_signals = signals + sma_signals
+            # 计算所有信号
+            all_signals = calculate_all_signals(df)
 
             macd_dates = df['date'].astype(str).tolist()
             diff_values = macd_df['DIFF'].tolist()
@@ -174,18 +170,18 @@ def show_kline_chart(stock, t: StockHistoryType):
                 signal_period=9,
                 title="MACD"
             )
-            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="400px", key=f"{key_prefix}_macd")
+            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="450px", key=f"{key_prefix}_macd")
 
             # 显示信号数据表格
             if all_signals:
                 st.markdown("---")
-                st.markdown("<h6 class='info-section-title'>交易信号信息</h6>", unsafe_allow_html=True)
+                st.markdown("<h6 class='info-section-title'>买卖点信息</h6>", unsafe_allow_html=True)
                 # 创建信号DataFrame
                 signal_df = pd.DataFrame([
                     {
                         '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str(s['date']),
-                        '信号类型': '买入' if s['signal_type'] == 'buy' else '卖出',
-                        '信号强度': '强' if s['strength'] == 'strong' else '弱',
+                        '信号类型': '🔴 MB(买入)' if s['signal_type'] == 'buy' else '🟢 MS(卖出)',
+                        '信号强度': '🔥 强' if s['strength'] == 'strong' else '🥀 弱',
                         '价格': round(s['price'], 2)
                     }
                     for s in all_signals
@@ -193,7 +189,7 @@ def show_kline_chart(stock, t: StockHistoryType):
 
                 st.dataframe(
                     signal_df,
-                    height=min(len(signal_df) * 35 + 38, 400),
+                    height=min(len(signal_df) * 35 + 38, 600),
                     use_container_width=True
                 )
 
@@ -212,13 +208,21 @@ def show_kline_chart(stock, t: StockHistoryType):
 
                 st.dataframe(
                     macd_display_df,
-                    height=min(len(macd_display_df) * 35 + 38, 400),
+                    height=min(len(macd_display_df) * 35 + 38, 600),
                     use_container_width=True
                 )
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
 def show_kline_process_chart(stock, t: StockHistoryType):
+    st.markdown(
+        f"""
+                  <div class="table-header">
+                      <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图处理</div>
+                  </div>
+                  """,
+        unsafe_allow_html=True
+    )
     model = get_history_model(t)
     try:
         with get_db_session() as session:
@@ -351,7 +355,7 @@ def show_kline_process_chart(stock, t: StockHistoryType):
                     # 显示包含关系表格
                     st.dataframe(
                         contains_df,
-                        height=min(len(contains_df) * 35 + 38, 400),
+                        height=min(len(contains_df) * 35 + 38, 600),
                         use_container_width=True
                     )
                     st.markdown("---")
@@ -360,13 +364,13 @@ def show_kline_process_chart(stock, t: StockHistoryType):
                     st.markdown("<h6 class='info-section-title'>分型标记信息</h6>", unsafe_allow_html=True)
                     pattern_df = pd.DataFrame({
                         '日期': [p['date'] for p in patterns],
-                        '类型': ["⬆顶分型" if p['type'] == Patterns.TOP else "⬇底分型" for p in patterns],
+                        '类型': ["🚀 顶分型" if p['type'] == Patterns.TOP else "💣 底分型" for p in patterns],
                         '价格': [p['value'] for p in patterns]
                     })
 
                     st.dataframe(
                         pattern_df,
-                        height=min(len(pattern_df) * 35 + 38, 400),
+                        height=min(len(pattern_df) * 35 + 38, 600),
                         use_container_width=True
                     )
                     st.markdown("---")
@@ -386,7 +390,7 @@ def show_kline_process_chart(stock, t: StockHistoryType):
                     ])
                     st.dataframe(
                         stroke_df,
-                        height=min(len(stroke_df) * 35 + 38, 400),
+                        height=min(len(stroke_df) * 35 + 38, 600),
                         use_container_width=True
                     )
                     st.markdown("---")
@@ -406,7 +410,7 @@ def show_kline_process_chart(stock, t: StockHistoryType):
                     ])
                     st.dataframe(
                         segment_df,
-                        height=min(len(segment_df) * 35 + 38, 400),
+                        height=min(len(segment_df) * 35 + 38, 600),
                         use_container_width=True
                     )
                     st.markdown("---")
@@ -432,7 +436,7 @@ def show_kline_process_chart(stock, t: StockHistoryType):
                     ])
                     st.dataframe(
                         center_df,
-                        height=min(len(center_df) * 35 + 38, 400),
+                        height=min(len(center_df) * 35 + 38, 600),
                         use_container_width=True
                     )
             except ValueError as e:
@@ -440,3 +444,127 @@ def show_kline_process_chart(stock, t: StockHistoryType):
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
+
+def show_trade_points_chart(stock, t: StockHistoryType):
+    st.markdown(
+        f"""
+               <div class="table-header">
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 买卖点分析</div>
+               </div>
+               """,
+        unsafe_allow_html=True
+    )
+
+    model = get_history_model(t)
+    try:
+        with get_db_session() as session:
+            # 获取该股票的最早和最晚日期
+            date_range = session.query(
+                func.min(model.date),
+                func.max(model.date)
+            ).filter(
+                model.code == stock.code,
+                model.removed == False
+            ).first()
+            if not date_range or None in date_range:
+                st.warning("没有找到数据")
+                return
+            min_date, max_date = date_range
+            default_start_date = max(max_date - timedelta(days=90), min_date)
+
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_trade_points',category=stock.category)
+            start_date_key = f"{key_prefix}_start_date"
+            end_date_key = f"{key_prefix}_end_date"
+
+            if start_date_key not in st.session_state:
+                st.session_state[start_date_key] = default_start_date
+            if end_date_key not in st.session_state:
+                st.session_state[end_date_key] = max_date
+
+            # 添加日期选择器
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input(
+                    "开始日期",
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=start_date_key
+                )
+                if start_date != st.session_state[start_date_key]:
+                    st.session_state[start_date_key] = start_date
+            with col2:
+                end_date = st.date_input(
+                    "结束日期",
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=end_date_key
+                )
+                if end_date != st.session_state[end_date_key]:
+                    st.session_state[end_date_key] = end_date
+
+            # 从数据库获取数据
+            query = session.query(
+                model.date,
+                model.opening,
+                model.highest,
+                model.lowest,
+                model.closing
+            ).filter(
+                model.code == stock.code,
+                model.removed == False,
+                model.date >= start_date,
+                model.date <= end_date
+            ).order_by(model.date)
+
+            # 读取数据到DataFrame
+            df = pd.read_sql(query.statement, session.bind)
+
+            if df.empty:
+                st.warning("所选日期范围内没有数据")
+                return
+
+            # 计算所有信号
+            all_signals = calculate_all_signals(df)
+            # 准备数据
+            dates = df['date'].astype(str).tolist()
+            open_prices = df['opening'].tolist()
+            high_prices = df['highest'].tolist()
+            low_prices = df['lowest'].tolist()
+            close_prices = df['closing'].tolist()
+
+            line_chart = ChartBuilder.create_trade_points_chart(
+                dates,
+                open_prices,
+                high_prices,
+                low_prices,
+                close_prices,
+                all_signals
+            )
+            # 显示图表
+            streamlit_echarts.st_pyecharts(line_chart, theme="white", height="600px", key=f"{key_prefix}_trade_points")
+
+            # 显示买卖点表格
+            if all_signals:
+                st.markdown("---")
+                st.markdown("<h6 class='info-section-title'>买卖点信息</h6>", unsafe_allow_html=True)
+
+                # 创建买卖点DataFrame - 在表格中用相应的图标表示信号强度
+                trade_points_df = pd.DataFrame([
+                    {
+                        '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str(s['date']),
+                        '信号类型': '🔴 MB(买入)' if s['signal_type'] == 'buy' else '🟢 MS(卖出)',
+                        '信号强度': '🔥 强' if s['strength'] == 'strong' else '🥀 弱',
+                        '价格': round(s['price'], 2)
+                    }
+                    for s in all_signals
+                ]).sort_values('日期')
+                st.dataframe(
+                    trade_points_df,
+                    height=min(len(trade_points_df) * 35 + 38, 800),
+                    use_container_width=True
+                )
+            else:
+                st.info("所选时间范围内未发现符合条件的买卖点信号")
+
+    except Exception as e:
+        st.error(f"加载数据失败：{str(e)}")

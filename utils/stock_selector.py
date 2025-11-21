@@ -115,7 +115,7 @@ class StockSelectorManager:
                     # 对于已关注的股票，在末尾添加标记
                     # 为了对齐，未关注的股票也保留相同长度的空格
                     if is_followed:
-                        return f"{base_text} ⭐"
+                        return f"{base_text} ❤️"
                     else:
                         # 添加相同数量的空格以保持对齐
                         return f"{base_text}           "

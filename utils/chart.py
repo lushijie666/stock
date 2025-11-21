@@ -257,7 +257,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in buy_signals_strong])
                     .add_yaxis(
-                        series_name="MB(强)",
+                        series_name="MB-买(强)",
                         y_axis=[p[1] for p in buy_signals_strong],
                         symbol_size=10,
                         symbol='triangle',  # 使用三角形符号更明显
@@ -265,7 +265,7 @@ class ChartBuilder:
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="top",
-                            formatter="MB",
+                            formatter="MB\n(强)",
                             font_size=10,
                             color='#8B0000',
                         )
@@ -279,7 +279,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in buy_signals_weak])
                     .add_yaxis(
-                        series_name="MB(弱)",
+                        series_name="MB-买(弱)",
                         y_axis=[p[1] for p in buy_signals_weak],
                         symbol_size=10,
                         symbol='triangle',
@@ -287,7 +287,7 @@ class ChartBuilder:
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="top",
-                            formatter="MB",
+                            formatter="MB\n(弱)",
                             font_size=10,
                             color='#FF7F7F',
                         )
@@ -301,7 +301,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in sell_signals_strong])
                     .add_yaxis(
-                        series_name="MS(强)",
+                        series_name="MS-卖(强)",
                         y_axis=[p[1] for p in sell_signals_strong],
                         symbol_size=10,
                         symbol='diamond',  # 使用菱形符号
@@ -309,7 +309,7 @@ class ChartBuilder:
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="bottom",
-                            formatter="MS",
+                            formatter="MS\n(强)",
                             font_size=10,
                             color='#006400'
                         )
@@ -323,7 +323,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in sell_signals_weak])
                     .add_yaxis(
-                        series_name="MS(弱)",
+                        series_name="MS-卖(弱)",
                         y_axis=[p[1] for p in sell_signals_weak],
                         symbol_size=10,
                         symbol='diamond',
@@ -331,7 +331,7 @@ class ChartBuilder:
                         label_opts=opts.LabelOpts(
                             is_show=True,
                             position="bottom",
-                            formatter="MS",
+                            formatter="MS\n(弱)",
                             font_size=10,
                             color='#90EE90'
                         )
@@ -745,6 +745,239 @@ class ChartBuilder:
         return grid
 
     @staticmethod
+    def create_trade_points_chart(dates, open_prices=None, high_prices=None, low_prices=None, close_prices=None, signals=None):
+        """
+        创建带买卖点标记的价格折线图
+        Args:
+            dates: 日期列表
+            open_prices: 开盘价列表
+            high_prices: 最高价列表
+            low_prices: 最低价列表
+            close_prices: 收盘价列表
+            signals: 信号列表，包含买卖点信息
+
+        Returns:
+            Line: pyecharts的Line实例
+        """
+        line_chart = Line()
+        line_chart.add_xaxis(dates)
+
+        # 添加开盘价横线
+        if open_prices is not None:
+            line_chart.add_yaxis(
+                "开盘价",
+                open_prices,
+                symbol="none",
+                color="#ffa940",
+                linestyle_opts=opts.LineStyleOpts(width=3),  # 稍微加粗线条
+            )
+
+        # 添加最高价横线
+        if high_prices is not None:
+            line_chart.add_yaxis(
+                "最高价",
+                high_prices,
+                symbol="none",
+                color="#cc053f",
+                linestyle_opts=opts.LineStyleOpts(width=3, type_="dashed")
+            )
+
+        # 添加最低价横线
+        if low_prices is not None:
+            line_chart.add_yaxis(
+                "最低价",
+                low_prices,
+                symbol="none",
+                color="#6feca5",
+                linestyle_opts=opts.LineStyleOpts(width=3, type_="dashed")
+            )
+
+        # 添加收盘价折线
+        if close_prices is not None:
+            line_chart.add_yaxis(
+                "收盘价",
+                close_prices,
+                symbol="none",
+                color="#1f77b4",
+                linestyle_opts=opts.LineStyleOpts(width=3)
+            )
+
+        # 添加买卖点标记
+        if signals:
+            # 按信号类型和强度分别收集数据
+            strong_buy_dates = []
+            strong_buy_prices = []
+            weak_buy_dates = []
+            weak_buy_prices = []
+            strong_sell_dates = []
+            strong_sell_prices = []
+            weak_sell_dates = []
+            weak_sell_prices = []
+
+            for signal in signals:
+                date_str = signal['date'].strftime('%Y-%m-%d') if hasattr(signal['date'], 'strftime') else str(
+                    signal['date'])
+                price = float(signal['price'])
+
+                if signal['signal_type'] == 'buy':
+                    if signal['strength'] == 'strong':
+                        strong_buy_dates.append(date_str)
+                        strong_buy_prices.append(price)
+                    else:
+                        weak_buy_dates.append(date_str)
+                        weak_buy_prices.append(price)
+                else:
+                    if signal['strength'] == 'strong':
+                        strong_sell_dates.append(date_str)
+                        strong_sell_prices.append(price)
+                    else:
+                        weak_sell_dates.append(date_str)
+                        weak_sell_prices.append(price)
+
+            # 强买入信号散点
+            if strong_buy_dates:
+                strong_buy_scatter = Scatter()
+                strong_buy_scatter.add_xaxis(strong_buy_dates)
+                strong_buy_scatter.add_yaxis(
+                    "MB-买(强)",
+                    strong_buy_prices,
+                    symbol="triangle",
+                    symbol_size=12,  # 稍微增大标记
+                    color="#8B0000",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="top",
+                        distance=10,  # 增加标签与标记的距离
+                        font_size=9,
+                        color='#8B0000',
+                        formatter="MB\n(强)"
+                    )
+                )
+                line_chart = line_chart.overlap(strong_buy_scatter)
+
+            # 弱买入信号散点
+            if weak_buy_dates:
+                weak_buy_scatter = Scatter()
+                weak_buy_scatter.add_xaxis(weak_buy_dates)
+                weak_buy_scatter.add_yaxis(
+                    "MB-买(弱)",
+                    weak_buy_prices,
+                    symbol="triangle",
+                    symbol_size=12,
+                    color="#FF7F7F",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="top",
+                        distance=10,
+                        font_size=9,
+                        color='#FF7F7F',
+                        formatter="MB\n(弱)"
+                    )
+                )
+                line_chart = line_chart.overlap(weak_buy_scatter)
+
+            # 强卖出信号散点
+            if strong_sell_dates:
+                strong_sell_scatter = Scatter()
+                strong_sell_scatter.add_xaxis(strong_sell_dates)
+                strong_sell_scatter.add_yaxis(
+                    "MS-卖(强)",
+                    strong_sell_prices,
+                    symbol="diamond",
+                    symbol_size=12,
+                    color="#006400",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="bottom",
+                        distance=10,
+                        font_size=9,
+                        color='#006400',
+                        formatter="MS\n(强)"
+                    )
+                )
+                line_chart = line_chart.overlap(strong_sell_scatter)
+
+            # 弱卖出信号散点
+            if weak_sell_dates:
+                weak_sell_scatter = Scatter()
+                weak_sell_scatter.add_xaxis(weak_sell_dates)
+                weak_sell_scatter.add_yaxis(
+                    "MS-卖(弱)",
+                    weak_sell_prices,
+                    symbol="diamond",
+                    symbol_size=12,
+                    color="#90EE90",
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="bottom",
+                        distance=10,
+                        font_size=9,
+                        color='#90EE90',
+                        formatter="MS\n(弱)"
+                    )
+                )
+                line_chart = line_chart.overlap(weak_sell_scatter)
+        # 设置图表选项
+        line_chart.set_global_opts(
+            title_opts=opts.TitleOpts(
+                title="标记图",
+                pos_left="left",
+            ),
+            legend_opts=opts.LegendOpts(
+                type_="scroll",
+                pos_top="30%",
+                pos_left="right",
+                orient="vertical",  # 改为垂直排列
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="axis",
+                axis_pointer_type="cross",
+                background_color="rgba(245, 245, 245, 0.8)",
+                border_width=1,
+                border_color="#ccc",
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+            ),
+            xaxis_opts=opts.AxisOpts(
+                type_="category",
+                is_scale=True,
+                boundary_gap=False,
+                axisline_opts=opts.AxisLineOpts(
+                    is_on_zero=False,
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
+                ),
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
+                min_="dataMin",
+                max_="dataMax"
+            ),
+            yaxis_opts=opts.AxisOpts(
+                is_scale=True,
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+            ),
+            datazoom_opts=[
+                opts.DataZoomOpts(
+                    is_show=True,
+                    type_="slider",
+                    pos_top="0%",  # 放在顶部
+                    pos_left="10%",  # 左侧边距
+                    pos_right="10%",  # 右侧边距
+                    xaxis_index=[0, 1],
+                    range_start=0,
+                    range_end=100,
+                ),
+            ]
+        )
+        return line_chart
+
+    @staticmethod
     def create_macd_chart(dates: list, diff: list, dea: list, hist: list,
                           fast_period=12, slow_period=26, signal_period=9,
                           title: str = "MACD"):
@@ -848,26 +1081,37 @@ class ChartBuilder:
             ),
             datazoom_opts=opts.DataZoomOpts(is_show=True,
                     type_="slider",
-                    pos_bottom="0%",
+                    pos_bottom="3%",
                     pos_left="10%",  # 左侧边距
                     pos_right="10%",  # 右侧边距
                     xaxis_index=[0, 1],
                     range_start=0,
                     range_end=100,
             ),
-            yaxis_opts=opts.AxisOpts(
-                name="MACD",
-                position="left",
-                min_=y_min,
-                max_=y_max,
-                axisline_opts=opts.AxisLineOpts(linestyle_opts=opts.LineStyleOpts(color="#666")),
-                splitline_opts=opts.SplitLineOpts(is_show=True)
-            ),
             xaxis_opts=opts.AxisOpts(
-                axislabel_opts=opts.LabelOpts(color="#000000"),
-                splitline_opts=opts.SplitLineOpts(is_show=False),
-                axispointer_opts=opts.AxisPointerOpts(is_show=True, type_="line")
-            )
+                type_="category",
+                is_scale=True,
+                boundary_gap=False,
+                axisline_opts=opts.AxisLineOpts(
+                    is_on_zero=False,
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
+                ),
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
+                min_="dataMin",
+                max_="dataMax"
+            ),
+            yaxis_opts=opts.AxisOpts(
+                is_scale=True,
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+            ),
         )
 
         # 添加第二个Y轴
@@ -1049,5 +1293,21 @@ def calculate_sma_signals(df, ma_lines):
 
         except Exception as e:
             continue
-
     return signals
+
+def calculate_all_signals(df):
+    ma_lines = {}
+    default_ma_periods = [5, 10, 30, 250]  # 5日移动平均线，10日移动平均线，30日移动平均线，250日移动平均线
+    for period in default_ma_periods:
+        ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
+
+    # 计算 MACD
+    macd_df = calculate_macd(df)
+    # 计算信号标记
+    signals = calculate_macd_signals(df, macd_df)
+
+    # 计算SMA信号
+    sma_signals = calculate_sma_signals(df, ma_lines)
+    # 合并信号
+    all_signals = signals + sma_signals
+    return all_signals

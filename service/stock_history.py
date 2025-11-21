@@ -105,7 +105,8 @@ def show_page(stock, t: StockHistoryType):
                     ],
                     layout=[1, 0.1]  # 每个按钮占一列
                 ),
-                title=f'{stock.category} {stock.code} ({stock.name}) - 「{t.text}」',
+
+                title=f'{stock.category} {stock.code} ({stock.name}) - [{t.text}]',
                 key_prefix=get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_date', category=stock.category),
             )
     except Exception as e:
