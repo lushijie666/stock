@@ -1310,4 +1310,66 @@ def calculate_all_signals(df):
     sma_signals = calculate_sma_signals(df, ma_lines)
     # 合并信号
     all_signals = signals + sma_signals
+
+    # 合并同一天的信号
+    # 合并同一天的信号
+    if all_signals:
+        # 按日期分组信号
+        signals_by_date = {}
+        for signal in all_signals:
+            date_key = signal['date'].strftime('%Y-%m-%d') if hasattr(signal['date'], 'strftime') else str(
+                signal['date'])
+            if date_key not in signals_by_date:
+                signals_by_date[date_key] = []
+            signals_by_date[date_key].append(signal)
+
+        # 对每天的信号进行合并
+        merged_signals = []
+        for date_key, date_signals in signals_by_date.items():
+            if len(date_signals) == 1:
+                merged_signals.append(date_signals[0])
+            else:
+                # 多个信号的处理策略：
+                # 1. 优先选择强信号
+                strong_signals = [s for s in date_signals if s['strength'] == 'strong']
+                if strong_signals:
+                    merged_signals.append(strong_signals[0])
+                else:
+                    # 2. 如果都是弱信号，选择第一个
+                    merged_signals.append(date_signals[0])
+
+        # 按日期排序
+        merged_signals.sort(key=lambda x: x['date'])
+
+        # 过滤连续信号的策略
+        if len(merged_signals) > 1:
+            filtered_signals = [merged_signals[0]]
+
+            for i in range(1, len(merged_signals)):
+                current_signal = merged_signals[i]
+                previous_signal = filtered_signals[-1]
+
+                # 信号过滤规则：
+                # 1. 信号类型改变时保留
+                # 2. 强信号总是保留
+                # 3. 相同类型信号间隔超过N天时保留
+                # 4. 价格变化超过一定幅度时保留
+
+                should_keep = False
+
+                # 规则1：信号类型不同则保留
+                if current_signal['signal_type'] != previous_signal['signal_type']:
+                    should_keep = True
+                # 规则2：强信号总是保留
+                elif current_signal['strength'] == 'strong':
+                    should_keep = True
+                # 规则3：相同类型信号间隔超过3天则保留
+                else:
+                    date_diff = (current_signal['date'] - previous_signal['date']).days
+                    if date_diff > 3:
+                        should_keep = True
+                if should_keep:
+                    filtered_signals.append(current_signal)
+            return filtered_signals
+        return merged_signals
     return all_signals
