@@ -13,7 +13,6 @@ from utils.k_line_processor import KLineProcessor
 
 
 from utils.db import get_db_session
-from datetime import  timedelta
 from utils.session import get_session_key, SessionKeys, get_date_range
 from utils.uuid import generate_key
 
@@ -80,8 +79,7 @@ def show_kline_chart(stock, t: StockHistoryType):
                 st.warning("没有找到数据")
                 return
             min_date, max_date = date_range
-            default_start_date = max(max_date - timedelta(days=90), min_date)
-
+            default_start_date = t.get_default_start_date(max_date, min_date)
             key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_history_chart',category=stock.category)
             start_date_key = f"{key_prefix}_start_date"
             end_date_key = f"{key_prefix}_end_date"
@@ -163,11 +161,10 @@ def show_kline_chart(stock, t: StockHistoryType):
               """, unsafe_allow_html=True)
             kline = ChartBuilder.create_kline_chart(dates, k_line_data, ma_lines=ma_lines, signals=all_signals)
             volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
-            grid = ChartBuilder.create_combined_chart(kline, volume_bar)
+            #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
             # 显示K线图
-            streamlit_echarts.st_pyecharts(grid, theme="white", height="800px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline")
-
+            streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline")
 
             # 显示 MACD 图
             fast_period = 12
@@ -189,7 +186,16 @@ def show_kline_chart(stock, t: StockHistoryType):
                 slow_period=slow_period,
                 signal_period=signal_period,
             )
-            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="450px", key=f"{KEY_PREFIX}_{stock.code}_{t}_macd")
+            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_macd")
+
+            # 显示成交量
+            st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">🔍</span>
+                      <span class="chart-title">成交量</span>
+                  </div>
+              """, unsafe_allow_html=True)
+            streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
 
             # 显示信号数据表格
             if all_signals:
@@ -265,7 +271,7 @@ def show_kline_process_chart(stock, t: StockHistoryType):
                 st.warning("没有找到数据")
                 return
             min_date, max_date = date_range
-            default_start_date = max(max_date - timedelta(days=90), min_date)
+            default_start_date = t.get_default_start_date(max_date, min_date)
 
             key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_process_history_chart', category=stock.category)
             # 初始化 session state 中的日期值
@@ -522,7 +528,7 @@ def show_trade_points_chart(stock, t: StockHistoryType):
                 st.warning("没有找到数据")
                 return
             min_date, max_date = date_range
-            default_start_date = max(max_date - timedelta(days=90), min_date)
+            default_start_date = t.get_default_start_date(max_date, min_date)
 
             key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_trade_points',category=stock.category)
             start_date_key = f"{key_prefix}_start_date"
@@ -656,7 +662,7 @@ def show_backtest_analysis(stock, t: StockHistoryType):
                 return
 
             min_date, max_date = date_range
-            default_start_date = max(max_date - timedelta(days=90), min_date)
+            default_start_date = t.get_default_start_date(max_date, min_date)
 
             key_prefix = get_session_key(
                 SessionKeys.PAGE,

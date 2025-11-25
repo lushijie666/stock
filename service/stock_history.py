@@ -173,10 +173,14 @@ def _create_history_handler(t: StockHistoryType):
             model.date >= start_date,
             model.date <= end_date,
         ]
+
+    unique_fields = ['code', 'date'],
+    if t == StockHistoryType.THIRTY_M:
+        unique_fields = ['code', 'time']
     return create_reload_handler(
         model=model,
         fetch_func=fetch,
-        unique_fields=['code', 'date'],
+        unique_fields=unique_fields,
         build_filter=build_filter,
         with_date_range=True
     )

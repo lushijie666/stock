@@ -257,7 +257,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in buy_signals_strong])
                     .add_yaxis(
-                        series_name="MB-买(强)",
+                        series_name="MB-买入(强)",
                         y_axis=[p[1] for p in buy_signals_strong],
                         symbol_size=10,
                         symbol='triangle',  # 使用三角形符号更明显
@@ -279,7 +279,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in buy_signals_weak])
                     .add_yaxis(
-                        series_name="MB-买(弱)",
+                        series_name="MB-买入(弱)",
                         y_axis=[p[1] for p in buy_signals_weak],
                         symbol_size=10,
                         symbol='triangle',
@@ -301,7 +301,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in sell_signals_strong])
                     .add_yaxis(
-                        series_name="MS-卖(强)",
+                        series_name="MS-卖出(强)",
                         y_axis=[p[1] for p in sell_signals_strong],
                         symbol_size=10,
                         symbol='diamond',  # 使用菱形符号
@@ -323,7 +323,7 @@ class ChartBuilder:
                     Scatter()
                     .add_xaxis([p[0] for p in sell_signals_weak])
                     .add_yaxis(
-                        series_name="MS-卖(弱)",
+                        series_name="MS-卖出(弱)",
                         y_axis=[p[1] for p in sell_signals_weak],
                         symbol_size=10,
                         symbol='diamond',
@@ -657,14 +657,14 @@ class ChartBuilder:
                             var colorList = {str(colors)};
                             return colorList[params.dataIndex];
                         }}
-                    """)
+                    """),
                 )
             )
             .set_global_opts(
                 title_opts=opts.TitleOpts(title=""),
                 legend_opts=opts.LegendOpts(
                     type_="scroll",
-                    pos_top="80%",
+                    pos_top="50%",
                     pos_left="right",
                     orient="vertical",
                     textstyle_opts=opts.TextStyleOpts(color="#000000")
@@ -672,7 +672,6 @@ class ChartBuilder:
                 xaxis_opts=opts.AxisOpts(
                     type_="category",
                     is_scale=True,
-                    grid_index=1,
                     boundary_gap=True,
                     axisline_opts=opts.AxisLineOpts(
                         is_on_zero=False,
@@ -691,7 +690,6 @@ class ChartBuilder:
                     max_="dataMax"
                 ),
                 yaxis_opts=opts.AxisOpts(
-                    grid_index=1,
                     is_scale=True,
                     split_number=2,
                     position="left",  # 改为左侧
@@ -709,6 +707,18 @@ class ChartBuilder:
                         color="#000000"
                     ),
                 ),
+                datazoom_opts=[
+                    opts.DataZoomOpts(
+                        is_show=True,
+                        type_="slider",
+                        pos_top="0%",  # 放在顶部
+                        pos_left="10%",  # 左侧边距
+                        pos_right="10%",  # 右侧边距
+                        xaxis_index=[0, 1],
+                        range_start=0,
+                        range_end=100,
+                    ),
+                ],
             )
         )
         return bar
@@ -839,7 +849,7 @@ class ChartBuilder:
                 strong_buy_scatter = Scatter()
                 strong_buy_scatter.add_xaxis(strong_buy_dates)
                 strong_buy_scatter.add_yaxis(
-                    "MB-买(强)",
+                    "MB-买入(强)",
                     strong_buy_prices,
                     symbol="triangle",
                     symbol_size=12,  # 稍微增大标记
@@ -860,7 +870,7 @@ class ChartBuilder:
                 weak_buy_scatter = Scatter()
                 weak_buy_scatter.add_xaxis(weak_buy_dates)
                 weak_buy_scatter.add_yaxis(
-                    "MB-买(弱)",
+                    "MB-买入(弱)",
                     weak_buy_prices,
                     symbol="triangle",
                     symbol_size=12,
@@ -881,7 +891,7 @@ class ChartBuilder:
                 strong_sell_scatter = Scatter()
                 strong_sell_scatter.add_xaxis(strong_sell_dates)
                 strong_sell_scatter.add_yaxis(
-                    "MS-卖(强)",
+                    "MS-卖出(强)",
                     strong_sell_prices,
                     symbol="diamond",
                     symbol_size=12,
@@ -902,7 +912,7 @@ class ChartBuilder:
                 weak_sell_scatter = Scatter()
                 weak_sell_scatter.add_xaxis(weak_sell_dates)
                 weak_sell_scatter.add_yaxis(
-                    "MS-卖(弱)",
+                    "MS-卖出(弱)",
                     weak_sell_prices,
                     symbol="diamond",
                     symbol_size=12,
@@ -1135,11 +1145,11 @@ class ChartBuilder:
                 buy_scatter = Scatter()
                 buy_scatter.add_xaxis(buy_dates)
                 buy_scatter.add_yaxis(
-                    "买入信号",
+                    "MB-买入",
                     buy_prices,
                     symbol="triangle",
                     symbol_size=12,
-                    color="#ff0000",
+                    color="#8B0000",
                     label_opts=opts.LabelOpts(
                         is_show=True,
                         position="top",
@@ -1155,11 +1165,11 @@ class ChartBuilder:
                 sell_scatter = Scatter()
                 sell_scatter.add_xaxis(sell_dates)
                 sell_scatter.add_yaxis(
-                    "卖出信号",
+                    "MS-卖出",
                     sell_prices,
-                    symbol="triangle",
+                    symbol="diamond",
                     symbol_size=12,
-                    color="#00ff00",
+                    color="#006400",
                     label_opts=opts.LabelOpts(
                         is_show=True,
                         position="bottom",
@@ -1658,17 +1668,16 @@ def calculate_sma_signals(df, ma_lines):
                 continue
 
             # 买入信号：5日线上穿10日线
-            if (prev_ma5 <= prev_ma10 and curr_ma5 > curr_ma10):
+            if (prev_ma5 <= prev_ma10 and curr_ma5 > curr_ma10 and prev_diff > 0 and prev_dea > 0):
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),
                     'signal_type': 'buy',
                     'strength': 'strong'
                 })
-
             # 强卖出信号：10日均线下破5日均线 && MACD DIF下破DEA
-            if (prev_ma5 >= prev_ma10 and curr_ma5 < curr_ma10 and
-                prev_diff >= prev_dea and curr_diff < curr_dea):
+            # and curr_dea<curr_ma5 and prev_diff >= prev_dea and curr_diff < curr_dea
+            if (prev_ma5 >= prev_ma10 and curr_ma5 < curr_ma10):
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),
@@ -1677,13 +1686,13 @@ def calculate_sma_signals(df, ma_lines):
                 })
 
             # 弱卖出信号：收盘价 < 10日线
-            elif curr_ma10 is not None and curr_closing < curr_ma10:
+            """elif curr_ma10 is not None and curr_closing < curr_ma10:
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),
                     'signal_type': 'sell',
                     'strength': 'weak'
-                })
+                })"""
 
         except Exception as e:
             continue
@@ -1705,7 +1714,6 @@ def calculate_all_signals(df):
     # 合并信号
     all_signals = signals + sma_signals
 
-    # 合并同一天的信号
     # 合并同一天的信号
     if all_signals:
         # 按日期分组信号

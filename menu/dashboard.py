@@ -209,28 +209,31 @@ def show_manual_sync_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
-    end_date = pd.Timestamp.now().date()
-    start_date = end_date - pd.Timedelta(days=90)
+    today_date = pd.Timestamp.now().date()
+    start_date_30d = today_date - pd.Timedelta(days=30)
+    start_date_90d = today_date - pd.Timedelta(days=90)
+    start_date_1y = today_date - pd.Timedelta(days=365)
+    start_date_2y = today_date - pd.Timedelta(days=730)
 
     sync_buttons = [
         [
             ("📊", "股票信息", "同步所有股票", sync_stock, "[股票信息]", "sync-card-purple"),
         ],
         [
-            ("📈", "历史数据(天)", "同步关注的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, False, start_date, end_date), "[历史数据-天-关注]", "sync-card-blue"),
-            ("💼", "历史数据(天)", "同步所有的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, True, start_date, end_date), "[历史数据-天-全部]","sync-card-orange"),
+            ("📈", "历史数据(天)", "同步关注的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, False, start_date_90d, today_date), "[历史数据-天-关注]", "sync-card-blue"),
+            ("💼", "历史数据(天)", "同步所有的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, True, start_date_90d,today_date), "[历史数据-天-全部]","sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(周)", "同步关注的股票近90天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, False, start_date, end_date), "[历史数据-周-关注]", "sync-card-blue"),
-            ("💼", "历史数据(周)", "同步所有的股票近90天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, True, start_date, end_date), "[历史数据-周-全部]", "sync-card-orange"),
+            ("📈", "历史数据(周)", "同步关注的股票近1年的数据(周)", lambda: sync_stock_history(StockHistoryType.W, False, start_date_1y, today_date ), "[历史数据-周-关注]", "sync-card-blue"),
+            ("💼", "历史数据(周)", "同步所有的股票近1年的数据(周)", lambda: sync_stock_history(StockHistoryType.W, True, start_date_1y,today_date), "[历史数据-周-全部]", "sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(月)", "同步关注的股票近90天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, False, start_date, end_date), "[历史数据-月-关注]", "sync-card-blue"),
-            ("💼", "历史数据(月)", "同步所有的股票近90天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, True, start_date, end_date), "[历史数据-月-全部]","sync-card-orange"),
+            ("📈", "历史数据(月)", "同步关注的股票近2年的数据(月)", lambda: sync_stock_history(StockHistoryType.M, False, start_date_2y,today_date ), "[历史数据-月-关注]", "sync-card-blue"),
+            ("💼", "历史数据(月)", "同步所有的股票近2年的数据(月)", lambda: sync_stock_history(StockHistoryType.M, True, start_date_2y,today_date ), "[历史数据-月-全部]","sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(30分钟)", "同步关注的股票近90天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, False, start_date, end_date), "[历史数据-30分钟-关注]", "sync-card-blue"),
-            ("💼", "历史数据(30分钟)", "同步所有的股票近90天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, start_date, end_date), "[历史数据-30分钟-全部]","sync-card-orange"),
+            ("📈", "历史数据(30分钟)", "同步关注的股票近30天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, False, start_date_30d,today_date), "[历史数据-30分钟-关注]", "sync-card-blue"),
+            ("💼", "历史数据(30分钟)", "同步所有的股票近30天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, start_date_30d,today_date), "[历史数据-30分钟-全部]","sync-card-orange"),
         ],
     ]
 
