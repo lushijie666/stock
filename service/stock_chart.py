@@ -3,10 +3,13 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import func
 import streamlit_echarts
+
+from enums.strategy import StrategyType
 from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
 from enums.patterns import Patterns
-from utils.chart import ChartBuilder, calculate_macd, calculate_macd_signals, calculate_sma_signals, \
+from utils.chart import ChartBuilder
+from utils.strategy import calculate_macd, \
     calculate_all_signals, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
     generate_trading_advice, calculate_strategy_performance, calculate_position_and_cash_values
 from utils.k_line_processor import KLineProcessor
@@ -44,18 +47,54 @@ def show_page(stock, t: StockHistoryType):
         "",
         ["K线图", "K线图处理", "买卖点分析", "回测分析"],
         horizontal=True,
-        key=f"{KEY_PREFIX}_{stock.code}_radio2",
+        key=f"{KEY_PREFIX}_{stock.code}_{t}_radio2",
         label_visibility="collapsed"
     )
+    strategy_required = chart_type in ["K线图", "买卖点分析", "回测分析"]
+    if strategy_required:
+        strategy_options = {
+            StrategyType.MACD_STRATEGY: StrategyType.MACD_STRATEGY.fullText,
+            StrategyType.SMA_STRATEGY: StrategyType.SMA_STRATEGY.fullText,
+            StrategyType.TURTLE_STRATEGY: StrategyType.TURTLE_STRATEGY.fullText
+        }
+        selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
+        if selected_strategy_key not in st.session_state:
+            st.session_state[selected_strategy_key] = []
+
+        temp_selection = st.session_state[selected_strategy_key].copy()
+        selected_strategies = []
+        cols = st.columns(len(strategy_options))
+        for i, (strategy, strategy_text) in enumerate(strategy_options.items()):
+            with cols[i]:
+                currently_selected = strategy in temp_selection
+                # 定义回调函数来切换选择状态
+                def toggle_strategy(sel_strategy=strategy):
+                    current = st.session_state[selected_strategy_key]
+                    if sel_strategy in current:
+                        st.session_state[selected_strategy_key] = [s for s in current if s != sel_strategy]
+                    else:
+                        st.session_state[selected_strategy_key] = current + [sel_strategy]
+                is_selected = st.checkbox(
+                    strategy_text,
+                    value=currently_selected,
+                    key=f"{selected_strategy_key}_{strategy.value}",
+                    on_change=toggle_strategy,
+                    label_visibility="visible"
+
+                )
+                if is_selected:
+                    selected_strategies.append(strategy)
+        # 更新session state
+        st.session_state[selected_strategy_key] = selected_strategies
     chart_handlers = {
-        "K线图": lambda: show_kline_chart(stock, t),
+        "K线图": lambda: show_kline_chart(stock, t, selected_strategies),
         "K线图处理": lambda: show_kline_process_chart(stock, t),
-        "买卖点分析": lambda: show_trade_points_chart(stock, t),
-        "回测分析": lambda: show_backtest_analysis(stock, t)
+        "买卖点分析": lambda: show_trade_points_chart(stock, t, selected_strategies),
+        "回测分析": lambda: show_backtest_analysis(stock, t, selected_strategies)
     }
     chart_handlers.get(chart_type, lambda: None)()
 
-def show_kline_chart(stock, t: StockHistoryType):
+def show_kline_chart(stock, t: StockHistoryType, strategies=None):
     st.markdown(
         f"""
                <div class="table-header">
@@ -136,15 +175,6 @@ def show_kline_chart(stock, t: StockHistoryType):
             for period in default_ma_periods:
                 ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
 
-            # 计算 MACD
-            macd_df = calculate_macd(df)
-            # 计算所有信号
-            all_signals = calculate_all_signals(df)
-
-            macd_dates = df['date'].astype(str).tolist()
-            diff_values = macd_df['DIFF'].tolist()
-            dea_values = macd_df['DEA'].tolist()
-            macd_hist = macd_df['MACD_hist'].tolist()
 
             dates = df['date'].astype(str).tolist()
             k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
@@ -152,6 +182,9 @@ def show_kline_chart(stock, t: StockHistoryType):
             colors = ['#ef232a' if close > open else '#14b143'
                       for open, close in zip(df['opening'], df['closing'])]
 
+            all_signals = []
+            if strategies:
+                all_signals = calculate_all_signals(df, strategies)
             # 创建 K 线图
             st.markdown("""
                   <div class="chart-header">
@@ -166,6 +199,12 @@ def show_kline_chart(stock, t: StockHistoryType):
             # 显示K线图
             streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline")
 
+            # 计算 MACD
+            macd_df = calculate_macd(df)
+            macd_dates = df['date'].astype(str).tolist()
+            diff_values = macd_df['DIFF'].tolist()
+            dea_values = macd_df['DEA'].tolist()
+            macd_hist = macd_df['MACD_hist'].tolist()
             # 显示 MACD 图
             fast_period = 12
             slow_period = 26
@@ -197,31 +236,6 @@ def show_kline_chart(stock, t: StockHistoryType):
               """, unsafe_allow_html=True)
             streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
 
-            # 显示信号数据表格
-            if all_signals:
-                st.markdown("""
-                    <div class="chart-header">
-                        <span class="chart-icon">🔍</span>
-                        <span class="chart-title">买卖点信息</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-                # 创建信号DataFrame
-                signal_df = pd.DataFrame([
-                    {
-                        '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str(s['date']),
-                        '信号类型': '🔴 MB(买入)' if s['signal_type'] == 'buy' else '🟢 MS(卖出)',
-                        '信号强度': '🔥 强' if s['strength'] == 'strong' else '🥀 弱',
-                        '价格': round(s['price'], 2)
-                    }
-                    for s in all_signals
-                ]).sort_values('日期')
-
-                st.dataframe(
-                    signal_df,
-                    height=min(len(signal_df) * 35 + 38, 600),
-                    use_container_width=True
-                )
-
             # 显示MACD数据表格
             if not macd_df.empty:
                 st.markdown("""
@@ -242,6 +256,32 @@ def show_kline_chart(stock, t: StockHistoryType):
                 st.dataframe(
                     macd_display_df,
                     height=min(len(macd_display_df) * 35 + 38, 600),
+                    use_container_width=True
+                )
+
+            # 显示信号数据表格
+            if all_signals:
+                st.markdown("""
+                            <div class="chart-header">
+                                <span class="chart-icon">🔍</span>
+                                <span class="chart-title">买卖点信息</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                # 创建信号DataFrame
+                signal_df = pd.DataFrame([
+                    {
+                        '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str( s['date']),
+                        '信号类型': '🔴 MB(买入)' if s['signal_type'] == 'buy' else '🟢 MS(卖出)',
+                        '信号强度': '🔥 强' if s['strength'] == 'strong' else '🥀 弱',
+                        '价格': round(s['price'], 2),
+                        '策略': s.get('strategy_display', '未知')
+
+                    }
+                    for s in all_signals
+                ]).sort_values('日期')
+                st.dataframe(
+                    signal_df,
+                    height=min(len(signal_df) * 35 + 38, 600),
                     use_container_width=True
                 )
     except Exception as e:
@@ -504,7 +544,7 @@ def show_kline_process_chart(stock, t: StockHistoryType):
         st.error(f"加载数据失败：{str(e)}")
 
 
-def show_trade_points_chart(stock, t: StockHistoryType):
+def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
     st.markdown(
         f"""
                <div class="table-header">
@@ -580,7 +620,7 @@ def show_trade_points_chart(stock, t: StockHistoryType):
                 st.warning("所选日期范围内没有数据")
                 return
             # 计算所有信号
-            all_signals = calculate_all_signals(df)
+            all_signals = calculate_all_signals(df, strategies)
             # 准备数据
             dates = df['date'].astype(str).tolist()
             open_prices = df['opening'].tolist()
@@ -620,7 +660,8 @@ def show_trade_points_chart(stock, t: StockHistoryType):
                         '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str(s['date']),
                         '信号类型': '🔴 MB(买入)' if s['signal_type'] == 'buy' else '🟢 MS(卖出)',
                         '信号强度': '🔥 强' if s['strength'] == 'strong' else '🥀 弱',
-                        '价格': round(s['price'], 2)
+                        '价格': round(s['price'], 2),
+                        '策略': s.get('strategy_display', '未知')
                     }
                     for s in all_signals
                 ]).sort_values('日期')
@@ -636,7 +677,7 @@ def show_trade_points_chart(stock, t: StockHistoryType):
         st.error(f"加载数据失败：{str(e)}")
 
 
-def show_backtest_analysis(stock, t: StockHistoryType):
+def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
     st.markdown(
         f"""
         <div class="table-header">
@@ -776,7 +817,7 @@ def show_backtest_analysis(stock, t: StockHistoryType):
                 sell_ratios = {'strong': sell_ratio_strong, 'weak': sell_ratio_weak}
 
             # 计算所有信号
-            all_signals = calculate_all_signals(df)
+            all_signals = calculate_all_signals(df, strategies)
 
             if not all_signals:
                 st.warning("所选时间范围内未发现交易信号")
@@ -790,10 +831,6 @@ def show_backtest_analysis(stock, t: StockHistoryType):
                 buy_ratios=buy_ratios,
                 sell_ratios=sell_ratios
             )
-            if not backtest_result:
-                st.warning("回测失败")
-                return
-
             dates = df['date'].astype(str).tolist()
             open_prices = df['opening'].tolist()
             high_prices = df['highest'].tolist()
