@@ -10,6 +10,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine import Engine
 
 
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -60,7 +61,8 @@ def get_all_models() -> List[Type]:
     from models.stock import Stock
     from models.stock_history import StockHistoryD, StockHistoryW, StockHistoryM, StockHistory30M
     from models.sync_history import SyncHistory
-    return [Stock, StockHistoryD, StockHistoryW, StockHistoryM, StockHistory30M, SyncHistory]
+    from models.stock_trade import StockTrade
+    return [Stock, StockHistoryD, StockHistoryW, StockHistoryM, StockHistory30M, SyncHistory, StockTrade]
 
 
 def check_tables(conn, tables: List[Type]) -> List[str]:

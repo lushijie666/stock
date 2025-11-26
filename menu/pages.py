@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Optional, Dict
-from menu import dashboard, stock, stock_history
+from menu import dashboard, stock, stock_history, stock_trade
 from utils import message
 
 @dataclass
@@ -31,13 +31,18 @@ class Pages:
             handler=stock.chartIndex,
             icon="heart-fill",
         ),
+        "买卖记录": PageConfig(
+            title="买卖记录",
+            handler=stock_trade.index,
+            icon="clipboard2-data",
+        ),
         "股票信息": PageConfig(
             title="股票信息",
             handler=stock.index,
             icon="grid",
         ),
-        "历史数据": PageConfig(
-            title="历史数据",
+        "股票数据": PageConfig(
+            title="股票数据",
             handler=stock_history.index,
             icon="clipboard2-data",
         ),

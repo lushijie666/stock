@@ -10,7 +10,7 @@ from datetime import datetime as dt
 import streamlit as st
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.functions import func
-from service.stock_chart import KEY_PREFIX as chartKP, show_detail, show_detail_dialog
+from service.stock_chart import KEY_PREFIX as chartKP, show_detail_dialog
 from enums.category import Category
 from models.stock import Stock
 from utils.chart import ChartBuilder

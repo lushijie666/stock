@@ -1,6 +1,5 @@
 from enums.category import Category
 from service.stock import show_page, show_follow_page
-from service.stock_chart import show_detail
 import streamlit as st
 
 from service.stock_chart import KEY_PREFIX, show_detail
