@@ -25,8 +25,9 @@ class StockTrade(Base):
     date = Column(Date)  # 日期
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
-    strategy = Column(String(32))   # 策略
-    trade_type = Column(String(32)) # 买卖类型
+    strategy_type = Column(String(32))   # 策略类型
+    signal_type = Column(String(32)) # 信号类型
+    signal_strength = Column(String(32)) # 信号强度
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

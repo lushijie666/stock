@@ -242,10 +242,25 @@ def paginate_dataframe(
 
         # 转换为DataFrame
         if records:
-            # 转换记录为字典列表
-            data = [record.__dict__ for record in records]
-            for d in data:
-                d.pop('_sa_instance_state', None)
+            # 检查是否是关联查询的结果（元组或命名元组）
+            if records and hasattr(records[0], '__dict__'):
+                # 完整模型实例的情况
+                data = [record.__dict__ for record in records]
+                for d in data:
+                    d.pop('_sa_instance_state', None)
+            else:
+                # 关联查询选择特定列的情况
+                # 获取列名
+                column_names = [desc['name'] for desc in query.column_descriptions]
+                # 转换记录为字典列表
+                data = []
+                for record in records:
+                    if hasattr(record, '_asdict'):
+                        # 如果是命名元组
+                        data.append(record._asdict())
+                    else:
+                        # 如果是普通元组
+                        data.append(dict(zip(column_names, record)))
 
             df = pd.DataFrame(data)
 

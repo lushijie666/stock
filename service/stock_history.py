@@ -38,7 +38,7 @@ def show_page(stock, t: StockHistoryType):
                     model.removed == False
                 ).order_by(model.date.desc())
 
-                # 使用 OrderedDict 按指定顺序构建列配置
+            # 使用 OrderedDict 按指定顺序构建列配置
             columns_config = OrderedDict([
                 ('code', st.column_config.TextColumn('股票代码', help="股票代码")),
                 ('date', st.column_config.DateColumn('日期', help="日期")),

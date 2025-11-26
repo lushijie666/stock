@@ -271,8 +271,8 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                 signal_df = pd.DataFrame([
                     {
                         '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str( s['date']),
-                        '信号类型': '🔴 MB(买入)' if s['signal_type'] == 'buy' else '🟢 MS(卖出)',
-                        '信号强度': '🔥 强' if s['strength'] == 'strong' else '🥀 弱',
+                        '信号类型': f"{s['type'].fullText}",
+                        '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
                         '策略': s.get('strategy_display', '未知')
 
@@ -658,8 +658,8 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                 trade_points_df = pd.DataFrame([
                     {
                         '日期': s['date'].strftime('%Y-%m-%d') if hasattr(s['date'], 'strftime') else str(s['date']),
-                        '信号类型': '🔴 MB(买入)' if s['signal_type'] == 'buy' else '🟢 MS(卖出)',
-                        '信号强度': '🔥 强' if s['strength'] == 'strong' else '🥀 弱',
+                        '信号类型': f"{s['type'].fullText}",
+                        '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
                         '策略': s.get('strategy_display', '未知')
                     }
@@ -1007,8 +1007,7 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
                 trades_df = pd.DataFrame([
                     {
                         '日期': trade['date'].strftime('%Y-%m-%d'),
-                        '操作': '🔴 买入' if trade['action'] == '买入' else '🟢 卖出',
-                        '信号强度': '🔥 强' if trade['strength'] == 'strong' else '🥀 弱',
+                        '操作': f"{trade['type'].icon} {trade['type'].display_name}",                        '信号强度': '🔥 强' if trade['strength'] == 'strong' else '🥀 弱',
                         '价格': f"¥{trade['price']:.2f}",
                         '数量': trade['shares'],
                         '金额': f"¥{trade['amount']:.2f}",

@@ -1,6 +1,7 @@
 from enums.strategy import StrategyType
 from typing import List, Dict, Any
 import pandas as pd
+from enums.signal import SignalType, SignalStrength
 
 class StrategyResult:
     """策略结果类"""
@@ -159,11 +160,11 @@ def calculate_macd_signals(df):
 
             # 买入信号：DIFF上穿DEA且DIFF>0
             if prev_diff <= prev_dea and curr_diff > curr_dea and curr_diff > 0:
-                strength = 'strong' if diff_angle > 30 else 'weak'
+                strength = SignalStrength.STRONG if diff_angle > 30 else SignalStrength.WEAK
                 signals.append({
                     'date': date,
                     'price': float(price),
-                    'signal_type': 'buy',
+                    'type': SignalType.BUY,
                     'strength': strength
                 })
 
@@ -171,14 +172,14 @@ def calculate_macd_signals(df):
             elif prev_diff >= prev_dea and curr_diff < curr_dea:
                 # 如果DIFF<0且DEA<0，为强卖出信号
                 if curr_diff < 0 and curr_dea < 0:
-                    strength = 'strong'
+                    strength = SignalStrength.STRONG
                 else:
-                    strength = 'weak'
+                    strength = SignalStrength.WEAK
 
                 signals.append({
                     'date': date,
                     'price': float(price),
-                    'signal_type': 'sell',
+                    'type': SignalType.SELL,
                     'strength': strength
                 })
     except Exception as e:
@@ -245,8 +246,8 @@ def calculate_sma_signals(df):
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),
-                    'signal_type': 'buy',
-                    'strength': 'strong'
+                    'type': SignalType.BUY,
+                    'strength': SignalStrength.STRONG
                 })
             # 强卖出信号：10日均线下破5日均线 && MACD DIF下破DEA
             # and curr_dea<curr_ma5 and prev_diff >= prev_dea and curr_diff < curr_dea
@@ -254,8 +255,8 @@ def calculate_sma_signals(df):
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),
-                    'signal_type': 'sell',
-                    'strength': 'strong'
+                    'type': SignalType.SELL,
+                    'strength': SignalStrength.STRONG
                 })
 
             # 弱卖出信号：收盘价 < 10日线
@@ -263,8 +264,8 @@ def calculate_sma_signals(df):
                 signals.append({
                     'date': curr_date,
                     'price': float(curr_closing),
-                    'signal_type': 'sell',
-                    'strength': 'weak'
+                    'type': SignalType.SELL,
+                    'strength': SignalStrength.Week
                 })"""
 
         except Exception as e:
@@ -345,11 +346,11 @@ def calculate_turtle_signals(
 
         # 入场：做多突破上轨
         if position <= 0 and pd.notna(upper) and df.iloc[i]["closing"] >= upper:
-            strength = "strong" if pd.notna(curr_atr) and (df.iloc[i]["closing"] - upper) / (curr_atr + 1e-9) >= 0.5 else "weak"
+            strength = SignalStrength.STRONG if pd.notna(curr_atr) and (df.iloc[i]["closing"] - upper) / (curr_atr + 1e-9) >= 0.5 else SignalStrength.WEAK
             signals.append({
                 "date": date,
                 "price": price,
-                "signal_type": "buy",
+                "type": SignalType.BUY,
                 "strength": strength,
             })
             position = 1
@@ -360,8 +361,8 @@ def calculate_turtle_signals(
             signals.append({
                 "date": date,
                 "price": price,
-                "signal_type": "sell",
-                "strength": "weak",
+                "type": SignalType.SELL,
+                "strength": SignalStrength.WEAK,
             })
             position = 0
             continue
@@ -369,11 +370,11 @@ def calculate_turtle_signals(
         if allow_short:
             # 入场：做空跌破下轨
             if position >= 0 and pd.notna(lower) and df.iloc[i]["closing"] <= lower:
-                strength = "strong" if pd.notna(curr_atr) and (lower - df.iloc[i]["closing"]) / (curr_atr + 1e-9) >= 0.5 else "weak"
+                strength = SignalStrength.STRONG if pd.notna(curr_atr) and (lower - df.iloc[i]["closing"]) / (curr_atr + 1e-9) >= 0.5 else SignalStrength.WEAK
                 signals.append({
                     "date": date,
                     "price": price,
-                    "signal_type": "sell",
+                    "type": SignalType.SELL,
                     "strength": strength,
                 })
                 position = -1
@@ -384,8 +385,8 @@ def calculate_turtle_signals(
                 signals.append({
                     "date": date,
                     "price": price,
-                    "signal_type": "buy",
-                    "strength": "weak",
+                    "type": SignalType.BUY,
+                    "strength": SignalStrength.WEAK,
                 })
                 position = 0
                 continue
@@ -469,7 +470,7 @@ def filter_consecutive_signals(signals: List[Dict]) -> List[Dict]:
         should_keep = False
 
         # 规则1：信号类型不同则保留
-        if current_signal['signal_type'] != previous_signal['signal_type']:
+        if current_signal['type'] != previous_signal['type']:
             should_keep = True
         # 规则2：强信号总是保留
         elif current_signal['strength'] == 'strong':
@@ -590,9 +591,9 @@ def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, se
         return None
 
     if buy_ratios is None:
-        buy_ratios = {'strong': 0.8, 'weak': 0.5}
+        buy_ratios = {SignalStrength.STRONG: 0.8, SignalStrength.WEAK: 0.5}
     if sell_ratios is None:
-        sell_ratios = {'strong': 0.8, 'weak': 0.5}
+        sell_ratios = {SignalStrength.STRONG: 0.8, SignalStrength.WEAK: 0.5}
 
     # 初始化回测参数
     capital = initial_capital
@@ -603,7 +604,7 @@ def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, se
     for signal in signals:
         signal_date = signal['date']
         signal_price = signal['price']
-        signal_type = signal['signal_type']
+        signal_type = signal['type']
         strength = signal['strength']
 
         # 获取信号日期对应的数据行
@@ -614,7 +615,7 @@ def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, se
             current_price = signal_price
 
         # 买入信号
-        if signal_type == 'buy' and position == 0:
+        if signal_type == SignalType.BUY and position == 0:
             # 根据信号强度决定买入比例
             buy_ratio = buy_ratios.get(strength, 0.5)  # 默认使用弱信号比例
             amount_to_invest = capital * buy_ratio
@@ -627,7 +628,7 @@ def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, se
 
                 trades.append({
                     'date': signal_date,
-                    'action': '买入',
+                    'type': SignalType.BUY,
                     'price': current_price,
                     'shares': shares_to_buy,
                     'amount': cost,
@@ -637,7 +638,7 @@ def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, se
                 })
 
         # 卖出信号
-        elif signal_type == 'sell' and position > 0:
+        elif signal_type == SignalType.SELL and position > 0:
             # 根据信号强度决定卖出比例
             sell_ratio = sell_ratios.get(strength, 0.5)  # 默认使用弱信号比例
             shares_to_sell = int(position * sell_ratio)
@@ -648,7 +649,7 @@ def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, se
                 position -= shares_to_sell
                 trades.append({
                     'date': signal_date,
-                    'action': '卖出',
+                    'type': SignalType.SELL,
                     'price': current_price,
                     'shares': shares_to_sell,
                     'amount': revenue,
@@ -685,17 +686,17 @@ def calculate_strategy_metrics(df, signals):
     signals = sorted(signals, key=lambda x: x['date'])
 
     # 计算胜率
-    buy_signals = [s for s in signals if s['signal_type'] == 'buy']
-    sell_signals = [s for s in signals if s['signal_type'] == 'sell']
+    buy_signals = [s for s in signals if s['type'] == SignalType.BUY]
+    sell_signals = [s for s in signals if s['type'] == SignalType.SELL]
 
     # 计算平均持股天数
     holding_periods = []
     buy_dates = {}
 
     for signal in signals:
-        if signal['signal_type'] == 'buy':
+        if signal['type'] == SignalType.BUY:
             buy_dates[signal['date']] = signal['price']
-        elif signal['signal_type'] == 'sell' and buy_dates:
+        elif signal['type'] == SignalType.SELL and buy_dates:
             # 简单匹配最近的买入信号
             if buy_dates:
                 last_buy_date = list(buy_dates.keys())[-1]
@@ -733,13 +734,13 @@ def generate_trading_advice(df, signals, current_date=None):
     current_price = df[df['date'] == current_date]['closing'].iloc[0] if current_date in df['date'].values else \
         latest_signal['price']
     advice = ""
-    if latest_signal['signal_type'] == 'buy':
-        if latest_signal['strength'] == 'strong':
+    if latest_signal['type'] == SignalType.BUY:
+        if latest_signal['strength'] == SignalStrength.STRONG:
             advice = f"🔴 🔥 MB（强烈买入），当前价格：¥{current_price:.2f}"
         else:
             advice = f"🔴 🥀 MB（建议买入），当前价格：¥{current_price:.2f}"
     else:  # sell signal
-        if latest_signal['strength'] == 'strong':
+        if latest_signal['strength'] == SignalStrength.STRONG:
             advice = f"🟢 🔥 MS（强烈买入），当前价格：¥{current_price:.2f}"
         else:
             advice = f"🟢 🥀 MS（建议买入），当前价格：¥{current_price:.2f}"

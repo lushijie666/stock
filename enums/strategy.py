@@ -17,3 +17,12 @@ class StrategyType(Enum):
     @property
     def fullText(self) -> str:
         return f"{self.text} ({self.code})"
+
+    @classmethod
+    def lookup(cls, value):
+        if not value:
+            return None
+        for v in cls:
+            if v.code == value:
+                return v
+        return None

@@ -5,6 +5,7 @@ from pyecharts import options as opts
 from pyecharts.commons.utils import JsCode
 import pandas as pd
 from enums.patterns import Patterns
+from enums.signal import SignalType, SignalStrength
 
 
 class ChartBuilder:
@@ -240,13 +241,13 @@ class ChartBuilder:
                 price = float(signal['price'])
                 point = [date_str, price, signal]
 
-                if signal['signal_type'] == 'buy':
-                    if signal['strength'] == 'strong':
+                if signal['type'] == SignalType.BUY:
+                    if signal['strength'] == SignalStrength.STRONG:
                         buy_signals_strong.append(point)
                     else:
                         buy_signals_weak.append(point)
-                elif signal['signal_type'] == 'sell':
-                    if signal['strength'] == 'strong':
+                elif signal['type'] == SignalType.SELL:
+                    if signal['strength'] == SignalStrength.STRONG:
                         sell_signals_strong.append(point)
                     else:
                         sell_signals_weak.append(point)
@@ -829,15 +830,15 @@ class ChartBuilder:
                     signal['date'])
                 price = float(signal['price'])
 
-                if signal['signal_type'] == 'buy':
-                    if signal['strength'] == 'strong':
+                if signal['type'] == SignalType.BUY:
+                    if signal['strength'] == SignalStrength.STRONG:
                         strong_buy_dates.append(date_str)
                         strong_buy_prices.append(price)
                     else:
                         weak_buy_dates.append(date_str)
                         weak_buy_prices.append(price)
                 else:
-                    if signal['strength'] == 'strong':
+                    if signal['strength'] == SignalStrength.STRONG:
                         strong_sell_dates.append(date_str)
                         strong_sell_prices.append(price)
                     else:
@@ -1133,7 +1134,7 @@ class ChartBuilder:
                     signal['date'])
                 price = float(signal['price'])
 
-                if signal['signal_type'] == 'buy':
+                if signal['type'] == SignalType.BUY:
                     buy_dates.append(date_str)
                     buy_prices.append(price)
                 else:
@@ -1192,7 +1193,7 @@ class ChartBuilder:
                     trade['date'])
                 price = float(trade['price'])
 
-                if trade['action'] == '买入':
+                if trade['type'] == SignalType.BUY:
                     actual_buy_dates.append(date_str)
                     actual_buy_prices.append(price)
                 else:
