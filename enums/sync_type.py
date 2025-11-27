@@ -6,6 +6,7 @@ class SyncHistoryType(StrEnum):
     STOCK_HISTORY_W = "stock_history_w"
     STOCK_HISTORY_M = "stock_history_m"
     STOCK_HISTORY_THIRTY_M = "stock_history_30m"
+    STOCK_TRADE = "stock_trade"
 
     @property
     def display_name(self):
@@ -16,5 +17,6 @@ class SyncHistoryType(StrEnum):
             SyncHistoryType.STOCK_HISTORY_W: "历史数据-周",
             SyncHistoryType.STOCK_HISTORY_M: "历史数据-月",
             SyncHistoryType.STOCK_HISTORY_THIRTY_M: "历史数据-30分钟",
+            SyncHistoryType.STOCK_TRADE: "买卖记录",
         }
         return type_map.get(self, "未知")

@@ -8,7 +8,7 @@ from enums.category import Category
 from service.stock_chart import show_detail, KEY_PREFIX
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 from utils.scheduler import scheduler
-from service.sync import sync_stock, sync_stock_history,SyncHistoryType, get_sync_summary
+from service.sync import sync_stock, sync_stock_history, SyncHistoryType, get_sync_summary, sync_stock_trade
 from models.sync_history import SyncStatus
 import pandas as pd
 import streamlit_echarts
@@ -174,6 +174,10 @@ def show_scheduler_sync_dashboard():
                     <span class="job-time">每天18:30</span>
                     <span class="job-name">📈 历史数据(30分钟)</span>
                 </div>   
+                 <div class="job-item">
+                    <span class="job-time">每天19:00</span>
+                    <span class="job-name">💰 买卖记录</span>
+                </div>   
             </div>
             """, unsafe_allow_html=True)
 
@@ -189,8 +193,8 @@ def show_scheduler_sync_dashboard():
             scheduler.add_daily_job("sync_stock", sync_stock, 6, 0)
             scheduler.add_daily_job("sync_stock_history_d",  lambda: sync_stock_history(StockHistoryType.D, True, date.today(),  date.today()) , 18, 10)
             scheduler.add_daily_job("sync_stock_history_30m", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(),  date.today()) , 18, 30)
+            scheduler.add_daily_job("sync_stock_trade", lambda: sync_stock_trade( True) , 19, 00)
             st.rerun()
-    
     st.markdown("""
     </div>
     """, unsafe_allow_html=True)
@@ -234,6 +238,10 @@ def show_manual_sync_dashboard():
         [
             ("📈", "历史数据(30分钟)", "同步关注的股票近30天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, False, start_date_30d,today_date), "[历史数据-30分钟-关注]", "sync-card-blue"),
             ("💼", "历史数据(30分钟)", "同步所有的股票近30天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, start_date_30d,today_date), "[历史数据-30分钟-全部]","sync-card-orange"),
+        ],
+        [
+            ("💰", "买卖记录", "同步关注的股票买卖记录", lambda: sync_stock_trade(False), "[买卖记录-关注]", "sync-card-blue"),
+            ("💰", "买卖记录", "同步所有的股票买卖记录", lambda: sync_stock_trade(True), "[买卖记录-全部]", "sync-card-orange"),
         ],
     ]
 
@@ -307,11 +315,11 @@ def show_sync_dashboard():
     show_sync_main_dashboard(summary_data)
     st.divider()
     # 并排展示同步类型和状态分布图表
-    col_chart1, col_chart2 = st.columns(2)
-    with col_chart1:
-        show_sync_type_distribution_chart(summary_data)
-    with col_chart2:
-        show_sync_status_distribution_chart(summary_data)
+   # col_chart1, col_chart2 = st.columns(2)
+   # with col_chart1:
+    show_sync_type_distribution_chart(summary_data)
+    #with col_chart2:
+    show_sync_status_distribution_chart(summary_data)
 
     # 每日同步次数图表
     show_daily_sync_chart(summary_data)

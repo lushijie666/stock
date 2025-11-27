@@ -43,9 +43,9 @@ class ChartBuilder:
                 ),
                 legend_opts=opts.LegendOpts(
                     type_="scroll",
-                    pos_left="center",
-                    pos_bottom="5%",
-                    orient="horizontal",
+                    pos_top="45%",
+                    pos_left="right",
+                    orient="vertical",  # 改为垂直排列
                     textstyle_opts=opts.TextStyleOpts(color="#000")
                 ),
                 tooltip_opts=opts.TooltipOpts(

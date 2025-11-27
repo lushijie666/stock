@@ -58,5 +58,6 @@ class SyncHistory(Base):
             "stock_history_w": "历史数据-周",
             "stock_history_m": "历史数据-月",
             "stock_history_30m": "历史数据-30分钟",
+            "stock_trade": "买卖记录",
         }
         return type_map.get(self.sync_type, "未知")

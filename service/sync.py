@@ -7,7 +7,7 @@ from enums.history_type import StockHistoryType
 from enums.sync_type import SyncHistoryType
 from models.sync_history import SyncHistory, SyncStatus
 from utils.db import get_db_session
-from service import stock, stock_history
+from service import stock, stock_history, stock_trade
 import logging
 def _create_sync_record(sync_type: SyncHistoryType) -> int:
     """创建同步记录，返回记录ID"""
@@ -100,6 +100,9 @@ def sync_stock():
 def sync_stock_history(t: StockHistoryType, is_all: bool = False, start_date=None, end_date=None):
     return _execute_sync(t.sync_history_type, stock_history.sync, t=t, is_all=is_all, start_date=start_date, end_date=end_date)
 
+
+def sync_stock_trade(is_all: bool = False):
+    return _execute_sync(SyncHistoryType.STOCK_TRADE, stock_trade.sync, is_all=is_all)
 
 def get_sync_history(limit: int = 50, offset: int = 0, sync_type: SyncHistoryType = None) -> List[SyncHistory]:
     """获取同步历史记录"""

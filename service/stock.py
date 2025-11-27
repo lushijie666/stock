@@ -64,27 +64,21 @@ def show_category_pie_chart():
             data_pairs = [(cat, num) for cat, num in zip(df['分类'], df['数量'])]
 
             pie = ChartBuilder.create_pie_chart(data_pairs, total_stocks)
-            # 使用 st.columns 并排显示饼图和表格
-            col1, col2 = st.columns([1, 1])  # 两个相等宽度的列
+            # 显示图表
+            streamlit_echarts.st_pyecharts(pie, height="300px")
 
-            with col1:
-                # 显示图表
-                streamlit_echarts.st_pyecharts(pie, height="300px")
+            df['占比'] = (df['数量'] / total_stocks * 100).round(1)
+            st.dataframe(
+                df,
+                column_config={
+                    "分类": st.column_config.TextColumn("分类"),
+                    "数量": st.column_config.NumberColumn("股票数量", format="%d"),
+                    "占比": st.column_config.NumberColumn("占比", format="%.1f%%")
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
 
-            with col2:
-                # 添加百分比列并显示数据表
-                df['占比'] = (df['数量'] / total_stocks * 100).round(1)
-                st.dataframe(
-                    df,
-                    column_config={
-                        "分类": st.column_config.TextColumn("分类"),
-                        "数量": st.column_config.NumberColumn("股票数量", format="%d"),
-                        "占比": st.column_config.NumberColumn("占比", format="%.1f%%")
-                    },
-                    hide_index=True,
-                    use_container_width=True,
-                    height=300
-                )
     except Exception as e:
         st.error(f"显示股票分类分布图表失败: {str(e)}")
 

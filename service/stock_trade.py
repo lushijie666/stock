@@ -1,4 +1,5 @@
 import logging
+from cgitb import handler
 from datetime import date, timedelta, datetime
 from functools import partial
 from pyexpat.errors import messages
@@ -15,7 +16,7 @@ from enums.strategy import StrategyType
 from models.stock import Stock
 from models.stock_history import get_history_model
 from models.stock_trade import StockTrade
-from service.stock import reload, get_followed_codes
+from service.stock import reload, get_followed_codes, get_codes
 from utils.db import get_db_session
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
@@ -124,116 +125,52 @@ def show_page(category: Category):
 
 
 def reload(category: Category):
-    try:
-        # 获取日期范围
-        prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category)
-        date_range = get_date_range(prefix=prefix)
+    # 获取日期范围
+    prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category)
+    date_range = get_date_range(prefix=prefix)
 
-        if date_range:
-            start_date, end_date = date_range
-        else:
-            # 如果没有设置日期范围，使用默认值
-            start_date = date.today() - timedelta(days=30)
-            end_date = date.today()
+    if date_range:
+        start_date, end_date = date_range
+    else:
+        # 如果没有设置日期范围，使用默认值
+        start_date = date.today() - timedelta(days=30)
+        end_date = date.today()
 
-        # 创建处理句柄
-        handler = _create_trade_handler()
-        # 获取分类下的所有股票
-        with get_db_session() as session:
-            codes = get_followed_codes(category)
-            # 循环处理每只股票
-            for code in codes:
-                try:
-                    # 显示正在处理的股票信息
-                    show_message(f"正在处理股票: {code}", type="warning")
-                    # 使用处理句柄刷新数据
-                    handler.refresh(
-                        code=code,
-                        category=category,
-                        history_type=StockHistoryType.D,
-                        start_date=start_date,
-                        end_date=end_date
-                    )
-                    show_message(f"股票: {code} 处理完成", type="success")
-                except Exception as e:
-                    show_message(f"股票: {code} 处理时出错: {str(e)}", type="error")
-                    continue
-                logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}, 股票: {code}")
-    except Exception as e:
-        st.error(f"更新失败：{str(e)}")
+    codes = get_codes(category)
+    for code in codes:
+        try:
+            # 显示正在处理的股票信息
+            show_message(f"正在处理股票: {code}", type="warning")
+            reload_by_code(code, StockHistoryType.D)
+            show_message(f"股票: {code} 处理完成", type="success")
+        except Exception as e:
+            show_message(f"股票: {code} 处理时出错: {str(e)}", type="error")
+            continue
+    logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}, 股票: {code}")
 
+
+
+def reload_by_code( code: str, t: StockHistoryType):
+    with get_db_session() as session:
+        session.query(StockTrade).filter(
+            StockTrade.code == code,
+        ).delete()
+        session.commit()
+    # 使用处理句柄刷新数据
+    _create_trade_handler().refresh(
+        code=code,
+        history_type=t,
+        # start_date=start_date,
+        # end_date=end_date,
+        limit=200,
+    )
 
 def _create_trade_handler():
     def build_filter(args: Dict[str, Any], session: Session) -> List:
         """构建过滤条件"""
         code = args.get('code')
-        start_date = args.get('start_date')
-        end_date = args.get('end_date')
-        category = args.get('category')
         filters = [StockTrade.code == code]
-        if category:
-            filters.append(StockTrade.category == category)
-        if start_date:
-            filters.append(StockTrade.date >= start_date)
-        if end_date:
-            filters.append(StockTrade.date <= end_date)
         return filters
-
-    def fetch_func(code: str, category: Category, history_type: StockHistoryType, start_date: Any, end_date: Any) -> list:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        # 获取历史数据模型类
-        model = get_history_model(history_type)
-        with get_db_session() as session:
-            # 查询并直接提取需要的数据，避免保留模型实例引用
-            query = session.query(
-                model.date,
-                model.opening,
-                model.closing,
-                model.highest,
-                model.lowest,
-                model.turnover_count
-            ).filter(model.code == code)
-            if start_date:
-                query = query.filter(model.date >= start_date)
-            if end_date:
-                query = query.filter(model.date <= end_date)
-            query = query.order_by(model.date)
-            rows = query.all()
-
-        if not rows:
-            return []
-
-        # 转换为DataFrame，使用元组解包而不是模型实例属性访问
-        df = pd.DataFrame([{
-            'date': row[0],  # date
-            'opening': float(row[1]),  # opening
-            'closing': float(row[2]),  # closing
-            'highest': float(row[3]),  # highest
-            'lowest': float(row[4]),  # lowest
-            'turnover_count': float(row[5])  # turnover_count
-        } for row in rows])
-
-        # 计算信号
-        signals = calculate_all_signals(df, merge_and_filter=True)
-        
-        # 转换为StockTrade对象
-        stock_trades_data = []
-
-        for signal in signals:
-            signal_date = signal['date']
-            if start_date <= signal_date <= end_date:
-                stock_trade = StockTrade(
-                    code=code,
-                    category=category.value,
-                    date=signal_date,
-                    signal_type=signal['type'].value,
-                    signal_strength=signal['strength'].value,
-                    strategy_type=signal['strategy_code'],
-                    removed=False
-                )
-                stock_trades_data.append(stock_trade)
-        return stock_trades_data
     return create_reload_handler(
         model=StockTrade,
         fetch_func=fetch_func,
@@ -241,3 +178,94 @@ def _create_trade_handler():
         build_filter=build_filter,
         with_date_range=False  # 我们已经在fetch_func中处理了日期范围
     )
+
+
+
+def fetch_func(code: str, history_type: StockHistoryType, start_date: Any = None, end_date: Any =  None, limit: int = 200) -> list:
+    logging.info(f"开始获取[{KEY_PREFIX}]数据..., 股票:{code}")
+    # 获取历史数据模型类
+    model = get_history_model(history_type)
+    with get_db_session() as session:
+        # 查询并直接提取需要的数据，避免保留模型实例引用
+        query = session.query(
+            model.date,
+            model.opening,
+            model.closing,
+            model.highest,
+            model.lowest,
+            model.turnover_count
+        ).filter(model.code == code)
+        if start_date is not None and start_date != '':
+            # 处理字符串类型的日期
+            if isinstance(start_date, str):
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(model.date >= start_date)
+
+        if end_date is not None and end_date != '':
+            # 处理字符串类型的日期
+            if isinstance(end_date, str):
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(model.date <= end_date)
+        query = query.order_by(model.date.desc()).limit(limit)
+        rows = query.all()
+    logging.info(f"获取[{KEY_PREFIX}]数据的历史数据[{history_type.text}]完成..., 股票:{code}, 共{len(rows)}条")
+    if not rows:
+        return []
+
+    # 转换为DataFrame，使用元组解包而不是模型实例属性访问
+    df = pd.DataFrame([{
+        'date': row[0],  # date
+        'opening': float(row[1]),  # opening
+        'closing': float(row[2]),  # closing
+        'highest': float(row[3]),  # highest
+        'lowest': float(row[4]),  # lowest
+        'turnover_count': float(row[5])  # turnover_count
+    } for row in rows])
+
+    category = Category.from_stock_code(code)
+    # 计算信号
+    signals = calculate_all_signals(df, merge_and_filter=True)
+    logging.info(f"获取[{KEY_PREFIX}]数据的信号数据完成..., 股票:{code}, 共{len(signals)}条")
+    # 转换为StockTrade对象
+    stock_trades = []
+    for signal in signals:
+        signal_date = signal['date']
+        stock_trade = StockTrade(
+            code=code,
+            category=category.value,
+            date=signal_date,
+            signal_type=signal['type'].value,
+            signal_strength=signal['strength'].value,
+            strategy_type=signal['strategy_code'],
+            removed=False
+        )
+        stock_trades.append(stock_trade)
+    return stock_trades
+
+
+def sync(is_all: bool) -> Dict[str, Any]:
+    success_count = 0
+    failed_count = 0
+
+    logging.info(f"开始同步[{KEY_PREFIX}]数据")
+    categories = Category.get_all()
+    for category in categories:
+        logging.info(f"开始同步[{KEY_PREFIX}]数据，分类: {category.fullText}")
+        codes = get_codes(category)
+        if not is_all:
+            codes = get_followed_codes(category)
+        for code in codes:
+            show_message(f"正在处理股票: {code}", type="warning")
+            try:
+                reload_by_code(code, StockHistoryType.D)
+                success_count += 1
+                show_message(f"股票: {code} 处理完成", type="success")
+            except Exception as e:
+                failed_count += 1
+                show_message(f"股票: {code} 处理时出错: {str(e)}", type="error")
+            logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}, 股票: {code}")
+    logging.info(f"同步[{KEY_PREFIX}]数据完成，成功数: {success_count}, 失败数: {failed_count}")
+    return {
+        "success_count": success_count,
+        "failed_count": failed_count
+    }
