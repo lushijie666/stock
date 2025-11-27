@@ -57,7 +57,7 @@ header {visibility: hidden;}
 
 /* 主题变量（可统一调风格浓淡与尺寸） */
 :root {
-    --color-bg: #200411;
+    --color-bg: #ffffff;
     --color-surface: #f8fafc;
     --color-text: #1e293b;
     --color-muted: #64748b;
@@ -995,7 +995,7 @@ li[role="option"] {
 .stSelectbox [role="listbox"] [role="option"]:hover,
 div[data-baseweb="popover"] [role="option"]:hover,
 li[role="option"]:hover {
-    background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%) !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234,0.1), rgba(118, 75, 162,0.2));
     color: #3b82f6 !important;
     transform: translateX(4px) !important;
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1) !important;
@@ -1008,7 +1008,7 @@ div[data-baseweb="popover"] [role="option"][aria-selected="true"],
 div[data-baseweb="popover"] [role="option"][data-highlighted="true"],
 li[role="option"][aria-selected="true"],
 li[role="option"][data-highlighted="true"] {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 1), rgba(118, 75, 162,1.5));
     color: #ffffff !important;
     font-weight: 600 !important;
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
@@ -1330,7 +1330,7 @@ div[data-testid="column"] {
 .stAlert {
     border-radius: 12px;
     border-left: 4px solid;
-    border-color: red;
+    border-color: #764ba2;
     padding: 4px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -2314,7 +2314,7 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
 
 /* 同步按钮优化 */
 [data-testid="stButton"] button[kind="primary"] {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
     padding: 0.75rem 1.5rem;
@@ -2326,7 +2326,7 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
 }
 
 [data-testid="stButton"] button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
     transform: translateY(-2px);
 }
