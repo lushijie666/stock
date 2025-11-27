@@ -1,15 +1,26 @@
+from datetime import date, timedelta
 from functools import partial
+from pyexpat.errors import messages
+from typing import Dict, Any, List
+
+import pandas as pd
+from requests.sessions import Session
 from sqlalchemy import or_
 import streamlit as st
 from enums.category import Category
+from enums.history_type import StockHistoryType
 from enums.signal import SignalType, SignalStrength
 from enums.strategy import StrategyType
 from models.stock import Stock
+from models.stock_history import get_history_model
 from models.stock_trade import StockTrade
-from service.stock import reload
+from service.stock import reload, get_followed_codes
 from utils.db import get_db_session
+from utils.fetch_handler import create_reload_handler
+from utils.message import show_message
 from utils.pagination import paginate_dataframe, SearchConfig, SearchField, ActionConfig, ActionButton
-from utils.session import get_session_key, SessionKeys
+from utils.session import get_session_key, SessionKeys, get_date_range
+from utils.signal import  calculate_all_signals
 from utils.table import format_pinyin_short
 
 KEY_PREFIX = "stock_trade"
@@ -18,6 +29,7 @@ KEY_PREFIX = "stock_trade"
 def show_page(category: Category):
     try:
         with get_db_session() as session:
+
             # 其他数据按日期排序
             query = session.query(
                 StockTrade.code,
@@ -68,6 +80,24 @@ def show_page(category: Category):
                                     Stock.pinyin.ilike(f"%{value}%")
                                 )
                             )
+                        ),
+                        SearchField(
+                            field="start_date",
+                            label="开始日期",
+                            type="date",
+                            default=date.today() - timedelta(days=30),
+                            max_date=date.today(),
+                            placeholder="输入开始日期",
+                            filter_func=lambda q, v: q.filter(StockTrade.date >= v) if v else q
+                        ),
+                        SearchField(
+                            field="end_date",
+                            label="结束日期",
+                            type="date",
+                            default=date.today(),
+                            max_date=date.today(),
+                            placeholder="输入结束日期",
+                            filter_func=lambda q, v: q.filter(StockTrade.date <= v) if v else q
                         )
                     ],
                     layout=[1, 1, 1, 1]
@@ -90,5 +120,109 @@ def show_page(category: Category):
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
+
 def reload(category: Category):
-    return ""
+    try:
+        # 获取日期范围
+        prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category)
+        date_range = get_date_range(prefix=prefix)
+
+        if date_range:
+            start_date, end_date = date_range
+        else:
+            # 如果没有设置日期范围，使用默认值
+            start_date = date.today() - timedelta(days=30)
+            end_date = date.today()
+
+        # 创建处理句柄
+        handler = _create_trade_handler()
+        # 获取分类下的所有股票
+        with get_db_session() as session:
+            codes = get_followed_codes(category)
+            # 循环处理每只股票
+            for code in codes:
+                try:
+                    # 显示正在处理的股票信息
+                    show_message(f"正在处理股票: {code}", type="warning")
+                    # 使用处理句柄刷新数据
+                    handler.refresh(
+                        code=code,
+                        category=category,
+                        history_type=StockHistoryType.D,
+                        start_date=start_date,
+                        end_date=end_date
+                    )
+                    show_message(f"股票: {code} 处理完成", type="success")
+                except Exception as e:
+                    show_message(f"股票: {code} 时出错: {str(e)}", type="error")
+                    continue
+            show_message(f"成功更新 {category.fullText} 分类下的交易信号", type="success")
+    except Exception as e:
+        st.error(f"更新失败：{str(e)}")
+
+
+def _create_trade_handler():
+    def build_filter(args: Dict[str, Any], session: Session) -> List:
+        """构建过滤条件"""
+        code = args.get('code')
+        start_date = args.get('start_date')
+        end_date = args.get('end_date')
+        category = args.get('category')
+        filters = [StockTrade.code == code]
+        if category:
+            filters.append(StockTrade.category == category)
+        if start_date:
+            filters.append(StockTrade.date >= start_date)
+        if end_date:
+            filters.append(StockTrade.date <= end_date)
+        return filters
+
+    def fetch_func(code: str, category: Category, history_type: StockHistoryType, start_date: date, end_date: date) -> list:
+        model = get_history_model(history_type)
+        with get_db_session() as session:
+            query = session.query(model).filter(model.code == code)
+            if start_date:
+                query = query.filter(model.date >= start_date)
+            if end_date:
+                query = query.filter(model.date <= end_date)
+            query = query.order_by(model.date)
+            items = query.all()
+
+        if not items:
+            return []
+
+        # 转换为DataFrame
+        df = pd.DataFrame([{
+            'date': item.date,
+            'opening': float(item.opening),
+            'closing': float(item.closing),
+            'highest': float(item.highest),
+            'lowest': float(item.lowest),
+            'volume': float(item.volume)
+        } for item in items])
+
+        # 计算信号
+        signals = calculate_all_signals(df, merge_and_filter=True)
+        # 转换为StockTrade对象
+        stock_trades_data = []
+        for signal in signals:
+            # 确保信号日期在指定范围内
+            if start_date <= signal['date'] <= end_date:
+                stock_trade_data = {
+                    'code': code,
+                    'category': category,
+                    'date': signal['date'],
+                    'signal_type': signal['type'],
+                    'signal_strength': signal['strength'],
+                    'strategy_type': signal['strategy'],
+                    'removed': False
+                }
+                stock_trades_data.append(stock_trade_data)
+        return stock_trades_data
+    return create_reload_handler(
+        model=StockTrade,
+        fetch_func=fetch_func,
+        unique_fields=['code', 'date', 'strategy_type'],
+        build_filter=build_filter,
+        with_date_range=False  # 我们已经在fetch_func中处理了日期范围
+    )

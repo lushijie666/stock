@@ -4,9 +4,6 @@ from enums.patterns import Patterns
 class KLineProcessor:
     @staticmethod
     def process_contains(df):
-        # 备份原始日期列
-        date_series = df['date'].copy()
-
         # 预计算技术指标（保持与日期列对齐）
         df = df.assign(
             body_size=abs(df['opening'] - df['closing']),

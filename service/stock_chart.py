@@ -9,8 +9,8 @@ from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
 from enums.patterns import Patterns
 from utils.chart import ChartBuilder
-from utils.strategy import calculate_macd, \
-    calculate_all_signals, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
+from utils.signal import calculate_all_signals
+from utils.strategy import calculate_macd, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
     generate_trading_advice, calculate_strategy_performance, calculate_position_and_cash_values
 from utils.k_line_processor import KLineProcessor
 
@@ -1007,7 +1007,8 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
                 trades_df = pd.DataFrame([
                     {
                         '日期': trade['date'].strftime('%Y-%m-%d'),
-                        '操作': f"{trade['type'].icon} {trade['type'].display_name}",                        '信号强度': '🔥 强' if trade['strength'] == 'strong' else '🥀 弱',
+                        '操作': f"{trade['type'].icon} {trade['type'].display_name}",
+                        '信号强度': '🔥 强' if trade['strength'] == 'strong' else '🥀 弱',
                         '价格': f"¥{trade['price']:.2f}",
                         '数量': trade['shares'],
                         '金额': f"¥{trade['amount']:.2f}",
