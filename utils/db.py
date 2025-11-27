@@ -34,61 +34,58 @@ def upsert_objects(
             batch = objects[i:i + batch_size]
             session.begin()
             try:
-                # 清除 session
-                session.expire_all()
-
+                # 使用PostgreSQL的INSERT ... ON CONFLICT语法进行真正的批量UPSERT
+                # 准备要插入的数据
+                data_to_insert = []
                 for obj in batch:
                     try:
-                        # 构建唯一性查询条件
-                        filter_conditions = []
-                        for field in unique_fields:
-                            filter_conditions.append(
-                                getattr(model, field) == getattr(obj, field)
-                            )
-
-                        # 查找现有记录
-                        existing = session.query(model).filter(
-                            *filter_conditions
-                        ).first()
-
-                        if existing:
-                            # 更新现有记录
-                            for key, value in obj.__dict__.items():
-                                # 跳过排除的列和内部属性
-                                if key in excluded_set or key.startswith('_'):
-                                    continue
-                                # 处理 NaN 值
-                                if isinstance(value, (float, np.float64)) and (math.isnan(value) or np.isnan(value)):
-                                    setattr(existing, key, None)
-                                else:
-                                    setattr(existing, key, value)
-                            existing.updated_at = dt.now()
-                            existing.removed = False
-                        else:
-                            # 创建新记录
-                            instance = model()
-                            for key, value in obj.__dict__.items():
-                                # 跳过排除的列和内部属性
-                                if key in excluded_set or key.startswith('_'):
-                                    continue
-                                # 处理 NaN 值
-                                if isinstance(value, (float, np.float64)) and (math.isnan(value) or np.isnan(value)):
-                                    setattr(instance, key, None)
-                                else:
-                                    setattr(instance, key, value)
-                            instance.updated_at = dt.now()
-                            instance.removed = False
-                            session.add(instance)
-                        processed += 1
+                        # 准备单条记录数据
+                        record_data = {}
+                        for key, value in obj.__dict__.items():
+                            # 跳过内部属性
+                            if key.startswith('_'):
+                                continue
+                            # 处理 NaN 值
+                            if isinstance(value, (float, np.float64)) and (math.isnan(value) or np.isnan(value)):
+                                record_data[key] = None
+                            else:
+                                record_data[key] = value
+                        # 确保更新时间和removed标志正确设置
+                        record_data['updated_at'] = dt.now()
+                        record_data['removed'] = False
+                        data_to_insert.append(record_data)
                     except Exception as e:
                         failed += 1
-                        logging.error(f"Record update failed: {str(e)}")
+                        logging.error(f"Record preparation failed: {str(e)}")
                         logging.error(f"Data: {obj.__dict__}")
                         continue
-
+                
+                # 构建INSERT语句
+                stmt = pg_insert(model).values(data_to_insert)
+                
+                # 构建更新部分
+                update_dict = {}
+                for column in model.__table__.columns:
+                    if column.name not in excluded_set and column.name not in unique_fields:
+                        update_dict[column.name] = stmt.excluded[column.name]
+                # 确保更新时间始终更新
+                update_dict['updated_at'] = dt.now()
+                update_dict['removed'] = False
+                
+                # 添加ON CONFLICT子句
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=unique_fields,
+                    set_=update_dict
+                )
+                
+                # 执行语句
+                session.execute(stmt)
+                processed += len(data_to_insert)
+                failed += len(batch) - len(data_to_insert)
+                
                 # 提交批次
                 session.commit()
-
+                
             except Exception as e:
                 session.rollback()
                 failed += len(batch)

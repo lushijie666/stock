@@ -46,15 +46,15 @@ def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = Non
         for signal in filtered_signals:
             if 'strategies' in signal:
                 strategy_names = [s.value for s in signal['strategies']]
-                signal['strategy_display'] = f"{','.join(strategy_names)}"
+                signal['strategy_code'] = f"{','.join(strategy_names)}"
             elif 'strategy' in signal:
-                signal['strategy_display'] = f"{signal['strategy'].value}"
+                signal['strategy_code'] = f"{signal['strategy'].value}"
 
         return filtered_signals
 
     # 为未合并的信号也添加策略显示文本
     for signal in all_signals:
-        signal['strategy_display'] = f"{signal['strategy'].value}"
+        signal['strategy_code'] = f"{signal['strategy'].value}"
 
     # 按日期排序后返回
     all_signals.sort(key=lambda x: x['date'])

@@ -1,7 +1,7 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from functools import partial
 from pyexpat.errors import messages
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 
 import pandas as pd
 from requests.sessions import Session
@@ -64,7 +64,7 @@ def show_page(category: Category):
                     'pinyin': format_pinyin_short,
                         'signal_type': lambda x: SignalType.lookup(x).fullText,
                         'signal_strength': lambda x: SignalStrength.lookup(x).fullText,
-                        'strategy_type': lambda x: StrategyType.lookup(x).fullText,
+                        'strategy_type': lambda x: ', '.join([StrategyType.lookup(code.strip()).fullText for code in x.split(',')]) if x and ',' in x else ( StrategyType.lookup(x).fullText if x else '')
                 },
                 search_config=SearchConfig(
                     fields=[
@@ -177,47 +177,60 @@ def _create_trade_handler():
             filters.append(StockTrade.date <= end_date)
         return filters
 
-    def fetch_func(code: str, category: Category, history_type: StockHistoryType, start_date: date, end_date: date) -> list:
+    def fetch_func(code: str, category: Category, history_type: StockHistoryType, start_date: Any, end_date: Any) -> list:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        # 获取历史数据模型类
         model = get_history_model(history_type)
         with get_db_session() as session:
-            query = session.query(model).filter(model.code == code)
+            # 查询并直接提取需要的数据，避免保留模型实例引用
+            query = session.query(
+                model.date,
+                model.opening,
+                model.closing,
+                model.highest,
+                model.lowest,
+                model.turnover_count
+            ).filter(model.code == code)
             if start_date:
                 query = query.filter(model.date >= start_date)
             if end_date:
                 query = query.filter(model.date <= end_date)
             query = query.order_by(model.date)
-            items = query.all()
+            rows = query.all()
 
-        if not items:
+        if not rows:
             return []
 
-        # 转换为DataFrame
+        # 转换为DataFrame，使用元组解包而不是模型实例属性访问
         df = pd.DataFrame([{
-            'date': item.date,
-            'opening': float(item.opening),
-            'closing': float(item.closing),
-            'highest': float(item.highest),
-            'lowest': float(item.lowest),
-            'volume': float(item.volume)
-        } for item in items])
+            'date': row[0],  # date
+            'opening': float(row[1]),  # opening
+            'closing': float(row[2]),  # closing
+            'highest': float(row[3]),  # highest
+            'lowest': float(row[4]),  # lowest
+            'turnover_count': float(row[5])  # turnover_count
+        } for row in rows])
 
         # 计算信号
         signals = calculate_all_signals(df, merge_and_filter=True)
+        
         # 转换为StockTrade对象
         stock_trades_data = []
+
         for signal in signals:
-            # 确保信号日期在指定范围内
-            if start_date <= signal['date'] <= end_date:
-                stock_trade_data = {
-                    'code': code,
-                    'category': category,
-                    'date': signal['date'],
-                    'signal_type': signal['type'],
-                    'signal_strength': signal['strength'],
-                    'strategy_type': signal['strategy'],
-                    'removed': False
-                }
-                stock_trades_data.append(stock_trade_data)
+            signal_date = signal['date']
+            if start_date <= signal_date <= end_date:
+                stock_trade = StockTrade(
+                    code=code,
+                    category=category.value,
+                    date=signal_date,
+                    signal_type=signal['type'].value,
+                    signal_strength=signal['strength'].value,
+                    strategy_type=signal['strategy_code'],
+                    removed=False
+                )
+                stock_trades_data.append(stock_trade)
         return stock_trades_data
     return create_reload_handler(
         model=StockTrade,

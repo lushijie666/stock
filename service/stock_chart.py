@@ -274,7 +274,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                         '信号类型': f"{s['type'].fullText}",
                         '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
-                        '策略': s.get('strategy_display', '未知')
+                        '策略': s.get('strategy_code', '未知')
 
                     }
                     for s in all_signals
@@ -661,7 +661,7 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                         '信号类型': f"{s['type'].fullText}",
                         '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
-                        '策略': s.get('strategy_display', '未知')
+                        '策略': s.get('strategy_code', '未知')
                     }
                     for s in all_signals
                 ]).sort_values('日期')

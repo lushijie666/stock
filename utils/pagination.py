@@ -295,7 +295,7 @@ def paginate_dataframe(
             
             with col1:
                 current_page = st.number_input(
-                    "",
+                    "页码",
                     min_value=1,
                     max_value=paginator.total_pages,
                     value=st.session_state[f"{key_prefix}_current_page"],

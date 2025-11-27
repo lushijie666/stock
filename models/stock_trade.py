@@ -13,7 +13,7 @@ class StockTrade(Base):
 
     # 添加唯一约束
     __table_args__ = (
-        UniqueConstraint( 'code', name='uix_stock_trade_code_date_strategy'),
+        UniqueConstraint('code', 'date', 'strategy_type', name='uix_stock_trade_code_date_strategy_new'),
         Index('idx_trade_code_date', 'code', 'date'),
     )
     # 基础信息

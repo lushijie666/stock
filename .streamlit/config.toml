@@ -1,0 +1,7 @@
+[server]
+port = 8502
+hideDeprecationWarnings = true
+hideWarningOnDirectExecution = true
+
+[global]
+hideDeprecationWarnings = true
