@@ -256,9 +256,6 @@ def show_follow_chart():
         st.error(f"加载关注股票数据失败：{str(e)}")
 
 
-
-
-
 def show_follow_page(category: Category):
     show_add_follow(category=category)
     try:

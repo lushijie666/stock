@@ -1,15 +1,16 @@
 import streamlit as st
-from menu import dashboard
+from menu import dashboard, auth
 import logging
 from config.database import check_db
 from menu.pages import Pages
+from utils.auth import require_auth
 # 导入模型以确保数据库表创建
 from models import stock, stock_history
 
 # 页面配置
 st.set_page_config(
-    page_title="股票分析系统",
-    page_icon="💹",
+    page_title="股票量化交易",
+    page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -59,8 +60,8 @@ def render_custom_menu():
                 st.rerun()
     
 
-# 渲染菜单
-render_custom_menu()
+if require_auth():
+    render_custom_menu()
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -73,20 +74,27 @@ except Exception as e:
 
 # 主程序逻辑
 def main():
-    selected = st.session_state.selected_page
-    st.markdown(f"""
-    <div class="location-header">
-        <div class="breadcrumb-content">
-            <span class="breadcrumb-icon">📍</span>
-            <span class="breadcrumb-label">当前位置</span>
-            <span class="breadcrumb-separator">></span>
-            <span class="breadcrumb-current">{selected}</span>
+    # 检查认证状态
+    if not require_auth():
+        # 未登录，显示登录页面
+        auth.login()
+
+    else:
+        # 已登录，显示正常应用内容
+        selected = st.session_state.selected_page
+        st.markdown(f"""
+        <div class="location-header">
+            <div class="breadcrumb-content">
+                <span class="breadcrumb-icon">📍</span>
+                <span class="breadcrumb-label">当前位置</span>
+                <span class="breadcrumb-separator">></span>
+                <span class="breadcrumb-current">{selected}</span>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
-    Pages.render_page(selected)
-
-
+        """, unsafe_allow_html=True)
+        
+        # 渲染选中的页面
+        Pages.render_page(selected)
 
 if __name__ == "__main__":
     main()
