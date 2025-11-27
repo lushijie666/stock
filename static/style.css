@@ -48,7 +48,7 @@ header {visibility: hidden;}
 /* 侧边栏样式 - 现代化企业级设计 */
 [data-testid="stSidebar"] {
     background-color: #1e293b !important;
-    width: 260px !important;
+    width: 120px !important;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
     padding: 0 !important;
     min-height: 100vh !important;
@@ -59,13 +59,13 @@ header {visibility: hidden;}
 }
 
 [data-testid="stSidebar"] > div:first-child {
-    background-color: #2563eb !important;
+    /*background-color: #2563eb !important;
     padding-top: 0 !important;
     padding: 0 !important;
     height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
-    color: #ffffff !important;
+    color: #ffffff !important;*/
 }
 
 /* 隐藏折叠按钮 */
@@ -233,7 +233,7 @@ header {visibility: hidden;}
     font-size: 15px !important;
     font-weight: 700 !important;
     padding: 14px 16px !important;
-    margin: 6px 0 !important;
+    margin: 5px 0 !important;
     border-radius: 12px !important;
     border: 1px solid transparent !important;
     transition: all 0.3s ease !important;

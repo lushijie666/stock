@@ -121,7 +121,7 @@ class StockSelectorManager:
                         return f"{base_text}           "
 
                 selected = st.selectbox(
-                    "",
+                    "选择股票",
                     options=options,
                     format_func=format_option,
                     key=select_key,

@@ -28,7 +28,7 @@ def show_detail_dialog(stock):
 
 def show_detail(stock):
     t = st.radio(
-        "",
+        "选择时间周期",
         ["天", "周", "月", "30分钟"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_radio",
@@ -44,7 +44,7 @@ def show_detail(stock):
 
 def show_page(stock, t: StockHistoryType):
     chart_type = st.radio(
-        "",
+        "选择功能",
         ["K线图", "K线图处理", "买卖点分析", "回测分析"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_{t}_radio2",
@@ -255,7 +255,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
 
                 st.dataframe(
                     macd_display_df,
-                    height=min(len(macd_display_df) * 35 + 38, 600),
+                    height=min(len(macd_display_df) * 35 + 38, 300),
                     use_container_width=True
                 )
 
@@ -274,7 +274,9 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                         '信号类型': f"{s['type'].fullText}",
                         '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
-                        '策略': s.get('strategy_code', '未知')
+                        '策略': ', '.join([StrategyType.lookup(code.strip()).fullText for code in s.get('strategy_code', '').split(',')])
+                            if s.get('strategy_code') and ',' in s.get('strategy_code', '')
+                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知')
 
                     }
                     for s in all_signals
@@ -661,7 +663,9 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                         '信号类型': f"{s['type'].fullText}",
                         '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
-                        '策略': s.get('strategy_code', '未知')
+                        '策略': ', '.join([StrategyType.lookup(code.strip()).fullText for code in s.get('strategy_code', '').split(',')])
+                            if s.get('strategy_code') and ',' in s.get('strategy_code', '')
+                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知')
                     }
                     for s in all_signals
                 ]).sort_values('日期')

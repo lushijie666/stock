@@ -78,9 +78,9 @@ def init_db():
     """初始化数据库（只创建不存在的表）"""
     try:
         Base.metadata.create_all(bind=engine)
-        logging.info("Database tables created successfully")
+        logging.info("database tables created successfully")
     except Exception as e:
-        logging.error(f"Error creating database tables: {str(e)}")
+        logging.error(f"error creating database tables: {str(e)}")
         raise e
 
 
@@ -94,10 +94,8 @@ def check_db():
             # 检查表是否存在
             missing_tables = check_tables(conn, models)
             if missing_tables:
-                logging.info(f"Missing tables: {', '.join(missing_tables)}, creating...")
+                logging.info(f"missing tables: {', '.join(missing_tables)}, creating...")
                 init_db()
-            else:
-                logging.info("All database tables exist")
     except Exception as e:
-        logging.error(f"Database check failed: {str(e)}")
+        logging.error(f"database check failed: {str(e)}")
         raise e

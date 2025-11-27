@@ -357,14 +357,12 @@ def show_follow_page(category: Category):
                             """
                             st.markdown(card_html, unsafe_allow_html=True)
                             # 并行展示按钮，使用不同颜色区分
-                            col1, col2 = st.columns(2)
+                            col1, col2, col3 = st.columns(3)
                             with col1:
-                                # 移除关注按钮使用默认样式（灰色）
                                 if st.button("移除关注", key=f"remove_{stock.code}", use_container_width=True):
                                     remove_follow(category, stock.code)
                                     st.rerun()
                             with col2:
-                                # 图表按钮使用primary样式（蓝色）
                                 if st.button("股票图表", key=f"kline_{stock.code}", type="primary", use_container_width=True):
                                     current_stock_key = get_session_key(
                                         SessionKeys.CURRENT_STOCK,
@@ -373,6 +371,16 @@ def show_follow_page(category: Category):
                                     )
                                     st.session_state[current_stock_key] = stock.code
                                     st.session_state.selected_page = "股票图表"
+                                    st.rerun()
+                            with col3:
+                                if st.button("买卖记录", key=f"trade_{stock.code}", type="primary", use_container_width=True):
+                                    current_stock_key = get_session_key(
+                                        SessionKeys.CURRENT_STOCK,
+                                        prefix=chartKP,
+                                        category=stock.category
+                                    )
+                                    st.session_state[current_stock_key] = stock.code
+                                    st.session_state.selected_page = "买卖记录"
                                     st.rerun()
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
@@ -527,11 +535,14 @@ def sync() -> Dict[str, int]:
     logging.info(f"开始同步{KEY_PREFIX}数据")
     categories = Category.get_all()
     for category in categories:
+        show_message(f"正在处理分类: {category.fullText}", type="warning")
         try:
             reload(category)
             success_count += 1
+            show_message(f"分类: {category.fullText} 处理完成", type="success")
         except Exception as e:
             failed_count += 1
+            show_message(f"分类: {category.fullText} 处理时出错: {str(e)}", type="error")
         logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}")
     logging.info(f"同步[{KEY_PREFIX}]数据完成，成功数: {success_count}, 失败数: {failed_count}")
     return {

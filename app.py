@@ -8,7 +8,7 @@ from models import stock, stock_history
 
 # 页面配置
 st.set_page_config(
-    page_title="股票数据分析系统",
+    page_title="股票分析系统",
     page_icon="💹",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -30,7 +30,7 @@ def render_custom_menu():
         st.markdown("""
         <div class="sidebar-header">
             <div class="logo-container">
-                <h1 class="logo-text">股票数据分析系统</h1>
+                <h1 class="logo-text">💰股票量化交易</h1>
             </div>
         </div>
         """, unsafe_allow_html=True)

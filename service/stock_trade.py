@@ -1,3 +1,4 @@
+import logging
 from datetime import date, timedelta, datetime
 from functools import partial
 from pyexpat.errors import messages
@@ -29,7 +30,6 @@ KEY_PREFIX = "stock_trade"
 def show_page(category: Category):
     try:
         with get_db_session() as session:
-
             # 其他数据按日期排序
             query = session.query(
                 StockTrade.code,
@@ -41,7 +41,9 @@ def show_page(category: Category):
                 StockTrade.strategy_type,
             ).join(Stock, StockTrade.code == Stock.code).filter(
                 StockTrade.category == category,
-                StockTrade.removed == False
+                StockTrade.removed == False,
+                StockTrade.date >= date.today() - timedelta(days=30),
+                StockTrade.date <= date.today()
             ).order_by(StockTrade.date.desc())
             # 使用通用的分页
             paginate_dataframe(
@@ -56,7 +58,7 @@ def show_page(category: Category):
                     'date': st.column_config.DateColumn('日期', help="日期"),
                     'signal_type': st.column_config.TextColumn('信号类型', help="信号类型"),
                     'signal_strength': st.column_config.TextColumn('信号强度', help="信号强度"),
-                    'strategy_type': st.column_config.TextColumn('策略类型', help="策略类型"),
+                    'strategy_type': st.column_config.TextColumn('策略', help="策略类型"),
                     'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
                 },
                 # 格式化函数
@@ -115,7 +117,7 @@ def show_page(category: Category):
                 ),
                 title=category.fullText,
                 key_prefix=get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category),
-                model=Stock,
+                model=StockTrade,
             )
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
@@ -154,9 +156,9 @@ def reload(category: Category):
                     )
                     show_message(f"股票: {code} 处理完成", type="success")
                 except Exception as e:
-                    show_message(f"股票: {code} 时出错: {str(e)}", type="error")
+                    show_message(f"股票: {code} 处理时出错: {str(e)}", type="error")
                     continue
-            show_message(f"成功更新 {category.fullText} 分类下的交易信号", type="success")
+                logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}, 股票: {code}")
     except Exception as e:
         st.error(f"更新失败：{str(e)}")
 

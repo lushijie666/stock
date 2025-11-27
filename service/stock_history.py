@@ -15,6 +15,8 @@ from utils.fetch_handler import create_reload_handler
 from models.stock_history import get_history_model, StockHistoryW, StockHistoryD, StockHistoryM,StockHistory30M
 from utils.db import get_db_session
 from datetime import date, timedelta
+
+from utils.message import show_message
 from utils.pagination import paginate_dataframe, SearchConfig, SearchField, ActionButton, ActionConfig
 from utils.session import get_session_key, SessionKeys, get_date_range
 from utils.table import  format_percent, format_volume
@@ -115,7 +117,7 @@ def show_page(stock, t: StockHistoryType):
 
 def show_detail(stock):
     t = st.radio(
-        "",
+        "选择时间周期",
         ["天", "周", "月", "30分钟"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_radio",
@@ -304,11 +306,14 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
         if not is_all:
             codes = get_followed_codes(category)
         for code in codes:
+            show_message(f"正在处理股票: {code}", type="warning")
             try:
                 reload_by_code(code, start_date_str, end_date_str, t)
                 success_count += 1
+                show_message(f"股票: {code} 处理完成", type="success")
             except Exception as e:
                 failed_count += 1
+                show_message(f"股票: {code} 处理时出错: {str(e)}", type="error")
             logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}, 股票: {code}")
     logging.info(f"同步[{KEY_PREFIX}]数据完成，成功数: {success_count}, 失败数: {failed_count}")
     return {

@@ -22,8 +22,8 @@ def index():
     st.markdown("---")
 
     dashboard_type = st.radio(
-        "",
-        ["📊 股票分类  ", "❤️ 关注股票  ", "📈 股票图表  ", "⏰ 定时同步  ", "📥 手动同步  ", "📈 同步图表  "],
+        "功能分类",
+        ["📊 股票分类  ", "❤️ 关注股票  ", "📈 股票图表  ", "⏰ 定时同步  ", "📥 手动同步  ", "📡 同步图表  "],
         horizontal=True,
         key=f"dashboard_type",
         label_visibility="collapsed"
@@ -34,7 +34,7 @@ def index():
         "📈 股票图表  ": lambda: show_stock_chart_dashboard(),
         "⏰ 定时同步  ": lambda: show_scheduler_sync_dashboard(),
         "📥 手动同步  ": lambda: show_manual_sync_dashboard(),
-        "📈 同步图表  ": lambda: show_sync_dashboard(),
+        "📡 同步图表  ": lambda: show_sync_dashboard(),
     }
     dashboard_handlers.get(dashboard_type, lambda: None)()
         
