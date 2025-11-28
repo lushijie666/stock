@@ -42,9 +42,7 @@ def show_page(category: Category):
                 StockTrade.strategy_type,
             ).join(Stock, StockTrade.code == Stock.code).filter(
                 StockTrade.category == category,
-                StockTrade.removed == False,
-                StockTrade.date >= date.today() - timedelta(days=30),
-                StockTrade.date <= date.today()
+                StockTrade.removed == False
             ).order_by(StockTrade.date.desc())
             # 使用通用的分页
             paginate_dataframe(
@@ -88,7 +86,7 @@ def show_page(category: Category):
                             field="start_date",
                             label="开始日期",
                             type="date",
-                            default=date.today() - timedelta(days=30),
+                            default=date.today() - timedelta(days=90),
                             max_date=date.today(),
                             placeholder="输入开始日期",
                             filter_func=lambda q, v: q.filter(StockTrade.date >= v) if v else q
@@ -133,7 +131,7 @@ def reload(category: Category):
         start_date, end_date = date_range
     else:
         # 如果没有设置日期范围，使用默认值
-        start_date = date.today() - timedelta(days=30)
+        start_date = date.today() - timedelta(days=90)
         end_date = date.today()
 
     codes = get_codes(category)

@@ -379,7 +379,7 @@ header {visibility: hidden;}
     font-size: 15px !important;
     font-weight: 700 !important;
     padding: 14px 16px !important;
-    margin: 5px 0 !important;
+    margin: 2px 0 !important;
     border-radius: 12px !important;
     border: 1px solid transparent !important;
     transition: all 0.3s ease !important;
@@ -633,12 +633,8 @@ h3 {
 }
 
 .breadcrumb-current {
-    color: #cbd5e1;
-    font-weight: 700;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #64748b;
+    font-weight: 500;
 }
 
 
@@ -1328,11 +1324,10 @@ div[data-testid="column"] {
    信息提示框样式
    ============================================ */
 .stAlert {
+    background: linear-gradient(135deg, rgba(118, 75, 162, 0.7) 100%, rgba(118, 75, 162, 0.7) 100%);
     border-radius: 12px;
     border-left: 4px solid;
     border-color: #764ba2;
-    padding: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .stAlert[data-baseweb="notification"] {
@@ -2460,4 +2455,23 @@ div[data-testid="stCheckbox"] > div > label > div:first-child:has(input:checked)
     color: white;
     font-size: 12px;
     font-weight: bold;
+}
+
+
+.st-emotion-cache-16tyu1 p {
+    color: white;
+    font-weight: 500;
+    text-align: justify;
+}
+
+.st-emotion-cache-p7i6r9 p {
+    color: white;
+    font-weight: 500;
+    text-align: justify;
+}
+
+.st-emotion-cache-102y9h7 h1 {
+    font-size: 1.4rem;
+    font-weight: 500;
+    padding: 1rem 1rem;
 }

@@ -79,7 +79,7 @@ def show_page(stock, t: StockHistoryType):
                             field="start_date",
                             label="开始日期",
                             type="date",
-                            default=date.today() - timedelta(days=30),
+                            default=date.today() - timedelta(days=90),
                             max_date=date.today(),
                             placeholder="输入开始日期",
                             filter_func=lambda q, v: date_range_filter(q, 'start_date', v)  # 添加过滤函数

@@ -117,10 +117,15 @@ def paginate_dataframe(
         if f"{key_prefix}_page_size" not in st.session_state:
             st.session_state[f"{key_prefix}_page_size"] = page_size
         if f"{key_prefix}_search_values" not in st.session_state:
-            st.session_state[f"{key_prefix}_search_values"] = {}
+            default_search_values = {}
+            if search_config:
+                for field in search_config.fields:
+                    if field.default is not None:
+                        default_search_values[field.field] = field.default
+            st.session_state[f"{key_prefix}_search_values"] = default_search_values
+
         # 处理搜索和操作按钮区域
         if search_config or action_config:
-
             # 分成搜索区域和操作区域两部分
             search_area, action_area = st.columns([6, 1])  # 可以调整比例
 
