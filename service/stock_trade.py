@@ -86,7 +86,7 @@ def show_page(category: Category):
                             field="start_date",
                             label="开始日期",
                             type="date",
-                            default=date.today() - timedelta(days=90),
+                            default=date.today() - timedelta(days=365),
                             max_date=date.today(),
                             placeholder="输入开始日期",
                             filter_func=lambda q, v: q.filter(StockTrade.date >= v) if v else q
@@ -123,7 +123,7 @@ def show_page(category: Category):
 
 
 def reload(category: Category):
-    # 获取日期范围
+    # 获取选择的日期范围
     prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category)
     date_range = get_date_range(prefix=prefix)
 
@@ -131,24 +131,24 @@ def reload(category: Category):
         start_date, end_date = date_range
     else:
         # 如果没有设置日期范围，使用默认值
-        start_date = date.today() - timedelta(days=90)
+        start_date = date.today() - timedelta(days=365)
         end_date = date.today()
 
     codes = get_codes(category)
+    #codes = get_followed_codes(category)
     for code in codes:
         try:
-            # 显示正在处理的股票信息
-            show_message(f"正在处理股票: {code}", type="warning")
-            reload_by_code(code, StockHistoryType.D)
-            show_message(f"股票: {code} 处理完成", type="success")
+            reload_by_code(code, StockHistoryType.D, start_date, end_date)
         except Exception as e:
-            show_message(f"股票: {code} 处理时出错: {str(e)}", type="error")
+            logging.error(f"股票: {code} 处理时出错: {str(e)}")
             continue
-    logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}, 股票: {code}")
 
 
-
-def reload_by_code( code: str, t: StockHistoryType):
+def reload_by_code(code: str, t: StockHistoryType = StockHistoryType.D, start_date: Any = None, end_date: Any = None):
+    if start_date is None:
+        start_date = date.today() - timedelta(days=365)
+    if end_date is None:
+        end_date = date.today()
     with get_db_session() as session:
         session.query(StockTrade).filter(
             StockTrade.code == code,
@@ -158,8 +158,8 @@ def reload_by_code( code: str, t: StockHistoryType):
     _create_trade_handler().refresh(
         code=code,
         history_type=t,
-        # start_date=start_date,
-        # end_date=end_date,
+        start_date=start_date,
+        end_date=end_date,
         limit=200,
     )
 
@@ -171,7 +171,7 @@ def _create_trade_handler():
         return filters
     return create_reload_handler(
         model=StockTrade,
-        fetch_func=fetch_func,
+        fetch_func=fetch,
         unique_fields=['code', 'date', 'strategy_type'],
         build_filter=build_filter,
         with_date_range=False  # 我们已经在fetch_func中处理了日期范围
@@ -179,7 +179,7 @@ def _create_trade_handler():
 
 
 
-def fetch_func(code: str, history_type: StockHistoryType, start_date: Any = None, end_date: Any =  None, limit: int = 200) -> list:
+def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end_date: Any =  None, limit: int = 200) -> list:
     logging.info(f"开始获取[{KEY_PREFIX}]数据..., 股票:{code}")
     # 获取历史数据模型类
     model = get_history_model(history_type)
@@ -204,7 +204,8 @@ def fetch_func(code: str, history_type: StockHistoryType, start_date: Any = None
             if isinstance(end_date, str):
                 end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
             query = query.filter(model.date <= end_date)
-        query = query.order_by(model.date.desc()).limit(limit)
+        #query = query.order_by(model.date.desc()).limit(limit)
+        query = query.order_by(model.date.desc())
         rows = query.all()
     logging.info(f"获取[{KEY_PREFIX}]数据的历史数据[{history_type.text}]完成..., 股票:{code}, 共{len(rows)}条")
     if not rows:
@@ -255,7 +256,7 @@ def sync(is_all: bool) -> Dict[str, Any]:
         for code in codes:
             show_message(f"正在处理股票: {code}", type="warning")
             try:
-                reload_by_code(code, StockHistoryType.D)
+                reload_by_code(code,  StockHistoryType.D,None, None)
                 success_count += 1
                 show_message(f"股票: {code} 处理完成", type="success")
             except Exception as e:

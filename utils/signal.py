@@ -3,7 +3,7 @@ from typing import List, Dict
 
 import pandas as pd
 
-from enums.history_type import StockHistoryType
+
 from enums.signal import SignalStrength
 from enums.strategy import StrategyType
 
@@ -73,6 +73,9 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
     Returns:
         Dict[StrategyType, StrategyResult]: 各策略的计算结果
     """
+    if 'date' in df.columns:
+        df = df.sort_values('date').reset_index(drop=True) # 按日期从小到大排序
+
     if strategies is None:
         strategies = [StrategyType.MACD_STRATEGY, StrategyType.SMA_STRATEGY, StrategyType.TURTLE_STRATEGY]
 

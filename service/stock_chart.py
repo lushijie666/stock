@@ -59,7 +59,7 @@ def show_page(stock, t: StockHistoryType):
         }
         selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
         if selected_strategy_key not in st.session_state:
-            st.session_state[selected_strategy_key] = []
+            st.session_state[selected_strategy_key] = list(strategy_options.keys())  # 默认选中所有策略
 
         temp_selection = st.session_state[selected_strategy_key].copy()
         selected_strategies = []
@@ -184,7 +184,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
 
             all_signals = []
             if strategies:
-                all_signals = calculate_all_signals(df, strategies)
+                all_signals = calculate_all_signals(df, strategies, merge_and_filter=True)
             # 创建 K 线图
             st.markdown("""
                   <div class="chart-header">

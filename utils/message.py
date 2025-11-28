@@ -9,7 +9,6 @@ def show_message(message: str, type: str = "success", duration: int = 2):
         "warning": "⚠️",
         "error": "❌"
     }
-
     message = message.replace('\n', '<br>')
     icon = icons.get(type, "")
 
@@ -25,6 +24,5 @@ def show_message(message: str, type: str = "success", duration: int = 2):
             </div>
         </div>
     """, unsafe_allow_html=True)
-
     time.sleep(duration)
     placeholder.empty()
