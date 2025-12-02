@@ -108,7 +108,8 @@ def paginate_dataframe(
         action_config: Optional[ActionConfig] = None,
         title: str = "",
         key_prefix: str = "",
-        model = None
+        model = None,
+        on_row_select: Optional[Callable] = None
 ) -> None:
     try:
         # 初始化session_state
@@ -287,13 +288,34 @@ def paginate_dataframe(
                 ordered_columns = [col for col in columns_config.keys() if col in df.columns]
                 df = df[ordered_columns]
 
-            # 显示数据框
-            st.dataframe(
-                df,
-                column_config=columns_config,
-                hide_index=False,
-                use_container_width=True
-            )
+         # 显示数据框，添加行选择功能
+            selection = None
+            if on_row_select:
+                # 如果有行点击处理函数，则启用行选择功能
+                event = st.dataframe(
+                    df,
+                    column_config=columns_config,
+                    hide_index=False,
+                    use_container_width=True,
+                    on_select="rerun",
+                    selection_mode="single-row"
+                )
+                # 处理选中的行
+                if event and hasattr(event, 'selection') and event.selection.rows:
+                    selected_indices = event.selection.rows
+                    if selected_indices:
+                        # 获取选中的行数据
+                        selected_rows = df.iloc[selected_indices].to_dict('records')
+                        # 调用行点击处理函数
+                        on_row_select(selected_rows)
+            else:
+                # 显示数据框
+                st.dataframe(
+                    df,
+                    column_config=columns_config,
+                    hide_index=False,
+                    use_container_width=True
+                )
             # 分页导航控件和信息显示在同一行 - 修复布局错位问题
             col1, col2, col3, col4, col5, col6 = st.columns([1.5, 1, 1, 1, 1, 3])
             

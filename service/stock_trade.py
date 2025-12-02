@@ -1,8 +1,6 @@
 import logging
-from cgitb import handler
 from datetime import date, timedelta, datetime
 from functools import partial
-from pyexpat.errors import messages
 from typing import Dict, Any, List, Optional, Tuple
 
 import pandas as pd
@@ -17,6 +15,7 @@ from models.stock import Stock
 from models.stock_history import get_history_model
 from models.stock_trade import StockTrade
 from service.stock import reload, get_followed_codes, get_codes
+from service.stock_chart import show_detail_dialog
 from utils.db import get_db_session
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
@@ -63,9 +62,9 @@ def show_page(category: Category):
                 # 格式化函数
                 format_funcs={
                     'pinyin': format_pinyin_short,
-                        'signal_type': lambda x: SignalType.lookup(x).fullText,
-                        'signal_strength': lambda x: SignalStrength.lookup(x).fullText,
-                        'strategy_type': lambda x: ', '.join([StrategyType.lookup(code.strip()).fullText for code in x.split(',')]) if x and ',' in x else ( StrategyType.lookup(x).fullText if x else '')
+                    'signal_type': lambda x: SignalType.lookup(x).fullText,
+                    'signal_strength': lambda x: SignalStrength.lookup(x).fullText,
+                    'strategy_type': lambda x: ', '.join([StrategyType.lookup(code.strip()).fullText for code in x.split(',')]) if x and ',' in x else ( StrategyType.lookup(x).fullText if x else '')
                 },
                 search_config=SearchConfig(
                     fields=[
@@ -117,10 +116,31 @@ def show_page(category: Category):
                 title=category.fullText,
                 key_prefix=get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category),
                 model=StockTrade,
+                on_row_select=handle_row_click
+
             )
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
+
+# 添加行点击处理函数
+def handle_row_click(selected_rows):
+    """
+    处理行点击事件
+    :param selected_rows: 选中的行数据
+    """
+    if selected_rows:
+        # 获取选中的第一行数据
+        selected_row = selected_rows[0]
+        try:
+            with get_db_session() as session:
+                stock = session.query(Stock).filter(Stock.code == selected_row['code']).first()
+                if stock:
+                    show_detail_dialog(stock)
+                else:
+                    st.error(f"未找到股票代码为 {selected_row['code']} 的股票信息")
+        except Exception as e:
+            st.error(f"加载股票信息失败：{str(e)}")
 
 def reload(category: Category):
     # 获取选择的日期范围
