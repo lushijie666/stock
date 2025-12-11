@@ -452,6 +452,7 @@ def reload(category: Category):
         unique_fields=['code'],
         build_filter=build_filter,
         mark_existing=True,
+        excluded_columns=['is_followed', 'followed_at']
     )
     return history_handler.refresh(
         category=category)

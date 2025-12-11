@@ -21,6 +21,7 @@ class ReloadConfig(Generic[T, D]):
     loading_message: str = "请稍候，正在处理..."
     error_prefix: str = "处理失败"
     mark_existing: bool = False
+    excluded_columns: List[str] = None
 
 
 class ReloadHandler(Generic[T, D]):
@@ -112,7 +113,8 @@ class ReloadHandler(Generic[T, D]):
                     objects=data,
                     session=session,
                     model=self.config.model,
-                    unique_fields=self.config.unique_fields
+                    unique_fields=self.config.unique_fields,
+                    excluded_columns=self.config.excluded_columns
                 )
                 self.progress_bar.progress(1.0)
                 self.status_text.text(
@@ -242,6 +244,7 @@ def create_reload_handler(
         build_filter: Callable[[Any, Session], Dict[str, Any]],
         mark_existing: bool = False,
         with_date_range: bool = False,
+        excluded_columns: List[str] = None,
         **kwargs
 ) -> Union[ReloadHandler[T, D], DateRangeReloadHandler[T, D]]:
     config = ReloadConfig(
@@ -250,6 +253,7 @@ def create_reload_handler(
         unique_fields=unique_fields,
         build_filter=build_filter,
         mark_existing=mark_existing,
+        excluded_columns=excluded_columns,
         **kwargs
     )
     if with_date_range:

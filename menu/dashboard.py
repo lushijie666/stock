@@ -190,7 +190,7 @@ def show_scheduler_sync_dashboard():
         if st.button("▶ 启动", use_container_width=True, type="primary", key="scheduler_start"):
             scheduler.start()
             # 添加定时任务
-            scheduler.add_daily_job("sync_stock", sync_stock, 6, 0)
+            #scheduler.add_daily_job("sync_stock", sync_stock, 6, 0)
             scheduler.add_daily_job("sync_stock_history_d",  lambda: sync_stock_history(StockHistoryType.D, True, date.today(),  date.today()) , 18, 10)
             scheduler.add_daily_job("sync_stock_history_30m", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(),  date.today()) , 18, 30)
             scheduler.add_daily_job("sync_stock_trade", lambda: sync_stock_trade( True) , 19, 00)
