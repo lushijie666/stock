@@ -378,13 +378,11 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
         except Exception as e:
             # 计算单个股票处理耗时
             stock_elapsed_time = time.time() - stock_start_time
-            
             with count_lock:
                 failed_count += 1
                 processed_count += 1
                 remaining = total_tasks - processed_count
-            error_msg = f"股票: {code} 处理时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票"
-            logging.error(error_msg)
+            logging.error(f"股票: {code} 处理时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
             return False, code, error_msg
     
     # 使用线程池并行处理任务

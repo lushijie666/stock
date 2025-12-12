@@ -265,7 +265,6 @@ def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end
 def sync(is_all: bool) -> Dict[str, Any]:
     success_count = 0
     failed_count = 0
-
     logging.info(f"开始同步[{KEY_PREFIX}]数据")
     categories = Category.get_all()
     for category in categories:

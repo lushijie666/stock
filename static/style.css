@@ -1903,6 +1903,9 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
 }
 
 .job-item {
+    font-weight: 700;
+    color: #3b82f6;
+    font-size: 0.95rem;
     align-items: center;
     gap: 15px;
     padding: 12px;
@@ -1922,22 +1925,6 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
     margin-bottom: 0;
 }
 
-.job-time {
-    font-weight: 700;
-    color: #3b82f6;
-    font-size: 0.95rem;
-    min-width: 50px;
-    text-align: center;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
-    padding: 6px 12px;
-    border-radius: 6px;
-}
-
-.job-name {
-    font-size: 0.95rem;
-    color: #334155;
-    font-weight: 500;
-}
 
 /* 位置头部 */
 .location-header {

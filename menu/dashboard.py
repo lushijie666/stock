@@ -130,7 +130,7 @@ def show_scheduler_sync_dashboard():
     is_running = scheduler.is_running()
     status_text = "运行中" if is_running else "已停止"
     status_class = "scheduler-running" if is_running else "scheduler-stopped"
-    
+
     # 统一的定时同步卡片
     st.markdown(f"""
     <div class="scheduler-toggle-card {status_class}">
@@ -158,28 +158,22 @@ def show_scheduler_sync_dashboard():
     <div class="scheduler-button-container">
     """, unsafe_allow_html=True)
 
-    # 显示定时任务列表
-    if is_running:
-        st.markdown("""
-            <div class="scheduled-jobs-list" style="gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
-                <div class="job-item">
-                    <span class="job-time">每天06:00</span>
-                    <span class="job-name">📊 股票信息</span>
-                </div>
-                <div class="job-item">
-                    <span class="job-time">每天18:10</span>
-                    <span class="job-name">📈 历史数据(天)</span>
-                </div>
-                <div class="job-item">
-                    <span class="job-time">每天18:30</span>
-                    <span class="job-name">📈 历史数据(30分钟)</span>
-                </div>   
-                 <div class="job-item">
-                    <span class="job-time">每天19:00</span>
-                    <span class="job-name">💰 买卖记录</span>
-                </div>   
-            </div>
-            """, unsafe_allow_html=True)
+    # 定义定时任务列表
+    scheduled_jobs = [
+        {"time": "每天06:00", "name": "📊 股票信息", "func": sync_stock},
+        {"time": "每天18:10", "name": "📈 历史数据(天)", "func": lambda: sync_stock_history(StockHistoryType.D, True, date.today(), date.today())},
+        {"time": "每天18:30", "name": "📈 历史数据(30分钟)", "func": lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(), date.today())},
+        {"time": "每天19:00", "name": "💰 买卖记录", "func": lambda: sync_stock_trade(True)}
+    ]
+
+    # 显示定时任务列表和立即执行按钮
+    for idx, job in enumerate(scheduled_jobs):
+        col1, col2 = st.columns([2, 0.2])
+        with col1:
+            st.markdown(f"<div class='job-item'>{job['name']}   [{job['time']}]</div>", unsafe_allow_html=True)
+        with col2:
+            if st.button("立即执行", key=f"execute_now_{idx}", use_container_width=True):
+                job['func']()
 
     # 任务控制按钮
     if is_running:
@@ -190,10 +184,9 @@ def show_scheduler_sync_dashboard():
         if st.button("▶ 启动", use_container_width=True, type="primary", key="scheduler_start"):
             scheduler.start()
             # 添加定时任务
-            #scheduler.add_daily_job("sync_stock", sync_stock, 6, 0)
-            scheduler.add_daily_job("sync_stock_history_d",  lambda: sync_stock_history(StockHistoryType.D, True, date.today(),  date.today()) , 18, 10)
-            scheduler.add_daily_job("sync_stock_history_30m", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(),  date.today()) , 18, 30)
-            scheduler.add_daily_job("sync_stock_trade", lambda: sync_stock_trade( True) , 19, 00)
+            scheduler.add_daily_job("sync_stock_history_d", lambda: sync_stock_history(StockHistoryType.D, True, date.today(), date.today()), 18, 10)
+            scheduler.add_daily_job("sync_stock_history_30m", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(),date.today()), 18, 30)
+            scheduler.add_daily_job("sync_stock_trade", lambda: sync_stock_trade(True), 19, 00)
             st.rerun()
     st.markdown("""
     </div>
@@ -212,36 +205,30 @@ def show_manual_sync_dashboard():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     today_date = pd.Timestamp.now().date()
-    start_date_30d = today_date - pd.Timedelta(days=30)
-    start_date_90d = today_date - pd.Timedelta(days=90)
-    start_date_1y = today_date - pd.Timedelta(days=365)
-    start_date_2y = today_date - pd.Timedelta(days=730)
-
     sync_buttons = [
         [
             ("📊", "股票信息", "同步所有股票", sync_stock, "[股票信息]", "sync-card-purple"),
         ],
         [
-            ("📈", "历史数据(天)", "同步关注的股票近N天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, False, start_date_90d, today_date), "[历史数据-天-关注]", "sync-card-blue"),
-            ("💼", "历史数据(天)", "同步所有的股票近N天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, True, start_date_90d,today_date), "[历史数据-天-全部]","sync-card-orange"),
+            ("📈", "历史数据(天)", "同步关注的股票近N天的数据(天)", None, "[历史数据-天-关注]", "sync-card-blue"),
+            ("💼", "历史数据(天)", "同步所有的股票近N天的数据(天)", None, "[历史数据-天-全部]","sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(周)", "同步关注的股票近N天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, False, start_date_1y, today_date ), "[历史数据-周-关注]", "sync-card-blue"),
-            ("💼", "历史数据(周)", "同步所有的股票近N天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, True, start_date_1y,today_date), "[历史数据-周-全部]", "sync-card-orange"),
+            ("📈", "历史数据(周)", "同步关注的股票近N天的数据(周)", None, "[历史数据-周-关注]", "sync-card-blue"),
+            ("💼", "历史数据(周)", "同步所有的股票近N天的数据(周)", None, "[历史数据-周-全部]", "sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(月)", "同步关注的股票近N天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, False, start_date_2y,today_date ), "[历史数据-月-关注]", "sync-card-blue"),
-            ("💼", "历史数据(月)", "同步所有的股票近N天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, True, start_date_2y,today_date ), "[历史数据-月-全部]","sync-card-orange"),
+            ("📈", "历史数据(月)", "同步关注的股票近N天的数据(月)", None, "[历史数据-月-关注]", "sync-card-blue"),
+            ("💼", "历史数据(月)", "同步所有的股票近N天的数据(月)", None, "[历史数据-月-全部]","sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(30分钟)", "同步关注的股票近N天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, False, start_date_30d,today_date), "[历史数据-30分钟-关注]", "sync-card-blue"),
-            ("💼", "历史数据(30分钟)", "同步所有的股票近N天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, start_date_30d,today_date), "[历史数据-30分钟-全部]","sync-card-orange"),
+            ("📈", "历史数据(30分钟)", "同步关注的股票近N天的数据(30分钟)", None, "[历史数据-30分钟-关注]", "sync-card-blue"),
+            ("💼", "历史数据(30分钟)", "同步所有的股票近N天的数据(30分钟)", None, "[历史数据-30分钟-全部]","sync-card-orange"),
         ],
         [
-            ("💰", "买卖记录", "同步关注的股票买卖记录", lambda: sync_stock_trade(False), "[买卖记录-关注]", "sync-card-blue"),
-            ("💰", "买卖记录", "同步所有的股票买卖记录", lambda: sync_stock_trade(True), "[买卖记录-全部]", "sync-card-orange"),
+            ("💰", "买卖记录", "同步关注的股票买卖记录", None, "[买卖记录-关注]", "sync-card-blue"),
+            ("💰", "买卖记录", "同步所有的股票买卖记录", None, "[买卖记录-全部]", "sync-card-orange"),
         ],
     ]
 
