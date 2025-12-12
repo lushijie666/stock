@@ -314,10 +314,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
 def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> Dict[str, Any]:
-    import time
     # 使用线程安全的计数器
     success_count = 0
     failed_count = 0
+    processed_count = 0
     count_lock = threading.Lock()
     
     # 记录总开始时间
@@ -332,6 +332,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
     # 转换为字符串格式
     start_date_str = start_date.strftime('%Y-%m-%d')
     end_date_str = end_date.strftime('%Y-%m-%d')
+    show_message("正在异步同步, 请稍后...", "success")
     logging.info(f"开始同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
     
     # 收集所有需要同步的任务
@@ -348,10 +349,14 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
         for code in codes:
             tasks.append((code, category, start_date_str, end_date_str, t))
     
+    # 获取总任务数
+    total_tasks = len(tasks)
+    logging.info(f"总共有 {total_tasks} 个股票需要同步")
+    
     # 定义单个股票同步的工作函数
     def sync_single_stock(task):
         code, category, start_date_str, end_date_str, t = task
-        nonlocal success_count, failed_count
+        nonlocal success_count, failed_count, processed_count
         
         # 记录单个股票开始时间
         stock_start_time = time.time()
@@ -366,7 +371,9 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
             
             with count_lock:
                 success_count += 1
-            logging.info(f"股票: {code} 处理完成，耗时: {stock_elapsed_time:.2f}秒")
+                processed_count += 1
+                remaining = total_tasks - processed_count
+            logging.info(f"股票: {code} 处理完成，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
             return True, code, None
         except Exception as e:
             # 计算单个股票处理耗时
@@ -374,7 +381,9 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
             
             with count_lock:
                 failed_count += 1
-            error_msg = f"股票: {code} 处理时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒"
+                processed_count += 1
+                remaining = total_tasks - processed_count
+            error_msg = f"股票: {code} 处理时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票"
             logging.error(error_msg)
             return False, code, error_msg
     
@@ -385,29 +394,26 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
         # 提交所有任务
         future_to_task = {executor.submit(sync_single_stock, task): task for task in tasks}
         
-        # 处理任务结果
+        # 处理任务结果（移除所有UI消息显示）
         for future in as_completed(future_to_task):
             task = future_to_task[future]
             code = task[0]
             try:
-                success, code, error_msg = future.result()
-                # 只在主线程中显示消息
-                if success:
-                    show_message(f"股票: {code} 处理完成", type="success")
-                else:
-                    show_message(error_msg, type="error")
+                # 只获取结果，不显示任何消息
+                future.result()
             except Exception as e:
                 with count_lock:
                     failed_count += 1
-                error_msg = f"股票: {code} 任务执行异常: {str(e)}"
+                    processed_count += 1
+                    remaining = total_tasks - processed_count
+                error_msg = f"股票: {code} 任务执行异常: {str(e)}，还剩 {remaining} 个股票"
                 logging.error(error_msg)
-                show_message(error_msg, type="error")
     
     # 计算总耗时
     total_elapsed_time = time.time() - total_start_time
     logging.info(f"完成同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
-    logging.info(f"总处理股票数: {len(tasks)}, 成功: {success_count}, 失败: {failed_count}")
-    logging.info(f"总耗时: {total_elapsed_time:.2f}秒, 平均每个股票耗时: {total_elapsed_time/len(tasks):.2f}秒")
+    logging.info(f"总处理股票数: {total_tasks}, 成功: {success_count}, 失败: {failed_count}")
+    logging.info(f"总耗时: {total_elapsed_time:.2f}秒, 平均每个股票耗时: {total_elapsed_time/total_tasks:.2f}秒")
     return {
         "success_count": success_count,
         "failed_count": failed_count
