@@ -27,6 +27,29 @@ def clean_number_value(value: str) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
+def clean_numeric_value(value: str) -> Optional[float]:
+    """清理数值字符串，将无效值转换为None
+    
+    Args:
+        value: 要清理的数值字符串
+        
+    Returns:
+        float或None: 清理后的数值，如果无效则返回None
+    """
+    try:
+        if value is None or value == "":
+            return None
+        if pd.isna(value):
+            return None
+        # 移除逗号和空格
+        cleaned = str(value).replace(',', '').replace(' ', '')
+        if not cleaned:
+            return None
+        # 转换为float
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return None
+
 
 def clean_name(name: str) -> str:
     replacements = {
