@@ -155,7 +155,8 @@ class ReloadHandler(Generic[T, D]):
                     objects=data,
                     session=session,
                     model=self.config.model,
-                    unique_fields=self.config.unique_fields
+                    unique_fields=self.config.unique_fields,
+                    excluded_columns=self.config.excluded_columns
                 )
                 return None
         except Exception as e:
