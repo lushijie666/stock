@@ -224,20 +224,20 @@ def show_manual_sync_dashboard():
             ("📊", "股票信息", "同步所有股票", sync_stock, "[股票信息]", "sync-card-purple"),
         ],
         [
-            ("📈", "历史数据(天)", "同步关注的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, False, start_date_90d, today_date), "[历史数据-天-关注]", "sync-card-blue"),
-            ("💼", "历史数据(天)", "同步所有的股票近90天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, True, start_date_90d,today_date), "[历史数据-天-全部]","sync-card-orange"),
+            ("📈", "历史数据(天)", "同步关注的股票近N天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, False, start_date_90d, today_date), "[历史数据-天-关注]", "sync-card-blue"),
+            ("💼", "历史数据(天)", "同步所有的股票近N天的数据(天)", lambda: sync_stock_history(StockHistoryType.D, True, start_date_90d,today_date), "[历史数据-天-全部]","sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(周)", "同步关注的股票近1年的数据(周)", lambda: sync_stock_history(StockHistoryType.W, False, start_date_1y, today_date ), "[历史数据-周-关注]", "sync-card-blue"),
-            ("💼", "历史数据(周)", "同步所有的股票近1年的数据(周)", lambda: sync_stock_history(StockHistoryType.W, True, start_date_1y,today_date), "[历史数据-周-全部]", "sync-card-orange"),
+            ("📈", "历史数据(周)", "同步关注的股票近N天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, False, start_date_1y, today_date ), "[历史数据-周-关注]", "sync-card-blue"),
+            ("💼", "历史数据(周)", "同步所有的股票近N天的数据(周)", lambda: sync_stock_history(StockHistoryType.W, True, start_date_1y,today_date), "[历史数据-周-全部]", "sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(月)", "同步关注的股票近2年的数据(月)", lambda: sync_stock_history(StockHistoryType.M, False, start_date_2y,today_date ), "[历史数据-月-关注]", "sync-card-blue"),
-            ("💼", "历史数据(月)", "同步所有的股票近2年的数据(月)", lambda: sync_stock_history(StockHistoryType.M, True, start_date_2y,today_date ), "[历史数据-月-全部]","sync-card-orange"),
+            ("📈", "历史数据(月)", "同步关注的股票近N天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, False, start_date_2y,today_date ), "[历史数据-月-关注]", "sync-card-blue"),
+            ("💼", "历史数据(月)", "同步所有的股票近N天的数据(月)", lambda: sync_stock_history(StockHistoryType.M, True, start_date_2y,today_date ), "[历史数据-月-全部]","sync-card-orange"),
         ],
         [
-            ("📈", "历史数据(30分钟)", "同步关注的股票近30天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, False, start_date_30d,today_date), "[历史数据-30分钟-关注]", "sync-card-blue"),
-            ("💼", "历史数据(30分钟)", "同步所有的股票近30天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, start_date_30d,today_date), "[历史数据-30分钟-全部]","sync-card-orange"),
+            ("📈", "历史数据(30分钟)", "同步关注的股票近N天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, False, start_date_30d,today_date), "[历史数据-30分钟-关注]", "sync-card-blue"),
+            ("💼", "历史数据(30分钟)", "同步所有的股票近N天的数据(30分钟)", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, start_date_30d,today_date), "[历史数据-30分钟-全部]","sync-card-orange"),
         ],
         [
             ("💰", "买卖记录", "同步关注的股票买卖记录", lambda: sync_stock_trade(False), "[买卖记录-关注]", "sync-card-blue"),
@@ -269,6 +269,51 @@ def show_manual_sync_dashboard():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+                # 对于历史数据类型的按钮，显示日期选择器
+                if "历史数据" in title:
+                    # 日期范围选项
+                    date_options = {
+                        "最近3天": 3,
+                        "最近7天": 7,
+                        "最近30天": 30,
+                        "最近90天": 90,
+                        "最近1年": 365,
+                        "最近2年": 730
+                    }
+                    selected_range = st.selectbox(
+                        "请选择同步几天",
+                        options=list(date_options.keys()),
+                        key=f"date_range_{row_idx}_{col_idx}"
+                    )
+                    days = date_options[selected_range]
+                    start_date = today_date - pd.Timedelta(days=days)
+                    end_date = today_date
+
+                    # 构建同步函数
+                    def create_sync_func(row_idx, col_idx, start_date, end_date):
+                        # 根据按钮位置确定同步类型
+                        if row_idx == 1:  # 历史数据(天)
+                            history_type = StockHistoryType.D
+                            is_all = (col_idx == 1)
+                        elif row_idx == 2:  # 历史数据(周)
+                            history_type = StockHistoryType.W
+                            is_all = (col_idx == 1)
+                        elif row_idx == 3:  # 历史数据(月)
+                            history_type = StockHistoryType.M
+                            is_all = (col_idx == 1)
+                        elif row_idx == 4:  # 历史数据(30分钟)
+                            history_type = StockHistoryType.THIRTY_M
+                            is_all = (col_idx == 1)
+
+                        return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
+
+                    sync_func = create_sync_func(row_idx, col_idx, start_date, end_date)
+                elif "买卖记录" in title:
+                    # 买卖记录按钮
+                    is_all = (col_idx == 1)
+                    sync_func = lambda: sync_stock_trade(is_all)
+
                 # 按钮置灰：当任何同步操作正在进行时，禁用所有按钮
                 if st.button(f"立即同步", use_container_width=True, type="primary", key=f"sync_btn_{row_idx}_{col_idx}", disabled=st.session_state.is_syncing):
                     # 标记为正在同步，并保存数据类型
