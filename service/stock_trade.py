@@ -47,6 +47,11 @@ def show_detail(category: Category):
 def show_page(category: Category, t: StockHistoryType):
     try:
         model = get_trade_model(t)
+        # 获取所有策略类型的完整文本显示
+        all_strategies = [strategy.fullText for strategy in StrategyType]
+        strategy_options = ["请选择策略"] + sorted(all_strategies)
+        strategy_map = {strategy.fullText: strategy.code for strategy in StrategyType}  # 创建显示文本到代码的映射
+        strategy_map["请选择策略"] = "全部"  # 添加默认选项映射
         with get_db_session() as session:
             # 其他数据按日期排序
             query = session.query(
@@ -99,6 +104,16 @@ def show_page(category: Category, t: StockHistoryType):
                                     Stock.pinyin.ilike(f"%{value}%")
                                 )
                             )
+                        ),
+                        SearchField(
+                            field="strategy_type",
+                            label="策略类型",
+                            type="select",
+                            options=strategy_options,
+                            default="请选择策略",
+                            filter_func=lambda query, value: query.filter(
+                                model.strategy_type.like(f"%{strategy_map.get(value, value)}%")
+                            ) if value and value != "请选择策略" else query
                         ),
                         SearchField(
                             field="start_date",
