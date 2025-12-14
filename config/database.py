@@ -61,8 +61,8 @@ def get_all_models() -> List[Type]:
     from models.stock import Stock
     from models.stock_history import StockHistoryD, StockHistoryW, StockHistoryM, StockHistory30M
     from models.sync_history import SyncHistory
-    from models.stock_trade import StockTrade
-    return [Stock, StockHistoryD, StockHistoryW, StockHistoryM, StockHistory30M, SyncHistory, StockTrade]
+    from models.stock_trade import StockTradeD, StockTradeW, StockTradeM, StockTrade30M
+    return [Stock, StockHistoryD, StockHistoryW, StockHistoryM, StockHistory30M, SyncHistory, StockTradeD, StockTradeW, StockTradeM, StockTrade30M]
 
 
 def check_tables(conn, tables: List[Type]) -> List[str]:

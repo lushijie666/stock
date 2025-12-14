@@ -108,7 +108,6 @@ def paginate_dataframe(
         action_config: Optional[ActionConfig] = None,
         title: str = "",
         key_prefix: str = "",
-        model = None,
         on_row_select: Optional[Callable] = None
 ) -> None:
     try:

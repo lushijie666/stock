@@ -137,7 +137,6 @@ def show_page(category: Category):
                 ),
                 title= category.fullText,
                 key_prefix=get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category),
-                model=Stock,
             )
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")

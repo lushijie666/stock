@@ -1,7 +1,7 @@
 import logging
 from datetime import date, timedelta, datetime
 from functools import partial
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,7 +15,7 @@ from enums.signal import SignalType, SignalStrength
 from enums.strategy import StrategyType
 from models.stock import Stock
 from models.stock_history import get_history_model
-from models.stock_trade import StockTrade
+from models.stock_trade import StockTradeW, StockTrade30M, StockTradeM, StockTradeD, get_trade_model
 from service.stock import reload, get_followed_codes, get_codes
 from service.stock_chart import show_detail_dialog
 from utils.db import get_db_session
@@ -28,24 +28,40 @@ from utils.table import format_pinyin_short
 
 KEY_PREFIX = "stock_trade"
 
+def show_detail(category: Category):
+    t = st.radio(
+        "选择时间周期",
+        ["天", "周", "月", "30分钟"],
+        horizontal=True,
+        key=f"{KEY_PREFIX}_{category}_radio",
+        label_visibility="collapsed"
+    )
+    handlers = {
+        "天": lambda:  show_page(category, StockHistoryType.D),
+        "周": lambda:  show_page(category, StockHistoryType.W),
+        "月": lambda:  show_page(category, StockHistoryType.M),
+        "30分钟": lambda:  show_page(category, StockHistoryType.THIRTY_M),
+    }
+    handlers.get(t, lambda: None)()
 
-def show_page(category: Category):
+def show_page(category: Category, t: StockHistoryType):
     try:
+        model = get_trade_model(t)
         with get_db_session() as session:
             # 其他数据按日期排序
             query = session.query(
-                StockTrade.code,
+                model.code,
                 Stock.name,
                 Stock.pinyin,
-                StockTrade.date,
-                StockTrade.signal_type,
-                StockTrade.signal_strength,
-                StockTrade.strategy_type,
-                StockTrade.updated_at,
-            ).join(Stock, StockTrade.code == Stock.code).filter(
-                StockTrade.category == category,
-                StockTrade.removed == False
-            ).order_by(StockTrade.date.desc())
+                model.date,
+                model.signal_type,
+                model.signal_strength,
+                model.strategy_type,
+                model.updated_at,
+            ).join(Stock, model.code == Stock.code).filter(
+                model.category == category,
+                model.removed == False
+            ).order_by(model.date.desc())
             # 使用通用的分页
             paginate_dataframe(
                 query,
@@ -78,7 +94,7 @@ def show_page(category: Category):
                             placeholder="输入股票代码/名称/简拼",
                             filter_func=lambda query, value: query.filter(
                                 or_(
-                                    StockTrade.code.ilike(f"%{value}%"),
+                                    model.code.ilike(f"%{value}%"),
                                     Stock.name.ilike(f"%{value}%"),
                                     Stock.pinyin.ilike(f"%{value}%")
                                 )
@@ -91,7 +107,7 @@ def show_page(category: Category):
                             default=date.today() - timedelta(days=365),
                             max_date=date.today(),
                             placeholder="输入开始日期",
-                            filter_func=lambda q, v: q.filter(StockTrade.date >= v) if v else q
+                            filter_func=lambda q, v: q.filter(model.date >= v) if v else q
                         ),
                         SearchField(
                             field="end_date",
@@ -100,7 +116,7 @@ def show_page(category: Category):
                             default=date.today(),
                             max_date=date.today(),
                             placeholder="输入结束日期",
-                            filter_func=lambda q, v: q.filter(StockTrade.date <= v) if v else q
+                            filter_func=lambda q, v: q.filter(model.date <= v) if v else q
                         )
                     ],
                     layout=[1, 1, 1, 1]
@@ -110,7 +126,7 @@ def show_page(category: Category):
                         ActionButton(
                             icon="🐙",
                             label="更新",
-                            handler=partial(reload, category=category, ignore_message=False),
+                            handler=partial(reload, category=category, t=t,ignore_message=False),
                             type="primary"
                         ),
                     ],
@@ -118,7 +134,6 @@ def show_page(category: Category):
                 ),
                 title=category.fullText,
                 key_prefix=get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category),
-                model=StockTrade,
                 on_row_select=handle_row_click
 
             )
@@ -145,11 +160,10 @@ def handle_row_click(selected_rows):
         except Exception as e:
             st.error(f"加载股票信息失败：{str(e)}")
 
-def reload(category: Category, ignore_message: bool = False):
+def reload(category: Category, t: StockHistoryType, ignore_message: bool = False):
     # 获取选择的日期范围
-    prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category)
+    prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{t}', category=category)
     date_range = get_date_range(prefix=prefix)
-
     if date_range:
         start_date, end_date = date_range
     else:
@@ -161,27 +175,28 @@ def reload(category: Category, ignore_message: bool = False):
     #codes = get_followed_codes(category)
     for code in codes:
         try:
-            reload_by_code(code, StockHistoryType.D, start_date, end_date, ignore_message)
+            reload_by_code(code, t, start_date, end_date, ignore_message)
         except Exception as e:
             logging.error(f"股票: {code} 处理时出错: {str(e)}")
             continue
 
 
-def reload_by_code(code: str, t: StockHistoryType = StockHistoryType.D, start_date: Any = None, end_date: Any = None, ignore_message: bool = False):
+def reload_by_code(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any = None, ignore_message: bool = False):
     if start_date is None:
         start_date = date.today() - timedelta(days=365)
     if end_date is None:
         end_date = date.today()
     with get_db_session() as session:
-        session.query(StockTrade).filter(
-            StockTrade.code == code,
+        model = get_trade_model(t)
+        session.query(model).filter(
+            model.code == code,
         ).delete()
         session.commit()
-    handler = _create_trade_handler()
+    handler = _create_trade_handler(t)
     if ignore_message :
         handler.refresh_ignore_message(
             code=code,
-            history_type=t,
+            t=t,
             start_date=start_date,
             end_date=end_date,
             limit=200,
@@ -189,30 +204,31 @@ def reload_by_code(code: str, t: StockHistoryType = StockHistoryType.D, start_da
     else:
         handler.refresh(
             code=code,
-            history_type=t,
+            t=t,
             start_date=start_date,
             end_date=end_date,
             limit=200,
         )
 
-def _create_trade_handler():
+def _create_trade_handler(t: StockHistoryType):
+    model = get_trade_model(t)
     def build_filter(args: Dict[str, Any], session: Session) -> List:
         """构建过滤条件"""
         code = args.get('code')
-        filters = [StockTrade.code == code]
+        filters = [model.code == code]
         return filters
     return create_reload_handler(
-        model=StockTrade,
+        model=model,
         fetch_func=fetch,
         unique_fields=['code', 'date', 'strategy_type'],
         build_filter=build_filter,
         with_date_range=False  # 我们已经在fetch_func中处理了日期范围
     )
 
-def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end_date: Any =  None, limit: int = 200) -> list:
+def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any =  None, limit: int = 200) -> list:
     logging.info(f"开始获取[{KEY_PREFIX}]数据..., 股票:{code}")
     # 获取历史数据模型类
-    model = get_history_model(history_type)
+    model = get_history_model(t)
     with get_db_session() as session:
         # 查询并直接提取需要的数据，避免保留模型实例引用
         query = session.query(
@@ -237,7 +253,7 @@ def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end
         #query = query.order_by(model.date.desc()).limit(limit)
         query = query.order_by(model.date.desc())
         rows = query.all()
-    logging.info(f"获取[{KEY_PREFIX}]数据的历史数据[{history_type.text}]完成..., 股票:{code}, 共{len(rows)}条")
+    logging.info(f"获取[{KEY_PREFIX}]数据的历史数据[{t.text}]完成..., 股票:{code}, 共{len(rows)}条")
     if not rows:
         return []
 
@@ -259,20 +275,52 @@ def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end
     stock_trades = []
     for signal in signals:
         signal_date = signal['date']
-        stock_trade = StockTrade(
-            code=code,
-            category=category.value,
-            date=signal_date,
-            signal_type=signal['type'].value,
-            signal_strength=signal['strength'].value,
-            strategy_type=signal['strategy_code'],
-            removed=False
-        )
-        stock_trades.append(stock_trade)
+        model_instance = None
+        if t == StockHistoryType.W:
+            model_instance = StockTradeW(
+                code=code,
+                category=category.value,
+                date=signal_date,
+                signal_type=signal['type'].value,
+                signal_strength=signal['strength'].value,
+                strategy_type=signal['strategy_code'],
+                removed=False
+            )
+        elif t == StockHistoryType.M:
+            model_instance = StockTradeM(
+                code=code,
+                category=category.value,
+                date=signal_date,
+                signal_type=signal['type'].value,
+                signal_strength=signal['strength'].value,
+                strategy_type=signal['strategy_code'],
+                removed=False
+            )
+        elif t == StockHistoryType.THIRTY_M:
+            model_instance = StockTrade30M(
+                code=code,
+                category=category.value,
+                date=signal_date,
+                signal_type=signal['type'].value,
+                signal_strength=signal['strength'].value,
+                strategy_type=signal['strategy_code'],
+                removed=False
+            )
+        else:
+            model_instance = StockTradeD(
+                code=code,
+                category=category.value,
+                date=signal_date,
+                signal_type=signal['type'].value,
+                signal_strength=signal['strength'].value,
+                strategy_type=signal['strategy_code'],
+                removed=False
+            )
+        stock_trades.append(model_instance)
     return stock_trades
 
 
-def sync(is_all: bool, start_date=None, end_date=None) -> Dict[str, Any]:
+def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> Dict[str, Any]:
     # 如果没有提供时间范围，默认为近7天
     if not end_date:
         end_date = date.today()
@@ -316,7 +364,7 @@ def sync(is_all: bool, start_date=None, end_date=None) -> Dict[str, Any]:
         # 记录单个股票开始时间
         stock_start_time = time.time()
         try:
-            reload_by_code(code, StockHistoryType.D, start_date_str, end_date_str, True)
+            reload_by_code(code, t, start_date_str, end_date_str, True)
             # 计算单个股票处理耗时
             stock_elapsed_time = time.time() - stock_start_time
             with count_lock:
