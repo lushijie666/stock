@@ -2,7 +2,9 @@ import logging
 from datetime import date, timedelta, datetime
 from functools import partial
 from typing import Dict, Any, List, Optional, Tuple
-
+import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 from requests.sessions import Session
 from sqlalchemy import or_
@@ -39,6 +41,7 @@ def show_page(category: Category):
                 StockTrade.signal_type,
                 StockTrade.signal_strength,
                 StockTrade.strategy_type,
+                StockTrade.updated_at,
             ).join(Stock, StockTrade.code == Stock.code).filter(
                 StockTrade.category == category,
                 StockTrade.removed == False
@@ -107,7 +110,7 @@ def show_page(category: Category):
                         ActionButton(
                             icon="🐙",
                             label="更新",
-                            handler=partial(reload, category=category),
+                            handler=partial(reload, category=category, ignore_message=False),
                             type="primary"
                         ),
                     ],
@@ -142,7 +145,7 @@ def handle_row_click(selected_rows):
         except Exception as e:
             st.error(f"加载股票信息失败：{str(e)}")
 
-def reload(category: Category):
+def reload(category: Category, ignore_message: bool = False):
     # 获取选择的日期范围
     prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category)
     date_range = get_date_range(prefix=prefix)
@@ -158,13 +161,13 @@ def reload(category: Category):
     #codes = get_followed_codes(category)
     for code in codes:
         try:
-            reload_by_code(code, StockHistoryType.D, start_date, end_date)
+            reload_by_code(code, StockHistoryType.D, start_date, end_date, ignore_message)
         except Exception as e:
             logging.error(f"股票: {code} 处理时出错: {str(e)}")
             continue
 
 
-def reload_by_code(code: str, t: StockHistoryType = StockHistoryType.D, start_date: Any = None, end_date: Any = None):
+def reload_by_code(code: str, t: StockHistoryType = StockHistoryType.D, start_date: Any = None, end_date: Any = None, ignore_message: bool = False):
     if start_date is None:
         start_date = date.today() - timedelta(days=365)
     if end_date is None:
@@ -174,14 +177,23 @@ def reload_by_code(code: str, t: StockHistoryType = StockHistoryType.D, start_da
             StockTrade.code == code,
         ).delete()
         session.commit()
-    # 使用处理句柄刷新数据
-    _create_trade_handler().refresh(
-        code=code,
-        history_type=t,
-        start_date=start_date,
-        end_date=end_date,
-        limit=200,
-    )
+    handler = _create_trade_handler()
+    if ignore_message :
+        handler.refresh_ignore_message(
+            code=code,
+            history_type=t,
+            start_date=start_date,
+            end_date=end_date,
+            limit=200,
+        )
+    else:
+        handler.refresh(
+            code=code,
+            history_type=t,
+            start_date=start_date,
+            end_date=end_date,
+            limit=200,
+        )
 
 def _create_trade_handler():
     def build_filter(args: Dict[str, Any], session: Session) -> List:
@@ -196,8 +208,6 @@ def _create_trade_handler():
         build_filter=build_filter,
         with_date_range=False  # 我们已经在fetch_func中处理了日期范围
     )
-
-
 
 def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end_date: Any =  None, limit: int = 200) -> list:
     logging.info(f"开始获取[{KEY_PREFIX}]数据..., 股票:{code}")
@@ -234,17 +244,17 @@ def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end
     # 转换为DataFrame，使用元组解包而不是模型实例属性访问
     df = pd.DataFrame([{
         'date': row[0],  # date
-        'opening': float(row[1]),  # opening
-        'closing': float(row[2]),  # closing
-        'highest': float(row[3]),  # highest
-        'lowest': float(row[4]),  # lowest
-        'turnover_count': float(row[5])  # turnover_count
+        'opening': float(row[1]) if row[1] is not None else 0.0,  # opening
+        'closing': float(row[2]) if row[2] is not None else 0.0,  # closing
+        'highest': float(row[3]) if row[3] is not None else 0.0,  # highest
+        'lowest': float(row[4]) if row[4] is not None else 0.0,  # lowest
+        'turnover_count': float(row[5]) if row[5] is not None else 0.0  # turnover_count
     } for row in rows])
 
     category = Category.from_stock_code(code)
     # 计算信号
     signals = calculate_all_signals(df, merge_and_filter=True)
-    logging.info(f"获取[{KEY_PREFIX}]数据的信号数据完成..., 股票:{code}, 共{len(signals)}条")
+    logging.info(f"计算[{KEY_PREFIX}]数据的买卖信号完成..., 股票:{code}, 共{len(signals)}条")
     # 转换为StockTrade对象
     stock_trades = []
     for signal in signals:
@@ -262,27 +272,97 @@ def fetch(code: str, history_type: StockHistoryType, start_date: Any = None, end
     return stock_trades
 
 
-def sync(is_all: bool) -> Dict[str, Any]:
+def sync(is_all: bool, start_date=None, end_date=None) -> Dict[str, Any]:
+    # 如果没有提供时间范围，默认为近7天
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = end_date - timedelta(days=7)
+
     success_count = 0
     failed_count = 0
-    logging.info(f"开始同步[{KEY_PREFIX}]数据")
+    processed_count = 0
+    count_lock = threading.Lock()
+
+    # 记录总开始时间
+    total_start_time = time.time()
+
+    start_date_str = start_date.strftime('%Y-%m-%d')
+    end_date_str = end_date.strftime('%Y-%m-%d')
+    show_message("正在异步同步, 请稍后...", "success")
+    logging.info(f"开始同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
+
+    # 收集所有需要同步的任务
+    tasks = []
     categories = Category.get_all()
+
     for category in categories:
-        logging.info(f"开始同步[{KEY_PREFIX}]数据，分类: {category.fullText}")
+        logging.info(f"准备同步[{KEY_PREFIX}]数据，分类: {category.fullText}")
         codes = get_codes(category)
         if not is_all:
             codes = get_followed_codes(category)
+
+        # 为每个股票代码创建任务
         for code in codes:
-            show_message(f"正在处理股票: {code}", type="warning")
-            try:
-                reload_by_code(code,  StockHistoryType.D,None, None)
+            tasks.append((code, category, start_date, end_date))
+    # 获取总任务数
+    total_tasks = len(tasks)
+    logging.info(f"总共有 {total_tasks} 个股票需要同步")
+
+    # 定义单个股票同步的工作函数
+    def sync_single_stock(task):
+        code, category, start_date_str, end_date_str = task
+        nonlocal success_count, failed_count, processed_count
+        # 记录单个股票开始时间
+        stock_start_time = time.time()
+        try:
+            reload_by_code(code, StockHistoryType.D, start_date_str, end_date_str, True)
+            # 计算单个股票处理耗时
+            stock_elapsed_time = time.time() - stock_start_time
+            with count_lock:
                 success_count += 1
-                show_message(f"股票: {code} 处理完成", type="success")
-            except Exception as e:
+                processed_count += 1
+                remaining = total_tasks - processed_count
+            logging.info(f"股票: {code} 处理完成，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
+            return True, code, None
+        except Exception as e:
+            # 计算单个股票处理耗时
+            stock_elapsed_time = time.time() - stock_start_time
+
+            with count_lock:
                 failed_count += 1
-                show_message(f"股票: {code} 处理时出错: {str(e)}", type="error")
-            logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}, 股票: {code}")
-    logging.info(f"同步[{KEY_PREFIX}]数据完成，成功数: {success_count}, 失败数: {failed_count}")
+                processed_count += 1
+                remaining = total_tasks - processed_count
+            logging.error(f"股票: {code} 处理时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
+            return False, code, str(e)
+
+    # 使用线程池并行处理任务
+    max_workers = min(30, len(tasks) if tasks else 1)  # 设置最大线程数，避免资源耗尽
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 提交所有任务
+        future_to_task = {executor.submit(sync_single_stock, task): task for task in tasks}
+
+        # 处理任务结果
+        for future in as_completed(future_to_task):
+            task = future_to_task[future]
+            code = task[0]
+            try:
+                future.result()
+            except Exception as e:
+                with count_lock:
+                    failed_count += 1
+                    processed_count += 1
+                    remaining = total_tasks - processed_count
+                logging.error(f"股票: {code} 任务执行异常: {str(e)}，还剩 {remaining} 个股票")
+
+    # 计算总耗时
+    total_elapsed_time = time.time() - total_start_time
+    logging.info(f"完成同步[{KEY_PREFIX}]数据")
+    logging.info(f"总处理股票数: {total_tasks}, 成功: {success_count}, 失败: {failed_count}")
+    logging.info(
+        f"总耗时: {total_elapsed_time:.2f}秒, 平均每个股票耗时: {total_elapsed_time / total_tasks:.2f}秒" if total_tasks > 0 else "无任务需要处理")
+
     return {
         "success_count": success_count,
         "failed_count": failed_count

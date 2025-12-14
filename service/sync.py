@@ -101,8 +101,8 @@ def sync_stock_history(t: StockHistoryType, is_all: bool = False, start_date=Non
     return _execute_sync(t.sync_history_type, stock_history.sync, t=t, is_all=is_all, start_date=start_date, end_date=end_date)
 
 
-def sync_stock_trade(is_all: bool = False):
-    return _execute_sync(SyncHistoryType.STOCK_TRADE, stock_trade.sync, is_all=is_all)
+def sync_stock_trade(is_all: bool = False, start_date=None, end_date=None):
+    return _execute_sync(SyncHistoryType.STOCK_TRADE, stock_trade.sync, is_all=is_all, start_date=start_date, end_date=end_date)
 
 def get_sync_history(limit: int = 50, offset: int = 0, sync_type: SyncHistoryType = None) -> List[SyncHistory]:
     """获取同步历史记录"""

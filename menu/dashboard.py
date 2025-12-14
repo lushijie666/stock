@@ -1,3 +1,4 @@
+import logging
 import time
 
 import streamlit as st
@@ -258,7 +259,7 @@ def show_manual_sync_dashboard():
                 """, unsafe_allow_html=True)
 
                 # 对于历史数据类型的按钮，显示日期选择器
-                if "历史数据" in title:
+                if "历史数据" in title or "买卖记录" in title:
                     # 日期范围选项
                     date_options = {
                         "最近3天": 3,
@@ -276,30 +277,30 @@ def show_manual_sync_dashboard():
                     days = date_options[selected_range]
                     start_date = today_date - pd.Timedelta(days=days)
                     end_date = today_date
-
                     # 构建同步函数
                     def create_sync_func(row_idx, col_idx, start_date, end_date):
                         # 根据按钮位置确定同步类型
                         if row_idx == 1:  # 历史数据(天)
                             history_type = StockHistoryType.D
                             is_all = (col_idx == 1)
+                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
                         elif row_idx == 2:  # 历史数据(周)
                             history_type = StockHistoryType.W
                             is_all = (col_idx == 1)
+                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
                         elif row_idx == 3:  # 历史数据(月)
                             history_type = StockHistoryType.M
                             is_all = (col_idx == 1)
+                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
                         elif row_idx == 4:  # 历史数据(30分钟)
                             history_type = StockHistoryType.THIRTY_M
                             is_all = (col_idx == 1)
-
-                        return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
-
+                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
+                        elif row_idx == 5:  # 买卖记录
+                            is_all = (col_idx == 1)
+                            return lambda: sync_stock_trade(is_all,  start_date, end_date)
+                        return None
                     sync_func = create_sync_func(row_idx, col_idx, start_date, end_date)
-                elif "买卖记录" in title:
-                    # 买卖记录按钮
-                    is_all = (col_idx == 1)
-                    sync_func = lambda: sync_stock_trade(is_all)
 
                 # 按钮置灰：当任何同步操作正在进行时，禁用所有按钮
                 if st.button(f"立即同步", use_container_width=True, type="primary", key=f"sync_btn_{row_idx}_{col_idx}", disabled=st.session_state.is_syncing):
