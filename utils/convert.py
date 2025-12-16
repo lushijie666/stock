@@ -8,6 +8,8 @@ from typing import Optional
 from sqlalchemy.orm import Query
 import pandas as pd
 
+from enums.history_type import StockHistoryType
+
 COLUMN_MAPPINGS = {
     'code': ['证券代码', 'A股代码', '代码', 'code', 'CODE'],
     'name': ['证券简称', 'A股简称', '名称', 'name', 'NAME'],
@@ -157,3 +159,55 @@ def parse_baostock_datetime(datetime_str: str) -> datetime:
     except Exception as e:
         logging.error(f"Error parsing baostock datetime: {datetime_str}, error: {str(e)}")
         return None
+
+
+def format_dates(df, time_type: StockHistoryType):
+    """
+    根据时间类型格式化日期
+
+    Args:
+        df: 包含'date'列的DataFrame
+        time_type: 时间类型枚举
+
+    Returns:
+        格式化后的日期字符串列表
+    """
+    df['date'] = pd.to_datetime(df['date'])
+    if time_type == StockHistoryType.THIRTY_M:
+        return df['date'].dt.strftime('%Y-%m-%d %H:%M').tolist()
+    else:
+        return df['date'].dt.strftime('%Y-%m-%d').tolist()
+
+
+def format_date_series(date_series, time_type: StockHistoryType):
+    """
+    根据时间类型格式化日期序列
+
+    Args:
+        date_series: 日期序列
+        time_type: 时间类型枚举
+
+    Returns:
+        格式化后的日期字符串列表
+    """
+    if time_type == StockHistoryType.THIRTY_M:
+        return date_series.dt.strftime('%Y-%m-%d %H:%M').tolist()
+    else:
+        return date_series.dt.strftime('%Y-%m-%d').tolist()
+
+
+def format_date_by_type(date_value, time_type: StockHistoryType):
+    """
+    根据时间类型格式化日期
+
+    Args:
+        date_value: 日期值
+        time_type: 时间类型枚举
+
+    Returns:
+        格式化后的日期字符串
+    """
+    if time_type == StockHistoryType.THIRTY_M:
+        return date_value.strftime('%Y-%m-%d %H:%M')
+    else:
+        return date_value.strftime('%Y-%m-%d')

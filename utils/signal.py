@@ -1,4 +1,4 @@
-from datetime import date
+
 from typing import List, Dict
 
 import pandas as pd
@@ -7,7 +7,8 @@ import pandas as pd
 from enums.signal import SignalStrength
 from enums.strategy import StrategyType
 
-from utils.strategy import StrategyResult, MACDStrategy, SMAStrategy, TurtleStrategy
+from utils.strategy import StrategyResult, MACDStrategy, SMAStrategy, TurtleStrategy, CBRStrategy
+
 
 def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = None, merge_and_filter: bool = True) -> List[Dict]:
     """
@@ -77,12 +78,13 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
         df = df.sort_values('date').reset_index(drop=True) # 按日期从小到大排序
 
     if strategies is None:
-        strategies = [StrategyType.MACD_STRATEGY, StrategyType.SMA_STRATEGY, StrategyType.TURTLE_STRATEGY]
+        strategies = StrategyType.all_strategies()
 
     strategy_map = {
         StrategyType.MACD_STRATEGY: MACDStrategy(),
         StrategyType.SMA_STRATEGY: SMAStrategy(),
-        StrategyType.TURTLE_STRATEGY: TurtleStrategy()
+        StrategyType.TURTLE_STRATEGY: TurtleStrategy(),
+        StrategyType.CBR_STRATEGY: CBRStrategy(),
     }
 
     results = {}
@@ -120,16 +122,20 @@ def merge_signals_by_date(signals: List[Dict]) -> List[Dict]:
         return signals
 
     # 按日期分组信号
-    signals_by_date = {}
+    signals_by_time = {}
     for signal in signals:
-        date_key = signal['date'].strftime('%Y-%m-%d') if hasattr(signal['date'], 'strftime') else str(signal['date'])
-        if date_key not in signals_by_date:
-            signals_by_date[date_key] = []
-        signals_by_date[date_key].append(signal)
+        # 使用完整的时间戳作为键，确保30分钟数据能被正确区分
+        if hasattr(signal['date'], 'strftime'):
+            time_key = signal['date'].strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            time_key = str(signal['date'])
+        if time_key not in signals_by_time:
+            signals_by_time[time_key] = []
+        signals_by_time[time_key].append(signal)
 
     # 对每天的信号进行合并
     merged_signals = []
-    for date_key, date_signals in signals_by_date.items():
+    for date_key, date_signals in signals_by_time.items():
         if len(date_signals) == 1:
             merged_signals.append(date_signals[0])
         else:
@@ -188,10 +194,21 @@ def filter_consecutive_signals(signals: List[Dict]) -> List[Dict]:
             should_keep = True
         # 规则3：相同类型信号间隔超过3天则保留
         else:
-            date_diff = (current_signal['date'] - previous_signal['date']).days
-            if date_diff > 3:
-                should_keep = True
-
+            # 使用精确的时间差计算
+            if hasattr(current_signal['date'], 'timestamp') and hasattr(previous_signal['date'], 'timestamp'):
+                # 计算秒级时间差
+                time_diff_seconds = current_signal['date'].timestamp() - previous_signal['date'].timestamp()
+                # 对于30分钟数据，如果间隔超过2小时(7200秒)则保留
+                if time_diff_seconds > 7200:
+                    should_keep = True
+            else:
+                # 兜底方案：按天计算
+                try:
+                    date_diff = (current_signal['date'] - previous_signal['date']).days
+                    if date_diff > 1:
+                        should_keep = True
+                except:
+                    pass
         if should_keep:
             filtered_signals.append(current_signal)
 

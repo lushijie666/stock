@@ -32,7 +32,7 @@ class StockTradeD(Base):
     created_at = Column(DateTime, default=dt.now)
     updated_at = Column(DateTime, default=dt.now, onupdate=dt.now)
 
-    date = Column(Date)  # 日期
+    date = Column(DateTime)  # 日期
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
     strategy_type = Column(String(32))   # 策略类型
@@ -57,7 +57,7 @@ class StockTradeW(Base):
     created_at = Column(DateTime, default=dt.now)
     updated_at = Column(DateTime, default=dt.now, onupdate=dt.now)
 
-    date = Column(Date)  # 日期
+    date = Column(DateTime)  # 日期
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
     strategy_type = Column(String(32))   # 策略类型
@@ -83,7 +83,7 @@ class StockTradeM(Base):
     created_at = Column(DateTime, default=dt.now)
     updated_at = Column(DateTime, default=dt.now, onupdate=dt.now)
 
-    date = Column(Date)  # 日期
+    date = Column(DateTime)  # 日期
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
     strategy_type = Column(String(32))   # 策略类型
@@ -108,7 +108,7 @@ class StockTrade30M(Base):
     created_at = Column(DateTime, default=dt.now)
     updated_at = Column(DateTime, default=dt.now, onupdate=dt.now)
 
-    date = Column(Date)  # 日期
+    date = Column(DateTime)  # 日期
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
     strategy_type = Column(String(32))   # 策略类型

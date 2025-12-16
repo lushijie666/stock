@@ -1,4 +1,5 @@
 # 历史行情
+import pandas as pd
 import streamlit as st
 import logging
 import threading
@@ -14,7 +15,8 @@ from enums.category import Category
 from enums.history_type import StockHistoryType
 
 from service.stock import get_codes, get_followed_codes
-from utils.convert import date_range_filter, parse_baostock_datetime, clean_numeric_value
+from utils.background_task import BackgroundTaskExecutor
+from utils.convert import date_range_filter, parse_baostock_datetime, clean_numeric_value, format_date_by_type
 from utils.fetch_handler import create_reload_handler
 from models.stock_history import get_history_model, StockHistoryW, StockHistoryD, StockHistoryM,StockHistory30M
 from utils.db import get_db_session
@@ -31,51 +33,35 @@ def show_page(stock, t: StockHistoryType):
     try:
         model = get_history_model(t)
         with get_db_session() as session:
-            if t == StockHistoryType.THIRTY_M:
-                query = session.query(model).filter(
-                    model.code == stock.code,
-                    model.removed == False
-                ).order_by(model.date.desc(), model.time.desc())
-            else:
-                # 其他数据按日期排序
-                query = session.query(model).filter(
-                    model.code == stock.code,
-                    model.removed == False
-                ).order_by(model.date.desc())
-
-            # 使用 OrderedDict 按指定顺序构建列配置
-            columns_config = OrderedDict([
-                ('code', st.column_config.TextColumn('股票代码', help="股票代码")),
-                ('date', st.column_config.DateColumn('日期', help="日期")),
-            ])
-
-            # 如果是30分钟类型，插入time字段
-            if t == StockHistoryType.THIRTY_M:
-                columns_config['time'] = st.column_config.TimeColumn('时间', help="交易时间", width="small")
-
-            # 继续添加其他字段
-            columns_config.update({
-                'opening': st.column_config.NumberColumn('开盘', help="当日开盘价", format="%.3f"),
-                'closing': st.column_config.NumberColumn('收盘', help="当日收盘价", format="%.3f"),
-                'highest': st.column_config.NumberColumn('最高', help="当日最高价", format="%.3f"),
-                'lowest': st.column_config.NumberColumn('最低', help="当日最低价", format="%.3f"),
-                'turnover_count': st.column_config.TextColumn('成交量(手)', help="成交股数"),
-                'turnover_amount': st.column_config.TextColumn('成交额(元)', help="成交金额"),
-                'change': st.column_config.NumberColumn('涨跌幅', help="涨跌幅", format="%.2f%%"),
-                'turnover_ratio': st.column_config.NumberColumn('换手率', help="成交股数与流通股数之比", format="%.2f%%"),
-                'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
-            })
-
+            # 其他数据按日期排序
+            query = session.query(model).filter(
+                model.code == stock.code,
+                model.removed == False
+            ).order_by(model.date.desc())
+            format_funcs = {
+                'turnover_count': format_volume,
+                'turnover_ratio': format_percent,
+                'change': format_percent,
+                'date': lambda x: format_date_by_type(x, t),
+            }
             paginate_dataframe(
                 query,
                 10,
-                columns_config=columns_config,
-                # 格式化函数
-                format_funcs={
-                    'turnover_count': format_volume,
-                    'turnover_ratio': format_percent,
-                    'change': format_percent,
+                columns_config={
+                    'code': st.column_config.TextColumn('股票代码', help="股票代码"),
+                    'date': st.column_config.TextColumn('日期（时间）', help="日期"),
+                    'opening': st.column_config.NumberColumn('开盘', help="当日开盘价", format="%.3f"),
+                    'closing': st.column_config.NumberColumn('收盘', help="当日收盘价", format="%.3f"),
+                    'highest': st.column_config.NumberColumn('最高', help="当日最高价", format="%.3f"),
+                    'lowest': st.column_config.NumberColumn('最低', help="当日最低价", format="%.3f"),
+                    'turnover_count': st.column_config.TextColumn('成交量(手)', help="成交股数"),
+                    'turnover_amount': st.column_config.TextColumn('成交额(元)', help="成交金额"),
+                    'change': st.column_config.NumberColumn('涨跌幅', help="涨跌幅", format="%.2f%%"),
+                    'turnover_ratio': st.column_config.NumberColumn('换手率', help="成交股数与流通股数之比", format="%.2f%%"),
+                    'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
                 },
+                # 格式化函数
+                format_funcs=format_funcs,
                 search_config=SearchConfig(
                     fields=[
                         SearchField(
@@ -192,13 +178,10 @@ def _create_history_handler(t: StockHistoryType):
             model.date <= end_date,
         ]
 
-    unique_fields = ['code', 'date']
-    if t == StockHistoryType.THIRTY_M:
-        unique_fields = ['code', 'time']
     return create_reload_handler(
         model=model,
         fetch_func=fetch,
-        unique_fields=unique_fields,
+        unique_fields=['code', 'date'],
         build_filter=build_filter,
         with_date_range=True
     )
@@ -273,8 +256,7 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
                     model_instance = StockHistory30M(
                         category=category,
                         code=code,
-                        date=row_data[0],
-                        time=parse_baostock_datetime(row_data[1]),
+                        date=parse_baostock_datetime(row_data[1]),
                         opening=clean_numeric_value(row_data[3]),
                         highest=clean_numeric_value(row_data[4]),
                         lowest=clean_numeric_value(row_data[5]),
@@ -309,10 +291,6 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
             bs.logout()
         return data_list
 
-
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
-
 def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> Dict[str, Any]:
     # 使用线程安全的计数器
     success_count = 0
@@ -332,7 +310,6 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
     # 转换为字符串格式
     start_date_str = start_date.strftime('%Y-%m-%d')
     end_date_str = end_date.strftime('%Y-%m-%d')
-    show_message("正在异步同步, 请稍后...", "success")
     logging.info(f"开始同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
     
     # 收集所有需要同步的任务

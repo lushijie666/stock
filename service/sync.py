@@ -6,6 +6,7 @@ from sqlalchemy import func
 from enums.history_type import StockHistoryType
 from enums.sync_type import SyncHistoryType
 from models.sync_history import SyncHistory, SyncStatus
+from utils.background_task import BackgroundTaskExecutor
 from utils.db import get_db_session
 from service import stock, stock_history, stock_trade
 import logging
@@ -57,40 +58,58 @@ def _update_sync_record(record_id: int, data: Dict[str, Any]):
     except Exception as e:
         logging.error(f"更新同步记录失败: {str(e)}")
 
+
 def _execute_sync(sync_type: SyncHistoryType, sync_func, *args, **kwargs) -> Dict[str, Any]:
     """执行同步任务的公共方法"""
+    # 创建记录并获取ID
     record_id = _create_sync_record(sync_type)
-    success_count = 0
-    failed_count = 0
-    error_msg = None
-    try:
-        result = sync_func(*args, **kwargs)
-        success_count = result.get('success_count', 0)
-        failed_count = result.get('failed_count', 0)
+    logging.info("创建同步记录成功, ID:", record_id)
+    # 使用后台任务执行器异步执行任务
+    def async_sync_wrapper():
+        success_count = 0
+        failed_count = 0
+        error_msg = None
+        try:
+            result = sync_func(*args, **kwargs)
+            success_count = result.get('success_count', 0)
+            failed_count = result.get('failed_count', 0)
 
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.SUCCESS.value,
-                'end_time': datetime.now(timezone.utc),
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        return {"success": True, "success_count": success_count, "failed_count": failed_count}
-    except Exception as e:
-        error_msg = str(e)
-        _update_sync_record(
-            record_id,
-            {
-                'status': SyncStatus.FAILED.value,
-                'end_time': datetime.now(timezone.utc),
-                'error': error_msg,
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        )
-        return {"success": False, "error": error_msg}
+            # 更新同步记录为成功状态
+            _update_sync_record(
+                record_id,
+                {
+                    'status': SyncStatus.SUCCESS.value,
+                    'end_time': datetime.now(timezone.utc),
+                    'success_count': success_count,
+                    'failed_count': failed_count
+                }
+            )
+        except Exception as e:
+            error_msg = str(e)
+            # 更新同步记录为失败状态
+            _update_sync_record(
+                record_id,
+                {
+                    'status': SyncStatus.FAILED.value,
+                    'end_time': datetime.now(timezone.utc),
+                    'error': error_msg,
+                    'success_count': success_count,
+                    'failed_count': failed_count
+                }
+            )
+
+    task_info = BackgroundTaskExecutor.execute(
+        async_sync_wrapper,
+        task_name=f"syncTask-{sync_type.value}"
+    )
+    print(f"任务已提交: {task_info}")  # 添加此行检查任务是否被提交
+    # 立即返回，但包含记录ID
+    return {
+        "success": True,
+        "message": "同步任务已在后台执行",
+        "record_id": record_id,
+        "task_info": task_info
+    }
 
 
 def sync_stock():

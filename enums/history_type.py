@@ -23,3 +23,14 @@ class StockHistoryType(StrEnum):
     def get_default_start_date(self, max_date, min_date):
         """根据历史数据类型计算默认开始日期"""
         return max(max_date - timedelta(days=self.default_days), min_date)
+
+    @property
+    def ma_periods(self):
+        """返回该周期对应的默认均线周期列表"""
+        mapping = {
+            self.D: [5, 10, 30, 250],
+            self.W: [5, 10, 20, 60],
+            self.M: [5, 10, 20, 60],
+            self.THIRTY_M: [5, 10, 20, 60]  # 30分钟图使用较短周期
+        }
+        return mapping[self]

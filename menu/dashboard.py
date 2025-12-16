@@ -6,6 +6,7 @@ from enums.history_type import StockHistoryType
 from service.stock import show_category_pie_chart, show_follow_chart, get_total_stocks_count, get_followed_stocks_count
 from enums.category import Category
 from service.stock_chart import show_detail, KEY_PREFIX
+from utils.message import show_message
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
 from utils.scheduler import scheduler
 from service.sync import sync_stock, sync_stock_history, SyncHistoryType, get_sync_summary, sync_stock_trade
@@ -163,7 +164,8 @@ def show_scheduler_sync_dashboard():
         {"time": "每天06:00", "name": "📊 股票信息", "func": sync_stock},
         {"time": "每天18:10", "name": "📈 历史数据(天)", "func": lambda: sync_stock_history(StockHistoryType.D, True, date.today(), date.today())},
         {"time": "每天18:30", "name": "📈 历史数据(30分钟)", "func": lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(), date.today())},
-        {"time": "每天19:00", "name": "💰 买卖记录", "func": lambda: sync_stock_trade(True)}
+        {"time": "每天19:00", "name": "💰 买卖记录(天)", "func": lambda: sync_stock_trade(StockHistoryType.D, True, date.today(), date.today())},
+        {"time": "每天19:00", "name": "💰 买卖记录(30分钟)", "func": lambda: sync_stock_trade(StockHistoryType.THIRTY_M, True, date.today(), date.today())}
     ]
 
     # 显示定时任务列表和立即执行按钮
@@ -186,7 +188,8 @@ def show_scheduler_sync_dashboard():
             # 添加定时任务
             scheduler.add_daily_job("sync_stock_history_d", lambda: sync_stock_history(StockHistoryType.D, True, date.today(), date.today()), 18, 10)
             scheduler.add_daily_job("sync_stock_history_30m", lambda: sync_stock_history(StockHistoryType.THIRTY_M, True, date.today(),date.today()), 18, 30)
-            scheduler.add_daily_job("sync_stock_trade", lambda: sync_stock_trade(True), 19, 00)
+            scheduler.add_daily_job("sync_stock_trade", lambda: sync_stock_trade(StockHistoryType.D, True, date.today(),date.today()), 19, 00),
+            scheduler.add_daily_job("sync_stock_trade", lambda: sync_stock_trade(StockHistoryType.THIRTY_M, True, date.today(),date.today()), 19, 00),
             st.rerun()
     st.markdown("""
     </div>
@@ -243,6 +246,16 @@ def show_manual_sync_dashboard():
             ("💰", "买卖记录(30分钟)", "同步所有的股票买卖记录(30分钟)", None, "[买卖记录-30分钟-全部]", "sync-card-orange"),
         ],
     ]
+    sync_type_mapping = {
+        1: (StockHistoryType.D, "sync_stock_history"),  # 历史数据(天)
+        2: (StockHistoryType.W, "sync_stock_history"),  # 历史数据(周)
+        3: (StockHistoryType.M, "sync_stock_history"),  # 历史数据(月)
+        4: (StockHistoryType.THIRTY_M, "sync_stock_history"),  # 历史数据(30分钟)
+        5: (StockHistoryType.D, "sync_stock_trade"),  # 买卖记录(天)
+        6: (StockHistoryType.W, "sync_stock_trade"),  # 买卖记录(周)
+        7: (StockHistoryType.M, "sync_stock_trade"),  # 买卖记录(月)
+        8: (StockHistoryType.THIRTY_M, "sync_stock_trade"),  # 买卖记录(30分钟)
+    }
 
     # 创建同步状态变量（使用st.session_state确保按钮置灰效果）
     if "is_syncing" not in st.session_state:
@@ -290,30 +303,15 @@ def show_manual_sync_dashboard():
                     end_date = today_date
                     # 构建同步函数
                     def create_sync_func(row_idx, col_idx, start_date, end_date):
-                        # 根据按钮位置确定同步类型
-                        if row_idx == 1:  # 历史数据(天)
-                            history_type = StockHistoryType.D
-                            is_all = (col_idx == 1)
-                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
-                        elif row_idx == 2:  # 历史数据(周)
-                            history_type = StockHistoryType.W
-                            is_all = (col_idx == 1)
-                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
-                        elif row_idx == 3:  # 历史数据(月)
-                            history_type = StockHistoryType.M
-                            is_all = (col_idx == 1)
-                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
-                        elif row_idx == 4:  # 历史数据(30分钟)
-                            history_type = StockHistoryType.THIRTY_M
-                            is_all = (col_idx == 1)
-                            return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
-                        elif row_idx == 5:  # 买卖记录(天)
-                            history_type = StockHistoryType.D
-                            is_all = (col_idx == 1)
-                            return lambda: sync_stock_trade(is_all,  start_date, end_date)
+                        if row_idx in sync_type_mapping:
+                            history_type, func_type = sync_type_mapping[row_idx]
+                            is_all = (col_idx == 1)  # 第二列是"全部"选项
+                            if func_type == "sync_stock_history":
+                                return lambda: sync_stock_history(history_type, is_all, start_date, end_date)
+                            elif func_type == "sync_stock_trade":
+                                return lambda: sync_stock_trade(history_type, is_all, start_date, end_date)
                         return None
                     sync_func = create_sync_func(row_idx, col_idx, start_date, end_date)
-
                 # 按钮置灰：当任何同步操作正在进行时，禁用所有按钮
                 if st.button(f"立即同步", use_container_width=True, type="primary", key=f"sync_btn_{row_idx}_{col_idx}", disabled=st.session_state.is_syncing):
                     # 标记为正在同步，并保存数据类型
@@ -325,6 +323,7 @@ def show_manual_sync_dashboard():
     
     # 在列外部显示同步结果（占据整行）
     if st.session_state.is_syncing and st.session_state.sync_data_type:
+        show_message("正在异步同步, 请稍后...", "success")
         try:
             # 执行同步操作
             result = st.session_state.sync_func()

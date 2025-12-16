@@ -104,7 +104,7 @@ class KLineProcessor:
                         'original_k2': k2.to_dict(),
                         'original_k3': k3.to_dict(),
                         'new_values': {
-                            'date': new_date.strftime('%Y-%m-%d'),
+                            'date': new_date,
                             'high': new_high,
                             'low': new_low,
                             'open': new_open,

@@ -33,7 +33,7 @@ class StockHistoryD(Base):
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
 
-    date = Column(Date) # 日期
+    date = Column(DateTime) # 日期
     opening = Column(Numeric(100, 4))  # 开盘
     closing = Column(Numeric(100, 4))  # 收盘
     highest = Column(Numeric(100, 4))  # 最高
@@ -66,7 +66,7 @@ class StockHistoryW(Base):
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
 
-    date = Column(Date) # 日期
+    date = Column(DateTime) # 日期
     opening = Column(Numeric(100, 4))  # 开盘
     closing = Column(Numeric(100, 4))  # 收盘
     highest = Column(Numeric(100, 4))  # 最高
@@ -98,7 +98,7 @@ class StockHistoryM(Base):
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
 
-    date = Column(Date) # 日期
+    date = Column(DateTime) # 日期
     opening = Column(Numeric(100, 4))  # 开盘
     closing = Column(Numeric(100, 4))  # 收盘
     highest = Column(Numeric(100, 4))  # 最高
@@ -118,8 +118,8 @@ class StockHistory30M(Base):
 
     # 添加唯一约束
     __table_args__ = (
-        UniqueConstraint( 'code', 'time', name='uix_stock_history_30m_code_time'),
-        Index('idx_history_30m_code_time', 'code', 'time'),
+        UniqueConstraint( 'code', 'date', name='uix_stock_history_30m_code_date'),
+        Index('idx_history_30m_code_date', 'code', 'date'),
     )
 
     # 基础信息
@@ -131,8 +131,7 @@ class StockHistory30M(Base):
     category = Column(String(32), index=True)
     code = Column(String(32), index=True) # 代号
 
-    date = Column(Date) # 日期
-    time = Column(DateTime) # 时间
+    date = Column(DateTime) # 日期
     opening = Column(Numeric(100, 4))  # 开盘
     closing = Column(Numeric(100, 4))  # 收盘
     highest = Column(Numeric(100, 4))  # 最高

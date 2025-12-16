@@ -88,6 +88,22 @@ class TurtleStrategy(BaseStrategy):
             }
         )
 
+class CBRStrategy(BaseStrategy):
+    """CBR (Confirmation-Based Reversal) 策略"""
+    def __init__(self):
+        super().__init__("CBR策略")
+
+    def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
+        # 计算CBR信号
+        signals = calculate_cbr_signals(df)
+        return StrategyResult(
+            strategy_type=StrategyType.CBR_STRATEGY,
+            signals=signals,
+            metadata={
+                "description": "基于价格形态和MACD确认的反转策略",
+                "indicators_used": ["Price Pattern", "MACD"]
+            }
+        )
 
 def calculate_macd(df: pd.DataFrame, fast_period=12, slow_period=26, signal_period=9):
     df = df.copy()
@@ -369,6 +385,86 @@ def calculate_turtle_signals(
 
     return signals
 
+
+def calculate_cbr_signals(df):
+    """
+    根据CBR策略计算买卖信号
+    买点: T-2的最高和最低 > T-1的最高和最低，T的收盘价 > T-1的最高 或者 MACD金叉
+    卖点: T-2的最高和最低 < T-1的最高和最低，T的收盘价 < T-1的最低 或者 MACD死叉
+    """
+    signals = []
+
+    # 确保有足够数据(T-2, T-1, T需要至少3天数据)
+    if len(df) < 3:
+        return signals
+
+    # 确保必要的列存在
+    required_columns = ['highest', 'lowest', 'closing']
+    if not all(col in df.columns for col in required_columns):
+        return signals
+
+    # 计算MACD指标（如果不存在）
+    if 'DIFF' not in df.columns or 'DEA' not in df.columns:
+        macd_df = calculate_macd(df)
+        df = df.copy()
+        df['DIFF'] = macd_df['DIFF']
+        df['DEA'] = macd_df['DEA']
+
+    # 遍历数据生成信号(从第3天开始，因为需要T-2的数据)
+    for i in range(2, len(df)):
+        # 获取T-2, T-1, T三个时间点的数据
+        t_minus_2_highest = df.iloc[i - 2]['highest']
+        t_minus_2_lowest = df.iloc[i - 2]['lowest']
+        t_minus_1_highest = df.iloc[i - 1]['highest']
+        t_minus_1_lowest = df.iloc[i - 1]['lowest']
+        t_closing = df.iloc[i]['closing']
+        t_date = df.iloc[i]['date']
+
+        # 获取MACD值
+        t_diff = df.iloc[i]['DIFF'] if 'DIFF' in df.columns else None
+        t_dea = df.iloc[i]['DEA'] if 'DEA' in df.columns else None
+        t_minus_1_diff = df.iloc[i - 1]['DIFF'] if 'DIFF' in df.columns else None
+        t_minus_1_dea = df.iloc[i - 1]['DEA'] if 'DEA' in df.columns else None
+
+        # 判断买点条件
+        # 条件1: T-2的最高和最低 > T-1的最高和最低
+        condition1_buy = (t_minus_2_highest > t_minus_1_highest) and (t_minus_2_lowest > t_minus_1_lowest)
+        # 条件2: T的收盘价 > T-1的最高 或者 MACD金叉
+        condition2_buy = False
+        if t_diff is not None and t_dea is not None and t_minus_1_diff is not None and t_minus_1_dea is not None:
+            condition2_buy = (t_closing > t_minus_1_highest) or (t_diff > t_dea and t_minus_1_diff <= t_minus_1_dea)
+        else:
+            condition2_buy = (t_closing > t_minus_1_highest)
+
+        # 判断卖点条件
+        # 条件1: T-2的最高和最低 < T-1的最高和最低
+        condition1_sell = (t_minus_2_highest < t_minus_1_highest) and (t_minus_2_lowest < t_minus_1_lowest)
+        # 条件2: T的收盘价 < T-1的最低 或者 MACD死叉
+        condition2_sell = False
+        if t_diff is not None and t_dea is not None and t_minus_1_diff is not None and t_minus_1_dea is not None:
+            condition2_sell = (t_closing < t_minus_1_lowest) or (t_diff < t_dea and t_minus_1_diff >= t_minus_1_dea)
+        else:
+            condition2_sell = (t_closing < t_minus_1_lowest)
+
+        # 生成买入信号
+        if condition1_buy and condition2_buy:
+            signals.append({
+                'date': t_date,
+                'price': float(t_closing),
+                'type': SignalType.BUY,
+                'strength': SignalStrength.STRONG
+            })
+
+        # 生成卖出信号
+        elif condition1_sell and condition2_sell:
+            signals.append({
+                'date': t_date,
+                'price': float(t_closing),
+                'type': SignalType.SELL,
+                'strength': SignalStrength.STRONG
+            })
+
+    return signals
 
 def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, sell_ratios=None):
     """

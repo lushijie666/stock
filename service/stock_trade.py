@@ -352,7 +352,6 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
 
     start_date_str = start_date.strftime('%Y-%m-%d')
     end_date_str = end_date.strftime('%Y-%m-%d')
-    show_message("正在异步同步, 请稍后...", "success")
     logging.info(f"开始同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
 
     # 收集所有需要同步的任务
