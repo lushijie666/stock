@@ -33,7 +33,6 @@ def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = Non
                 signal_copy = signal.copy()
                 signal_copy['strategy'] = strategy_type
                 all_signals.append(signal_copy)
-
     # 如果需要，对所有信号进行合并和过滤处理
     if merge_and_filter and all_signals:
         # 合并同一天的信号

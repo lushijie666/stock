@@ -9,7 +9,7 @@ from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
 from enums.patterns import Patterns
 from utils.chart import ChartBuilder
-from utils.convert import format_dates, format_date_series, format_date_by_type
+from utils.convert import format_dates, format_dates_series, format_date_by_type, format_dates_signals
 from utils.signal import calculate_all_signals
 from utils.strategy import calculate_macd, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
     generate_trading_advice, calculate_strategy_performance, calculate_position_and_cash_values
@@ -193,6 +193,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
             all_signals = []
             if strategies:
                 all_signals = calculate_all_signals(df, strategies, merge_and_filter=True)
+                all_signals = format_dates_signals(all_signals, t)
             # 创建 K 线图
             st.markdown("""
                   <div class="chart-header">
@@ -255,7 +256,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
 
                 # 创建MACD数据DataFrame
                 macd_display_df = pd.DataFrame({
-                    '日期（时间）': format_date_series(df['date'], t),
+                    '日期（时间）': format_dates_series(df['date'], t),
                     'DIFF': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DIFF']],
                     'DEA': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DEA']],
                     'MACD': [round(x, 4) if not pd.isna(x) else None for x in macd_df['MACD_hist']]
@@ -626,6 +627,7 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                 return
             # 计算所有信号
             all_signals = calculate_all_signals(df, strategies)
+            all_signals = format_dates_signals(all_signals, t)
             # 准备数据
             dates = format_dates(df, t)
             open_prices = df['opening'].tolist()
@@ -825,15 +827,14 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
 
             # 计算所有信号
             all_signals = calculate_all_signals(df, strategies)
-
             if not all_signals:
                 st.warning("所选时间范围内未发现交易信号")
                 return
-
+            format_all_signals = format_dates_signals(all_signals, t)
             # 执行回测
             backtest_result = backtest_strategy(
                 df,
-                all_signals,
+                format_all_signals,
                 initial_capital=initial_capital,
                 buy_ratios=buy_ratios,
                 sell_ratios=sell_ratios
@@ -984,7 +985,7 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
                 high_prices,
                 low_prices,
                 close_prices,
-                all_signals,
+                format_all_signals,
                 trades
             )
             streamlit_echarts.st_pyecharts(backtest_trade_points_chart, height="450px", key=f"{KEY_PREFIX}_{stock.code}_{t}_backtest_trade_points_chart")

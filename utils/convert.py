@@ -4,7 +4,7 @@ from datetime import datetime
 
 import logging
 from datetime import date
-from typing import Optional
+from typing import Optional, List, Dict
 from sqlalchemy.orm import Query
 import pandas as pd
 
@@ -161,53 +161,82 @@ def parse_baostock_datetime(datetime_str: str) -> datetime:
         return None
 
 
-def format_dates(df, time_type: StockHistoryType):
+def format_dates(df, t: StockHistoryType):
     """
     根据时间类型格式化日期
 
     Args:
         df: 包含'date'列的DataFrame
-        time_type: 时间类型枚举
+        t: 时间类型枚举
 
     Returns:
         格式化后的日期字符串列表
     """
     df['date'] = pd.to_datetime(df['date'])
-    if time_type == StockHistoryType.THIRTY_M:
+    if t == StockHistoryType.THIRTY_M:
         return df['date'].dt.strftime('%Y-%m-%d %H:%M').tolist()
     else:
         return df['date'].dt.strftime('%Y-%m-%d').tolist()
 
 
-def format_date_series(date_series, time_type: StockHistoryType):
+def format_dates_series(date_series, t: StockHistoryType):
     """
     根据时间类型格式化日期序列
 
     Args:
         date_series: 日期序列
-        time_type: 时间类型枚举
+        t: 时间类型枚举
 
     Returns:
         格式化后的日期字符串列表
     """
-    if time_type == StockHistoryType.THIRTY_M:
+    if t == StockHistoryType.THIRTY_M:
         return date_series.dt.strftime('%Y-%m-%d %H:%M').tolist()
     else:
         return date_series.dt.strftime('%Y-%m-%d').tolist()
 
 
-def format_date_by_type(date_value, time_type: StockHistoryType):
+def format_dates_signals(signals: List[Dict], t: StockHistoryType) -> List[Dict]:
+    formatted_signals = []
+
+    for signal in signals:
+        formatted_signal = signal.copy()
+        # 根据历史数据类型格式化日期，直接替换 date 字段
+        formatted_signal['date'] = format_date_by_type(signal['date'], t)
+        formatted_signals.append(formatted_signal)
+
+    return formatted_signals
+
+def format_date_by_type(date_value, t: StockHistoryType):
     """
     根据时间类型格式化日期
 
     Args:
         date_value: 日期值
-        time_type: 时间类型枚举
+        t: 时间类型枚举
 
     Returns:
         格式化后的日期字符串
     """
-    if time_type == StockHistoryType.THIRTY_M:
-        return date_value.strftime('%Y-%m-%d %H:%M')
+    # 如果是字符串，先解析为datetime对象
+    if isinstance(date_value, str):
+        try:
+            # 尝试解析常见的日期格式
+            if ' ' in date_value and ':' in date_value:
+                # 包含时间信息的格式
+                date_obj = datetime.strptime(date_value, '%Y-%m-%d %H:%M:%S')
+            else:
+                # 只有日期信息的格式
+                date_obj = datetime.strptime(date_value, '%Y-%m-%d')
+        except ValueError:
+            # 如果解析失败，直接返回原字符串
+            return date_value
     else:
-        return date_value.strftime('%Y-%m-%d')
+        # 假设是datetime对象
+        date_obj = date_value
+
+    # 使用解析后的date_obj进行格式化
+    if t == StockHistoryType.THIRTY_M:
+        return date_obj.strftime('%Y-%m-%d %H:%M')
+    else:
+        return date_obj.strftime('%Y-%m-%d')
