@@ -241,7 +241,7 @@ def _create_trade_handler(t: StockHistoryType):
     )
 
 def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any =  None, limit: int = 200) -> list:
-    logging.info(f"开始获取[{KEY_PREFIX}]数据..., 股票:{code}")
+    logging.info(f"开始获取[{KEY_PREFIX}][{t.text}]数据..., 股票:{code}")
     # 获取历史数据模型类
     model = get_history_model(t)
     with get_db_session() as session:
@@ -285,7 +285,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
     category = Category.from_stock_code(code)
     # 计算信号
     signals = calculate_all_signals(df, merge_and_filter=True)
-    logging.info(f"计算[{KEY_PREFIX}]数据的买卖信号完成..., 股票:{code}, 共{len(signals)}条")
+    logging.info(f"计算[{KEY_PREFIX}][{t.text}]数据的买卖信号完成..., 股票:{code}, 共{len(signals)}条")
     # 转换为StockTrade对象
     stock_trades = []
     for signal in signals:
@@ -352,14 +352,14 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
 
     start_date_str = start_date.strftime('%Y-%m-%d')
     end_date_str = end_date.strftime('%Y-%m-%d')
-    logging.info(f"开始同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
+    logging.info(f"开始同步[{KEY_PREFIX}][{t.text}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
 
     # 收集所有需要同步的任务
     tasks = []
     categories = Category.get_all()
 
     for category in categories:
-        logging.info(f"准备同步[{KEY_PREFIX}]数据，分类: {category.fullText}")
+        logging.info(f"准备同步[{KEY_PREFIX}][{t.text}]数据，分类: {category.fullText}")
         codes = get_codes(category)
         if not is_all:
             codes = get_followed_codes(category)
@@ -369,7 +369,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
             tasks.append((code, category, start_date, end_date))
     # 获取总任务数
     total_tasks = len(tasks)
-    logging.info(f"总共有 {total_tasks} 个股票需要同步")
+    logging.info(f"同步[{KEY_PREFIX}][{t.text}]数据, 总共有 {total_tasks} 个股票需要同步")
 
     # 定义单个股票同步的工作函数
     def sync_single_stock(task):
@@ -385,7 +385,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
                 success_count += 1
                 processed_count += 1
                 remaining = total_tasks - processed_count
-            logging.info(f"股票: {code} 处理完成，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
+            logging.info(f"股票: {code} 处理[{KEY_PREFIX}][{t.text}]数据完成，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
             return True, code, None
         except Exception as e:
             # 计算单个股票处理耗时
@@ -395,7 +395,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
                 failed_count += 1
                 processed_count += 1
                 remaining = total_tasks - processed_count
-            logging.error(f"股票: {code} 处理时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
+            logging.error(f"股票: {code} 处理[{KEY_PREFIX}][{t.text}]数据时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
             return False, code, str(e)
 
     # 使用线程池并行处理任务
@@ -416,11 +416,11 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
                     failed_count += 1
                     processed_count += 1
                     remaining = total_tasks - processed_count
-                logging.error(f"股票: {code} 任务执行异常: {str(e)}，还剩 {remaining} 个股票")
+                logging.error(f"股票: {code} 任务[{KEY_PREFIX}][{t.text}]数据执行异常: {str(e)}，还剩 {remaining} 个股票")
 
     # 计算总耗时
     total_elapsed_time = time.time() - total_start_time
-    logging.info(f"完成同步[{KEY_PREFIX}]数据")
+    logging.info(f"完成同步[{KEY_PREFIX}][{t.text}]数据")
     logging.info(f"总处理股票数: {total_tasks}, 成功: {success_count}, 失败: {failed_count}")
     logging.info(
         f"总耗时: {total_elapsed_time:.2f}秒, 平均每个股票耗时: {total_elapsed_time / total_tasks:.2f}秒" if total_tasks > 0 else "无任务需要处理")

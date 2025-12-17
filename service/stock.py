@@ -526,14 +526,14 @@ def sync() -> Dict[str, int]:
     logging.info(f"开始同步{KEY_PREFIX}数据")
     categories = Category.get_all()
     for category in categories:
-        show_message(f"正在处理分类: {category.fullText}", type="warning")
+        #show_message(f"正在处理分类: {category.fullText}", type="warning")
         try:
             reload(category)
             success_count += 1
-            show_message(f"分类: {category.fullText} 处理完成", type="success")
+            #show_message(f"分类: {category.fullText} 处理完成", type="success")
         except Exception as e:
             failed_count += 1
-            show_message(f"分类: {category.fullText} 处理时出错: {str(e)}", type="error")
+            #show_message(f"分类: {category.fullText} 处理时出错: {str(e)}", type="error")
         logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}")
     logging.info(f"同步[{KEY_PREFIX}]数据完成，成功数: {success_count}, 失败数: {failed_count}")
     return {

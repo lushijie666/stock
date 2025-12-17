@@ -209,20 +209,20 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
             lg = bs.login()
             logging.info(f"登录结果为, code: {lg.error_code}, msg: {lg.error_msg}")
 
-            logging.info(f"开始获取[{KEY_PREFIX}]数据..., 股票:{code}, 开始日期: {start_date}, 结束日期: {end_date}")
+            logging.info(f"开始获取[{KEY_PREFIX}][{t.text}]数据..., 股票:{code}, 开始日期: {start_date}, 结束日期: {end_date}")
             fields = fields.get(t)
             rs = bs.query_history_k_data_plus(category.get_full_code(code, "."),
                                             fields,
                                             start_date=start_date, end_date=end_date, frequency=t.bs_frequency, adjustflag="1")
-            logging.info( f"获取[{KEY_PREFIX}]数据结果为..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
+            logging.info( f"获取[{KEY_PREFIX}][{t.text}]数据结果为..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
             if rs.error_code != '0':
-                logging.error( f"获取[{KEY_PREFIX}]数据失败..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
+                logging.error( f"获取[{KEY_PREFIX}][{t.text}]数据失败..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
                 return None
             data_list = []
             while (rs.error_code == '0') & rs.next():
                 row_data = rs.get_row_data()
                 logging.info(
-                    f"获取[{KEY_PREFIX}]数据为..., 分类: {category.fullText}, 股票:{code}, 日期: {row_data[0]}, 信息为: {row_data}")
+                    f"获取[{KEY_PREFIX}][{t.text}]数据为..., 分类: {category.fullText}, 股票:{code}, 日期: {row_data[0]}, 信息为: {row_data}")
                 model_instance = None
                 if t == StockHistoryType.W:
                     model_instance = StockHistoryW(
@@ -281,11 +281,11 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
                         change=clean_numeric_value(row_data[10])
                     )
                 data_list.append(model_instance)
-            logging.info( f"获取[{KEY_PREFIX}]数据成功..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, 共{len(data_list)}条记录")
+            logging.info( f"获取[{KEY_PREFIX}][{t.text}]数据成功..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, 共{len(data_list)}条记录")
             bs.logout()
         return data_list
     except Exception as e:
-        logging.error(f"获取[{KEY_PREFIX}]数据异常: {str(e)}")
+        logging.error(f"获取[{KEY_PREFIX}][{t.text}]数据异常: {str(e)}")
         # 确保在异常情况下也能正确登出
         with _baostock_lock:
             bs.logout()
@@ -310,14 +310,14 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
     # 转换为字符串格式
     start_date_str = start_date.strftime('%Y-%m-%d')
     end_date_str = end_date.strftime('%Y-%m-%d')
-    logging.info(f"开始同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
+    logging.info(f"开始同步[{KEY_PREFIX}][{t.text}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
     
     # 收集所有需要同步的任务
     tasks = []
     categories = Category.get_all()
     
     for category in categories:
-        logging.info(f"开始同步[{KEY_PREFIX}]数据，分类: {category.fullText}")
+        logging.info(f"开始同步[{KEY_PREFIX}][{t.text}]数据，分类: {category.fullText}")
         codes = get_codes(category)
         if not is_all:
             codes = get_followed_codes(category)
@@ -328,7 +328,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
     
     # 获取总任务数
     total_tasks = len(tasks)
-    logging.info(f"总共有 {total_tasks} 个股票需要同步")
+    logging.info(f"同步[{KEY_PREFIX}][{t.text}]数据, 总共有 {total_tasks} 个股票需要同步")
     
     # 定义单个股票同步的工作函数
     def sync_single_stock(task):
@@ -350,7 +350,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
                 success_count += 1
                 processed_count += 1
                 remaining = total_tasks - processed_count
-            logging.info(f"股票: {code} 处理完成，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
+            logging.info(f"股票: {code} 处理[{KEY_PREFIX}][{t.text}]数据完成，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
             return True, code, None
         except Exception as e:
             # 计算单个股票处理耗时
@@ -359,7 +359,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
                 failed_count += 1
                 processed_count += 1
                 remaining = total_tasks - processed_count
-            logging.error(f"股票: {code} 处理时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
+            logging.error(f"股票: {code} 处理[{KEY_PREFIX}][{t.text}]数据时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
             return False, code, error_msg
     
     # 使用线程池并行处理任务
@@ -386,7 +386,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
     
     # 计算总耗时
     total_elapsed_time = time.time() - total_start_time
-    logging.info(f"完成同步[{KEY_PREFIX}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
+    logging.info(f"完成同步[{KEY_PREFIX}][{t.text}]数据, 时间范围：{start_date_str} 至 {end_date_str}")
     logging.info(f"总处理股票数: {total_tasks}, 成功: {success_count}, 失败: {failed_count}")
     logging.info(f"总耗时: {total_elapsed_time:.2f}秒, 平均每个股票耗时: {total_elapsed_time/total_tasks:.2f}秒")
     return {
