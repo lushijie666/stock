@@ -7,6 +7,7 @@ class Category(StrEnum):
     A_SH = ("A_SH", "沪A", "「A股-上证」")
     A_SZ = ("A_SZ", "深A", "「A股-深证」")
     A_BJ = ("A_BJ", "京A", "「A股-北证」")
+    US_XX = ("US_XX", "美股", "「美股」")
     X_XX = ("X_XX", "其他", "「其他」")
 
     def __new__(cls, value, code, text):
@@ -31,6 +32,7 @@ class Category(StrEnum):
             Category.A_SH: "sh",
             Category.A_SZ: "sz",
             Category.A_BJ: "bj",
+            Category.US_XX: "",
         }
         prefix = prefix_map.get(self, "")
         if not prefix:
@@ -69,6 +71,11 @@ class Category(StrEnum):
         # 北京证券交易所
         elif code.startswith(('8', '43', '83', '87', '88', '920')):  # 北交所股票 + 新三板做市
             return cls.A_BJ
+        # 美股代码特征（可根据实际情况调整）
+        elif any(code.endswith(suffix) for suffix in ['W', 'R', 'Z', 'Q']) or \
+             (len(code) >= 1 and code[0].isalpha()) or \
+             ('.' in code and any(x.isalpha() for x in code.split('.')[0])):
+            return cls.US_XX
         # 其他特殊情况（如债券、REITs等）
         elif code.startswith(('10', '11', '12', '13')):  # 沪/深债券（需进一步细分）
             return cls.X_XX
@@ -80,10 +87,19 @@ class Category(StrEnum):
     def parse_full_code(cls, full_code: str) -> Tuple['Category', str]:
         if not full_code or len(full_code) < 3:
             return cls.X_XX, ""
+        # 处理美股代码（通常没有前缀）
+        if not full_code.startswith(('sh', 'sz', 'bj')):
+            code = full_code
+            category = cls.from_stock_code(code)
+            return category, code
+
+        # 处理A股代码
+        if len(full_code) < 3:
+            return cls.X_XX, ""
         code = full_code[2:]
         category = cls.from_stock_code(code)
         return category, code
 
     @classmethod
     def get_all(cls) -> List['Category']:
-        return [cls.A_SH, cls.A_SZ, cls.A_BJ, cls.X_XX]
+        return [cls.A_SH, cls.A_SZ, cls.A_BJ, cls.US_XX, cls.X_XX]

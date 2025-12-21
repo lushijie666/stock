@@ -489,6 +489,57 @@ def fetch(category: Category) -> list:
                     logging.error(f"获取[{KEY_PREFIX}]到的数据异常, 信息: {row}, 错误: {str(row_error)}")
                     continue
             return data
+        # 处理美股数据
+        elif category == Category.US_XX:
+            logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
+            df = ak.stock_us_spot_em()
+            logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, 共 {len(df)} 条记录")
+            data = []
+            for i, row in df.iterrows():
+                #logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {row}")
+                try:
+                    raw_code = row.get("代码", "")
+                    if not raw_code or pd.isna(raw_code):
+                        logging.warning(f"跳过无效美股数据，第{i}行，代码为空")
+                        continue
+
+                    # 从 akshare 返回的数据中提取代码，清理格式
+                    if '.' in str(raw_code):
+                        code = str(raw_code).split('.', 1)[1]  # 提取 'NXLIW' 部分
+                    else:
+                        code = str(raw_code)
+
+                    # 添加数据验证，跳过空代码或无效数据
+                    if not code or code.strip() == '':
+                        logging.warning(f"跳过无效美股数据，第{i}行，代码为空")
+                        continue
+
+                    # 检查是否已存在相同代码的数据（避免重复）
+                    if any(existing_stock.code == code for existing_stock in data):
+                        logging.warning(f"跳过重复美股数据，代码: {code}")
+                        continue
+
+                    name = row.get("名称", "")
+                    if not name or pd.isna(name):
+                        logging.warning(f"跳过无效美股数据，第{i}行，名称为空")
+                        continue
+                    s = Stock(
+                        category=category,
+                        code=code,
+                        name=clean_name(str(name)),
+                        full_name=str(name),  # 美股通常名称即为全称
+                        ipo_at=None,  # 美股数据中可能没有上市时间
+                        total_capital=None,  # 美股数据格式不同，需要特殊处理
+                        flow_capital=None,
+                        industry=row.get("所属行业", ""),  # 如果存在的话
+                    )
+                    s.pinyin = s.generate_pinyin()
+                    logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {s}")
+                    data.append(s)
+                except Exception as row_error:
+                    logging.error(f"获取[{KEY_PREFIX}]到的数据异常, 信息: {row}, 错误: {str(row_error)}")
+                    continue
+            return data
         return None
     except Exception as e:
         logging.error(f"获取[{KEY_PREFIX}]到的数据异常: {str(e)}")

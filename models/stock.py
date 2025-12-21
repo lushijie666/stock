@@ -47,6 +47,8 @@ class Stock(Base):
                 f"industry='{self.industry}', pinyin='{self.pinyin}')")
 
     def generate_pinyin(self):
+        if self.category == Category.US_XX:
+            return self.code
         """生成拼音"""
         # 完整拼音
         full_pinyin = ''.join(lazy_pinyin(self.name))

@@ -42,4 +42,9 @@ def format_volume(value: float) -> str:
 
 
 def format_pinyin_short(value):
-    return value.split(',')[1] if value else ''
+    if not value:
+        return value
+    parts = value.split(',')
+    if len(parts) >= 2 and parts[1]:
+        return parts[1]
+    return value

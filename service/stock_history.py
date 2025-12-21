@@ -1,5 +1,8 @@
 # 历史行情
-import pandas as pd
+import os
+
+import yfinance as yf
+import akshare as ak
 import streamlit as st
 import logging
 import threading
@@ -11,6 +14,7 @@ from sqlalchemy.orm import Session
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 import time
+import random
 from enums.category import Category
 from enums.history_type import StockHistoryType
 
@@ -23,8 +27,10 @@ from utils.db import get_db_session
 
 from utils.message import show_message
 from utils.pagination import paginate_dataframe, SearchConfig, SearchField, ActionButton, ActionConfig
+from utils.retry import retry_with_backoff, RATE_LIMIT_RETRY_CONFIG
 from utils.session import get_session_key, SessionKeys, get_date_range
 from utils.table import  format_percent, format_volume
+from utils.rate_limiter import get_rate_limiter, RateLimiterConfig, BALANCED_CONFIG
 
 KEY_PREFIX = "stock_history"
 
@@ -186,10 +192,6 @@ def _create_history_handler(t: StockHistoryType):
         with_date_range=True
     )
 
-# 为baostock API创建线程锁，确保同一时间只有一个线程在使用API
-_baostock_lock = threading.Lock()
-
-
 
 def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> list:
     # 拉取 http://www.baostock.com/mainContent?file=stockKData.md
@@ -197,6 +199,16 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
     if category == Category.X_XX or category == Category.A_BJ: # 暂不支持这两种
         logging.info(f"获取[{KEY_PREFIX}]数据暂不支持..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}")
         return []
+    if category == Category.US_XX:
+        return _fetch_us_stock_data(code, start_date, end_date, t)
+    return _fetch_a_stock_data(code, start_date, end_date, t)
+
+
+
+_baostock_lock = threading.Lock()
+def _fetch_a_stock_data(code: str, start_date: str, end_date: str, t: StockHistoryType) -> list:
+    # 拉取 http://www.baostock.com/mainContent?file=stockKData.md
+    category = Category.from_stock_code(code)
     fields = {
         StockHistoryType.D: "date,code,open,high,low,close,volume,amount,adjustflag,turn,pctChg",
         StockHistoryType.W: "date,code,open,high,low,close,volume,amount,adjustflag,turn,pctChg",
@@ -209,14 +221,18 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
             lg = bs.login()
             logging.info(f"登录结果为, code: {lg.error_code}, msg: {lg.error_msg}")
 
-            logging.info(f"开始获取[{KEY_PREFIX}][{t.text}]数据..., 股票:{code}, 开始日期: {start_date}, 结束日期: {end_date}")
+            logging.info(
+                f"开始获取[{KEY_PREFIX}][{t.text}]数据..., 股票:{code}, 开始日期: {start_date}, 结束日期: {end_date}")
             fields = fields.get(t)
             rs = bs.query_history_k_data_plus(category.get_full_code(code, "."),
-                                            fields,
-                                            start_date=start_date, end_date=end_date, frequency=t.bs_frequency, adjustflag="1")
-            logging.info( f"获取[{KEY_PREFIX}][{t.text}]数据结果为..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
+                                              fields,
+                                              start_date=start_date, end_date=end_date, frequency=t.bs_frequency,
+                                              adjustflag="1")
+            logging.info(
+                f"获取[{KEY_PREFIX}][{t.text}]数据结果为..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
             if rs.error_code != '0':
-                logging.error( f"获取[{KEY_PREFIX}][{t.text}]数据失败..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
+                logging.error(
+                    f"获取[{KEY_PREFIX}][{t.text}]数据失败..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
                 return None
             data_list = []
             while (rs.error_code == '0') & rs.next():
@@ -263,8 +279,8 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
                         closing=clean_numeric_value(row_data[6]),
                         turnover_count=clean_numeric_value(row_data[7]),
                         turnover_amount=clean_numeric_value(row_data[8]),
-                        #turnover_ratio=row_data[9],
-                        #change=row_data[9]
+                        # turnover_ratio=row_data[9],
+                        # change=row_data[9]
                     )
                 else:
                     model_instance = StockHistoryD(
@@ -281,7 +297,8 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
                         change=clean_numeric_value(row_data[10])
                     )
                 data_list.append(model_instance)
-            logging.info( f"获取[{KEY_PREFIX}][{t.text}]数据成功..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, 共{len(data_list)}条记录")
+            logging.info(
+                f"获取[{KEY_PREFIX}][{t.text}]数据成功..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, 共{len(data_list)}条记录")
             bs.logout()
         return data_list
     except Exception as e:
@@ -290,6 +307,144 @@ def fetch(code: str, start_date: str, end_date: str, t: StockHistoryType) -> lis
         with _baostock_lock:
             bs.logout()
         return data_list
+
+
+
+# 美股数据获取使用通用限流器
+# 使用平衡模式配置（可根据需要调整为 AGGRESSIVE_CONFIG 或 CONSERVATIVE_CONFIG）
+_us_stock_limiter = get_rate_limiter("akshare_us_stock", BALANCED_CONFIG)
+
+def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHistoryType) -> list:
+    """使用 akshare 抓取美股数据（东财数据源，国内网络友好）"""
+    def _fetch_data():
+        # 使用通用限流器：请求前智能等待
+        _us_stock_limiter.wait_before_request()
+
+        logging.info(f"开始获取美股[{KEY_PREFIX}][{t.text}]数据..., 股票:{code}, 开始日期: {start_date}, 结束日期: {end_date}")
+
+        # akshare 需要带前缀的股票代码（如 105.AAPL）
+        # 根据测试，大部分美股使用 105 前缀
+        symbol = f"105.{code}"
+
+        # 周期映射
+        period_map = {
+            StockHistoryType.D: "daily",
+            StockHistoryType.W: "weekly",
+            StockHistoryType.M: "monthly",
+            StockHistoryType.THIRTY_M: "30"  # 30分钟
+        }
+
+        period = period_map.get(t, "daily")
+
+        # 转换日期格式：YYYY-MM-DD -> YYYYMMDD
+        start_date_fmt = start_date.replace('-', '')
+        end_date_fmt = end_date.replace('-', '')
+        try:
+            # 获取历史数据
+            df = ak.stock_us_hist(
+                symbol=symbol,
+                period=period,
+                start_date=start_date_fmt,
+                end_date=end_date_fmt,
+                adjust="hfq"
+            )
+            if df is None or df.empty:
+                logging.warning(f"获取美股[{KEY_PREFIX}][{t.text}]数据为空, 股票: {code}, symbol: {symbol}")
+                # 数据为空也算成功（可能是该时间段没有交易数据）
+                _us_stock_limiter.handle_success()
+                return []
+
+            # 请求成功，重置失败计数
+            _us_stock_limiter.handle_success()
+
+            data_list = []
+            for index, row in df.iterrows():
+                # akshare 返回的字段：日期、开盘、收盘、最高、最低、成交量、成交额、振幅、涨跌幅、涨跌额、换手率
+                date_str = str(row['日期'])
+
+                # 根据不同的时间类型创建相应的模型实例
+                model_instance = None
+                if t == StockHistoryType.W:
+                    model_instance = StockHistoryW(
+                        category=Category.US_XX,
+                        code=code,
+                        date=date_str,
+                        opening=clean_numeric_value(row['开盘']),
+                        highest=clean_numeric_value(row['最高']),
+                        lowest=clean_numeric_value(row['最低']),
+                        closing=clean_numeric_value(row['收盘']),
+                        turnover_count=clean_numeric_value(row['成交量']),
+                        turnover_amount=clean_numeric_value(row['成交额']),
+                        turnover_ratio=clean_numeric_value(row['换手率']),
+                        change=clean_numeric_value(row['涨跌幅'])
+                    )
+                elif t == StockHistoryType.M:
+                    model_instance = StockHistoryM(
+                        category=Category.US_XX,
+                        code=code,
+                        date=date_str,
+                        opening=clean_numeric_value(row['开盘']),
+                        highest=clean_numeric_value(row['最高']),
+                        lowest=clean_numeric_value(row['最低']),
+                        closing=clean_numeric_value(row['收盘']),
+                        turnover_count=clean_numeric_value(row['成交量']),
+                        turnover_amount=clean_numeric_value(row['成交额']),
+                        turnover_ratio=clean_numeric_value(row['换手率']),
+                        change=clean_numeric_value(row['涨跌幅'])
+                    )
+                elif t == StockHistoryType.THIRTY_M:
+                    # 对于30分钟数据，日期字段可能包含时间
+                    model_instance = StockHistory30M(
+                        category=Category.US_XX,
+                        code=code,
+                        date=date_str,
+                        opening=clean_numeric_value(row['开盘']),
+                        highest=clean_numeric_value(row['最高']),
+                        lowest=clean_numeric_value(row['最低']),
+                        closing=clean_numeric_value(row['收盘']),
+                        turnover_count=clean_numeric_value(row['成交量']),
+                        turnover_amount=clean_numeric_value(row.get('成交额')),  # 30分钟可能没有成交额
+                    )
+                else:  # 日线数据
+                    model_instance = StockHistoryD(
+                        category=Category.US_XX,
+                        code=code,
+                        date=date_str,
+                        opening=clean_numeric_value(row['开盘']),
+                        highest=clean_numeric_value(row['最高']),
+                        lowest=clean_numeric_value(row['最低']),
+                        closing=clean_numeric_value(row['收盘']),
+                        turnover_count=clean_numeric_value(row['成交量']),
+                        turnover_amount=clean_numeric_value(row['成交额']),
+                        turnover_ratio=clean_numeric_value(row['换手率']),
+                        change=clean_numeric_value(row['涨跌幅'])
+                    )
+                data_list.append(model_instance)
+            logging.info(
+                f"获取美股[{KEY_PREFIX}][{t.text}]数据成功..., 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, 共{len(data_list)}条记录")
+            return data_list
+
+        except Exception as e:
+            # 请求失败，触发冷却机制
+            _us_stock_limiter.handle_failure()
+            logging.error(f"获取美股[{KEY_PREFIX}][{t.text}]数据异常: {str(e)}, 股票: {code}")
+            raise  # 重新抛出异常，让重试机制处理
+
+    try:
+        # 使用重试工具处理频率限制问题
+        return retry_with_backoff(
+            func=_fetch_data,
+            max_retries=RATE_LIMIT_RETRY_CONFIG.max_retries,
+            base_delay=RATE_LIMIT_RETRY_CONFIG.base_delay,
+            max_delay=RATE_LIMIT_RETRY_CONFIG.max_delay,
+            backoff_factor=RATE_LIMIT_RETRY_CONFIG.backoff_factor,
+            jitter=RATE_LIMIT_RETRY_CONFIG.jitter,
+            exceptions=(Exception,),
+            logger=logging
+        )
+    except Exception as e:
+        logging.error(f"获取美股[{KEY_PREFIX}][{t.text}]数据异常: {str(e)}")
+        return []
 
 def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> Dict[str, Any]:
     # 使用线程安全的计数器
@@ -315,29 +470,29 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
     # 收集所有需要同步的任务
     tasks = []
     categories = Category.get_all()
-    
+
     for category in categories:
         logging.info(f"开始同步[{KEY_PREFIX}][{t.text}]数据，分类: {category.fullText}")
         codes = get_codes(category)
         if not is_all:
             codes = get_followed_codes(category)
-        
+
         # 为每个股票代码创建任务
         for code in codes:
             tasks.append((code, category, start_date_str, end_date_str, t))
-    
+
     # 获取总任务数
     total_tasks = len(tasks)
     logging.info(f"同步[{KEY_PREFIX}][{t.text}]数据, 总共有 {total_tasks} 个股票需要同步")
-    
+
     # 定义单个股票同步的工作函数
     def sync_single_stock(task):
         code, category, start_date_str, end_date_str, t = task
         nonlocal success_count, failed_count, processed_count
-        
+
         # 记录单个股票开始时间
         stock_start_time = time.time()
-        
+
         try:
             # 每个线程使用独立的数据库会话
             with get_db_session() as session:
@@ -345,7 +500,7 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
 
             # 计算单个股票处理耗时
             stock_elapsed_time = time.time() - stock_start_time
-            
+
             with count_lock:
                 success_count += 1
                 processed_count += 1
@@ -359,12 +514,22 @@ def sync(t: StockHistoryType, is_all: bool, start_date=None, end_date=None) -> D
                 failed_count += 1
                 processed_count += 1
                 remaining = total_tasks - processed_count
-            logging.error(f"股票: {code} 处理[{KEY_PREFIX}][{t.text}]数据时出错: {str(e)}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
+            error_msg = str(e)
+            logging.error(f"股票: {code} 处理[{KEY_PREFIX}][{t.text}]数据时出错: {error_msg}，耗时: {stock_elapsed_time:.2f}秒，还剩 {remaining} 个股票")
             return False, code, error_msg
-    
-    # 使用线程池并行处理任务
-    max_workers = min(30, len(tasks) if tasks else 1)  # 设置最大线程数，避免资源耗尽
-    
+
+    # 防封策略：根据分类动态调整并发数
+    # 美股使用较低的并发数（因为 akshare 容易被限流）
+    # A股使用较高的并发数（因为 baostock 相对稳定）
+    us_stock_count = sum(1 for task in tasks if task[1] == Category.US_XX)
+    if us_stock_count > 0:
+        # 如果包含美股，使用低并发（串行或2-3个线程）
+        max_workers = min(3, len(tasks) if tasks else 1)
+        logging.info(f"检测到 {us_stock_count} 只美股，降低并发数至 {max_workers} 以防止被封")
+    else:
+        # 纯A股数据，使用正常并发
+        max_workers = min(30, len(tasks) if tasks else 1)
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任务
         future_to_task = {executor.submit(sync_single_stock, task): task for task in tasks}
