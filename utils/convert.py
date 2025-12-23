@@ -1,6 +1,6 @@
 # 定义字段映射
 import datetime
-from datetime import datetime
+from datetime import datetime, time
 
 import logging
 from datetime import date
@@ -87,9 +87,11 @@ def date_range_filter(query: Query, field: str, value: date, date_field: str = '
     """日期范围过滤函数"""
     column = getattr(query.column_descriptions[0]['type'], date_field)  # 使用实际的日期字段名
     if field == 'start_date':
-        return query.filter(column >= value)
+        start_datetime = datetime.combine(value, time.min)
+        return query.filter(column >= start_datetime)
     elif field == 'end_date':
-        return query.filter(column <= value)
+        end_datetime = datetime.combine(value, time.max)
+        return query.filter(column <= end_datetime)
     return query
 
 
@@ -240,3 +242,17 @@ def format_date_by_type(date_value, t: StockHistoryType):
         return date_obj.strftime('%Y-%m-%d %H:%M')
     else:
         return date_obj.strftime('%Y-%m-%d')
+
+def extend_end_date(end_date):
+    """
+    将结束日期扩展到当天的最后一刻
+    - 对于字符串日期(YYYY-MM-DD)，扩展为 YYYY-MM-DD 23:59:59
+    - 对于date对象，扩展为datetime对象的23:59:59
+    - 对于datetime对象，保持不变
+    """
+    if isinstance(end_date, str) and len(end_date) == 10:  # YYYY-MM-DD
+        return f"{end_date} 23:59:59"
+    elif isinstance(end_date, date) and not isinstance(end_date, datetime):
+        return datetime.combine(end_date, time.max)
+    else:
+        return end_date

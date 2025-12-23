@@ -1,3 +1,4 @@
+from datetime import datetime, time
 
 import streamlit as st
 import pandas as pd
@@ -170,7 +171,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                 model.code == stock.code,
                 model.removed == False,
                 model.date >= start_date,
-                model.date <= end_date
+                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
             ).order_by(model.date)
 
             # 读取数据到DataFrame
@@ -367,7 +368,7 @@ def show_kline_process_chart(stock, t: StockHistoryType):
                 model.code == stock.code,
                 model.removed == False,
                 model.date >= start_date,
-                model.date <= end_date
+                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
             ).order_by(model.date)
 
             # 读取数据到DataFrame
@@ -617,7 +618,7 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                 model.code == stock.code,
                 model.removed == False,
                 model.date >= start_date,
-                model.date <= end_date
+                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
             ).order_by(model.date)
 
             # 读取数据到DataFrame
@@ -759,7 +760,7 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
                 model.code == stock.code,
                 model.removed == False,
                 model.date >= start_date,
-                model.date <= end_date
+                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
             ).order_by(model.date)
 
             # 读取数据到DataFrame

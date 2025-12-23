@@ -122,7 +122,7 @@ def show_page(category: Category, t: StockHistoryType):
                             default=date.today() - timedelta(days=365),
                             max_date=date.today(),
                             placeholder="输入开始日期",
-                            filter_func=lambda q, v: q.filter(model.date >= v) if v else q
+                            filter_func=lambda q, v: q.filter(model.date >= datetime.combine(v, datetime.min.time())) if v else q
                         ),
                         SearchField(
                             field="end_date",
@@ -131,8 +131,7 @@ def show_page(category: Category, t: StockHistoryType):
                             default=date.today(),
                             max_date=date.today(),
                             placeholder="输入结束日期",
-                            filter_func=lambda q, v: q.filter(model.date <= v) if v else q
-                        )
+                            filter_func=lambda q, v: q.filter(model.date <= datetime.combine(v, datetime.max.time())) if v else q                        )
                     ],
                     layout=[1, 1, 1, 1]
                 ),

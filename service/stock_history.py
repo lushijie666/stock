@@ -21,7 +21,8 @@ from enums.history_type import StockHistoryType
 
 from service.stock import get_codes, get_followed_codes
 from utils.background_task import BackgroundTaskExecutor
-from utils.convert import date_range_filter, parse_baostock_datetime, clean_numeric_value, format_date_by_type
+from utils.convert import date_range_filter, parse_baostock_datetime, clean_numeric_value, format_date_by_type, \
+    extend_end_date
 from utils.fetch_handler import create_reload_handler
 from models.stock_history import get_history_model, StockHistoryW, StockHistoryD, StockHistoryM,StockHistory30M
 from utils.db import get_db_session
@@ -179,6 +180,7 @@ def _create_history_handler(t: StockHistoryType):
         code = args.get('code')
         start_date = args.get('start_date')
         end_date = args.get('end_date')
+        end_date = extend_end_date(end_date)
         return [
             model.code == code,
             model.date >= start_date,
