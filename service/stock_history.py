@@ -364,6 +364,27 @@ def _aggregate_minute_to_30min(df: pd.DataFrame) -> pd.DataFrame:
     # 重置索引，将时间列恢复
     df_30min.reset_index(inplace=True)
 
+    # 处理开盘价为0的情况：用前一条记录的收盘价代替
+    # 使用 shift() 获取前一行的收盘价
+    df_30min['前收盘'] = df_30min['收盘'].shift(1)
+
+    # 记录需要修复的数量（用于日志）
+    zero_open_count = (df_30min['开盘'] == 0).sum()
+
+    # 当开盘价为0时，使用前一条的收盘价
+    # 第一条记录如果开盘价为0，则使用当前的收盘价（因为没有前一条）
+    df_30min['开盘'] = df_30min.apply(
+        lambda row: row['前收盘'] if row['开盘'] == 0 and pd.notna(row['前收盘'])
+                    else (row['收盘'] if row['开盘'] == 0 else row['开盘']),
+        axis=1
+    )
+
+    # 删除临时列
+    df_30min.drop(columns=['前收盘'], inplace=True)
+
+    if zero_open_count > 0:
+        logging.info(f"修复了 {zero_open_count} 条开盘价为0的记录（使用前一条收盘价）")
+
     logging.info(f"聚合分钟数据: 原始 {len(df)} 条 → 30分钟 {len(df_30min)} 条")
 
     return df_30min
@@ -422,7 +443,7 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                     period=period,
                     start_date=start_date_fmt,
                     end_date=end_date_fmt,
-                    adjust=""  # 不复权（与A股保持一致）
+                    adjust="hfq"
                 )
             if df is None or df.empty:
                 logging.warning(f"获取美股[{KEY_PREFIX}][{t.text}]数据为空, 股票: {code}, symbol: {symbol}")
