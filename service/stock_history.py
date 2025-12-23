@@ -3,6 +3,7 @@ import os
 
 import yfinance as yf
 import akshare as ak
+import pandas as pd
 import streamlit as st
 import logging
 import threading
@@ -314,6 +315,60 @@ def _fetch_a_stock_data(code: str, start_date: str, end_date: str, t: StockHisto
 # 使用平衡模式配置（可根据需要调整为 AGGRESSIVE_CONFIG 或 CONSERVATIVE_CONFIG）
 _us_stock_limiter = get_rate_limiter("akshare_us_stock", BALANCED_CONFIG)
 
+
+def _aggregate_minute_to_30min(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    将1分钟数据聚合为30分钟数据
+
+    Args:
+        df: 1分钟数据，包含列：时间、开盘、收盘、最高、最低、成交量、成交额
+
+    Returns:
+        30分钟聚合数据
+    """
+    if df is None or df.empty:
+        return df
+
+    # 确保时间列是 datetime 类型
+    df['时间'] = pd.to_datetime(df['时间'])
+
+    # 设置时间为索引
+    df.set_index('时间', inplace=True)
+
+    # 按30分钟重采样
+    # 开盘价：取第一个值
+    # 最高价：取最大值
+    # 最低价：取最小值
+    # 收盘价：取最后一个值
+    # 成交量：求和
+    # 成交额：求和
+    agg_rules = {
+        '开盘': 'first',
+        '最高': 'max',
+        '最低': 'min',
+        '收盘': 'last',
+        '成交量': 'sum',
+        '成交额': 'sum',
+    }
+
+    # 如果有最新价，也聚合
+    if '最新价' in df.columns:
+        agg_rules['最新价'] = 'last'
+
+    # 重采样为30分钟
+    df_30min = df.resample('30min').agg(agg_rules)
+
+    # 移除空值行（可能在某些时间段没有交易）
+    df_30min = df_30min.dropna()
+
+    # 重置索引，将时间列恢复
+    df_30min.reset_index(inplace=True)
+
+    logging.info(f"聚合分钟数据: 原始 {len(df)} 条 → 30分钟 {len(df_30min)} 条")
+
+    return df_30min
+
+
 def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHistoryType) -> list:
     """使用 akshare 抓取美股数据（东财数据源，国内网络友好）"""
     def _fetch_data():
@@ -326,28 +381,49 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
         # 根据测试，大部分美股使用 105 前缀
         symbol = f"105.{code}"
 
-        # 周期映射
-        period_map = {
-            StockHistoryType.D: "daily",
-            StockHistoryType.W: "weekly",
-            StockHistoryType.M: "monthly",
-            StockHistoryType.THIRTY_M: "30"  # 30分钟
-        }
-
-        period = period_map.get(t, "daily")
-
-        # 转换日期格式：YYYY-MM-DD -> YYYYMMDD
-        start_date_fmt = start_date.replace('-', '')
-        end_date_fmt = end_date.replace('-', '')
         try:
-            # 获取历史数据
-            df = ak.stock_us_hist(
-                symbol=symbol,
-                period=period,
-                start_date=start_date_fmt,
-                end_date=end_date_fmt,
-                adjust="hfq"
-            )
+            # 30分钟数据使用分时接口
+            if t == StockHistoryType.THIRTY_M:
+                # stock_us_hist_min_em 返回1分钟数据，需要指定时间范围
+                # 格式: YYYY-MM-DD HH:MM:SS
+                start_datetime = f"{start_date} 00:00:00"
+                end_datetime = f"{end_date} 23:59:59"
+
+                df = ak.stock_us_hist_min_em(
+                    symbol=symbol,
+                    start_date=start_datetime,
+                    end_date=end_datetime
+                )
+
+                if df is None or df.empty:
+                    logging.warning(f"获取美股[{KEY_PREFIX}][{t.text}]分时数据为空, 股票: {code}, symbol: {symbol}")
+                    _us_stock_limiter.handle_success()
+                    return []
+
+                # 将1分钟数据聚合为30分钟数据
+                df = _aggregate_minute_to_30min(df)
+
+            else:
+                # 日线、周线、月线使用 stock_us_hist 接口
+                period_map = {
+                    StockHistoryType.D: "daily",
+                    StockHistoryType.W: "weekly",
+                    StockHistoryType.M: "monthly",
+                }
+
+                period = period_map.get(t, "daily")
+
+                # 转换日期格式：YYYY-MM-DD -> YYYYMMDD
+                start_date_fmt = start_date.replace('-', '')
+                end_date_fmt = end_date.replace('-', '')
+
+                df = ak.stock_us_hist(
+                    symbol=symbol,
+                    period=period,
+                    start_date=start_date_fmt,
+                    end_date=end_date_fmt,
+                    adjust=""  # 不复权（与A股保持一致）
+                )
             if df is None or df.empty:
                 logging.warning(f"获取美股[{KEY_PREFIX}][{t.text}]数据为空, 股票: {code}, symbol: {symbol}")
                 # 数据为空也算成功（可能是该时间段没有交易数据）
@@ -359,41 +435,18 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
 
             data_list = []
             for index, row in df.iterrows():
-                # akshare 返回的字段：日期、开盘、收盘、最高、最低、成交量、成交额、振幅、涨跌幅、涨跌额、换手率
-                date_str = str(row['日期'])
-
                 # 根据不同的时间类型创建相应的模型实例
                 model_instance = None
-                if t == StockHistoryType.W:
-                    model_instance = StockHistoryW(
-                        category=Category.US_XX,
-                        code=code,
-                        date=date_str,
-                        opening=clean_numeric_value(row['开盘']),
-                        highest=clean_numeric_value(row['最高']),
-                        lowest=clean_numeric_value(row['最低']),
-                        closing=clean_numeric_value(row['收盘']),
-                        turnover_count=clean_numeric_value(row['成交量']),
-                        turnover_amount=clean_numeric_value(row['成交额']),
-                        turnover_ratio=clean_numeric_value(row['换手率']),
-                        change=clean_numeric_value(row['涨跌幅'])
-                    )
-                elif t == StockHistoryType.M:
-                    model_instance = StockHistoryM(
-                        category=Category.US_XX,
-                        code=code,
-                        date=date_str,
-                        opening=clean_numeric_value(row['开盘']),
-                        highest=clean_numeric_value(row['最高']),
-                        lowest=clean_numeric_value(row['最低']),
-                        closing=clean_numeric_value(row['收盘']),
-                        turnover_count=clean_numeric_value(row['成交量']),
-                        turnover_amount=clean_numeric_value(row['成交额']),
-                        turnover_ratio=clean_numeric_value(row['换手率']),
-                        change=clean_numeric_value(row['涨跌幅'])
-                    )
-                elif t == StockHistoryType.THIRTY_M:
-                    # 对于30分钟数据，日期字段可能包含时间
+
+                # 30分钟数据的字段名不同（来自分时接口）
+                if t == StockHistoryType.THIRTY_M:
+                    # 分时接口返回字段：时间、开盘、收盘、最高、最低、成交量、成交额
+                    # 注意：时间列可能是索引，也可能是普通列
+                    if '时间' in row:
+                        date_str = str(row['时间'])
+                    else:
+                        date_str = str(index)
+
                     model_instance = StockHistory30M(
                         category=Category.US_XX,
                         code=code,
@@ -403,22 +456,54 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                         lowest=clean_numeric_value(row['最低']),
                         closing=clean_numeric_value(row['收盘']),
                         turnover_count=clean_numeric_value(row['成交量']),
-                        turnover_amount=clean_numeric_value(row.get('成交额')),  # 30分钟可能没有成交额
+                        turnover_amount=clean_numeric_value(row.get('成交额')),
                     )
-                else:  # 日线数据
-                    model_instance = StockHistoryD(
-                        category=Category.US_XX,
-                        code=code,
-                        date=date_str,
-                        opening=clean_numeric_value(row['开盘']),
-                        highest=clean_numeric_value(row['最高']),
-                        lowest=clean_numeric_value(row['最低']),
-                        closing=clean_numeric_value(row['收盘']),
-                        turnover_count=clean_numeric_value(row['成交量']),
-                        turnover_amount=clean_numeric_value(row['成交额']),
-                        turnover_ratio=clean_numeric_value(row['换手率']),
-                        change=clean_numeric_value(row['涨跌幅'])
-                    )
+                else:
+                    # 日线、周线、月线数据字段：日期、开盘、收盘、最高、最低、成交量、成交额、振幅、涨跌幅、涨跌额、换手率
+                    date_str = str(row['日期'])
+
+                    if t == StockHistoryType.W:
+                        model_instance = StockHistoryW(
+                            category=Category.US_XX,
+                            code=code,
+                            date=date_str,
+                            opening=clean_numeric_value(row['开盘']),
+                            highest=clean_numeric_value(row['最高']),
+                            lowest=clean_numeric_value(row['最低']),
+                            closing=clean_numeric_value(row['收盘']),
+                            turnover_count=clean_numeric_value(row['成交量']),
+                            turnover_amount=clean_numeric_value(row['成交额']),
+                            turnover_ratio=clean_numeric_value(row['换手率']),
+                            change=clean_numeric_value(row['涨跌幅'])
+                        )
+                    elif t == StockHistoryType.M:
+                        model_instance = StockHistoryM(
+                            category=Category.US_XX,
+                            code=code,
+                            date=date_str,
+                            opening=clean_numeric_value(row['开盘']),
+                            highest=clean_numeric_value(row['最高']),
+                            lowest=clean_numeric_value(row['最低']),
+                            closing=clean_numeric_value(row['收盘']),
+                            turnover_count=clean_numeric_value(row['成交量']),
+                            turnover_amount=clean_numeric_value(row['成交额']),
+                            turnover_ratio=clean_numeric_value(row['换手率']),
+                            change=clean_numeric_value(row['涨跌幅'])
+                        )
+                    else:  # 日线数据
+                        model_instance = StockHistoryD(
+                            category=Category.US_XX,
+                            code=code,
+                            date=date_str,
+                            opening=clean_numeric_value(row['开盘']),
+                            highest=clean_numeric_value(row['最高']),
+                            lowest=clean_numeric_value(row['最低']),
+                            closing=clean_numeric_value(row['收盘']),
+                            turnover_count=clean_numeric_value(row['成交量']),
+                            turnover_amount=clean_numeric_value(row['成交额']),
+                            turnover_ratio=clean_numeric_value(row['换手率']),
+                            change=clean_numeric_value(row['涨跌幅'])
+                        )
                 data_list.append(model_instance)
             logging.info(
                 f"获取美股[{KEY_PREFIX}][{t.text}]数据成功..., 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, 共{len(data_list)}条记录")
