@@ -88,7 +88,7 @@ class TurtleStrategy(BaseStrategy):
             }
         )
 
-class CBRStrategy(BaseStrategy):
+class CBR_STRATEGY(BaseStrategy):
     """CBR (Confirmation-Based Reversal) 策略"""
     def __init__(self):
         super().__init__("CBR策略")
@@ -102,6 +102,84 @@ class CBRStrategy(BaseStrategy):
             metadata={
                 "description": "基于价格形态和MACD确认的反转策略",
                 "indicators_used": ["Price Pattern", "MACD"]
+            }
+        )
+
+
+class RSIStrategy(BaseStrategy):
+    """RSI策略 - 相对强弱指标"""
+    def __init__(self, period: int = 14, oversold: int = 30, overbought: int = 70):
+        super().__init__("RSI策略")
+        self.period = period
+        self.oversold = oversold
+        self.overbought = overbought
+
+    def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
+        signals = calculate_rsi_signals(
+            df,
+            period=self.period,
+            oversold=self.oversold,
+            overbought=self.overbought
+        )
+        return StrategyResult(
+            strategy_type=StrategyType.RSI_STRATEGY,
+            signals=signals,
+            metadata={
+                "description": f"基于RSI指标的超买超卖策略",
+                "period": self.period,
+                "oversold": self.oversold,
+                "overbought": self.overbought
+            }
+        )
+
+
+class BollingerStrategy(BaseStrategy):
+    """布林带策略"""
+    def __init__(self, period: int = 20, std_dev: float = 2.0):
+        super().__init__("布林带策略")
+        self.period = period
+        self.std_dev = std_dev
+
+    def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
+        signals = calculate_bollinger_signals(
+            df,
+            period=self.period,
+            std_dev=self.std_dev
+        )
+        return StrategyResult(
+            strategy_type=StrategyType.BOLL_STRATEGY,
+            signals=signals,
+            metadata={
+                "description": "基于布林带通道的突破策略",
+                "period": self.period,
+                "std_dev": self.std_dev
+            }
+        )
+
+
+class KDJStrategy(BaseStrategy):
+    """KDJ策略 - 随机指标"""
+    def __init__(self, n: int = 9, m1: int = 3, m2: int = 3):
+        super().__init__("KDJ策略")
+        self.n = n
+        self.m1 = m1
+        self.m2 = m2
+
+    def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
+        signals = calculate_kdj_signals(
+            df,
+            n=self.n,
+            m1=self.m1,
+            m2=self.m2
+        )
+        return StrategyResult(
+            strategy_type=StrategyType.KDJ_STRATEGY,
+            signals=signals,
+            metadata={
+                "description": "基于KDJ指标的超买超卖策略",
+                "n": self.n,
+                "m1": self.m1,
+                "m2": self.m2
             }
         )
 
@@ -560,10 +638,30 @@ def backtest_strategy(df, signals, initial_capital=100000.0, buy_ratios=None, se
 
 def calculate_strategy_metrics(df, signals):
     """
-    计算策略指标
+    计算策略指标（增强版）
+
+    返回：
+    - 总信号数
+    - 买入/卖出信号数
+    - 平均持股天数
+    - 胜率（盈利交易 / 总交易）
+    - 盈亏比（平均盈利 / 平均亏损）
+    - 最大连续盈利/亏损次数
     """
     if not signals:
-        return None
+        return {
+            'total_signals': 0,
+            'buy_signals': 0,
+            'sell_signals': 0,
+            'avg_holding_period': 0,
+            'win_rate': 0,
+            'profit_loss_ratio': 0,
+            'max_consecutive_wins': 0,
+            'max_consecutive_losses': 0,
+            'total_trades': 0,
+            'winning_trades': 0,
+            'losing_trades': 0
+        }
 
     # 按日期排序
     signals = sorted(signals, key=lambda x: x['date'])
@@ -572,9 +670,14 @@ def calculate_strategy_metrics(df, signals):
     buy_signals = [s for s in signals if s['type'] == SignalType.BUY]
     sell_signals = [s for s in signals if s['type'] == SignalType.SELL]
 
-    # 计算平均持股天数
+    # 计算平均持股天数和盈亏情况
     holding_periods = []
     buy_dates = {}
+    profits = []  # 每次交易的盈亏
+    consecutive_wins = 0
+    consecutive_losses = 0
+    max_consecutive_wins = 0
+    max_consecutive_losses = 0
 
     for signal in signals:
         if signal['type'] == SignalType.BUY:
@@ -583,18 +686,55 @@ def calculate_strategy_metrics(df, signals):
             # 简单匹配最近的买入信号
             if buy_dates:
                 last_buy_date = list(buy_dates.keys())[-1]
+                last_buy_price = buy_dates[last_buy_date]
+
+                # 计算持股天数
                 holding_days = (signal['date'] - last_buy_date).days
                 if holding_days > 0:
                     holding_periods.append(holding_days)
+
+                # 计算盈亏
+                profit_pct = (signal['price'] - last_buy_price) / last_buy_price
+                profits.append(profit_pct)
+
+                # 计算连续盈亏
+                if profit_pct > 0:
+                    consecutive_wins += 1
+                    consecutive_losses = 0
+                    max_consecutive_wins = max(max_consecutive_wins, consecutive_wins)
+                else:
+                    consecutive_losses += 1
+                    consecutive_wins = 0
+                    max_consecutive_losses = max(max_consecutive_losses, consecutive_losses)
+
                 del buy_dates[last_buy_date]
 
+    # 计算指标
     avg_holding_period = sum(holding_periods) / len(holding_periods) if holding_periods else 0
+
+    # 胜率和盈亏比
+    winning_trades = len([p for p in profits if p > 0])
+    losing_trades = len([p for p in profits if p <= 0])
+    total_trades = len(profits)
+
+    win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+
+    avg_profit = sum([p for p in profits if p > 0]) / winning_trades if winning_trades > 0 else 0
+    avg_loss = abs(sum([p for p in profits if p <= 0]) / losing_trades) if losing_trades > 0 else 0
+    profit_loss_ratio = (avg_profit / avg_loss) if avg_loss > 0 else 0
 
     return {
         'total_signals': len(signals),
         'buy_signals': len(buy_signals),
         'sell_signals': len(sell_signals),
-        'avg_holding_period': avg_holding_period
+        'avg_holding_period': avg_holding_period,
+        'win_rate': win_rate,
+        'profit_loss_ratio': profit_loss_ratio,
+        'max_consecutive_wins': max_consecutive_wins,
+        'max_consecutive_losses': max_consecutive_losses,
+        'total_trades': total_trades,
+        'winning_trades': winning_trades,
+        'losing_trades': losing_trades
     }
 
 
@@ -735,3 +875,238 @@ def calculate_position_and_cash_values(df, backtest_result):
         cash_values.append(cash_value)
 
     return position_values, cash_values
+
+
+def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """
+    计算RSI（相对强弱指标）
+
+    RSI = 100 - (100 / (1 + RS))
+    其中 RS = 平均涨幅 / 平均跌幅
+    """
+    delta = df['closing'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def calculate_rsi_signals(
+    df: pd.DataFrame,
+    period: int = 14,
+    oversold: int = 30,
+    overbought: int = 70
+) -> List[Dict]:
+    """
+    基于RSI指标生成交易信号
+
+    买入信号：RSI < 30（超卖）且开始上升
+    卖出信号：RSI > 70（超买）且开始下降
+    """
+    signals = []
+
+    if len(df) < period + 1:
+        return signals
+
+    rsi = calculate_rsi(df, period)
+
+    for i in range(1, len(df)):
+        if pd.isna(rsi.iloc[i]) or pd.isna(rsi.iloc[i-1]):
+            continue
+
+        date = df.iloc[i]['date']
+        price = float(df.iloc[i]['closing'])
+        curr_rsi = rsi.iloc[i]
+        prev_rsi = rsi.iloc[i-1]
+
+        # 买入信号：RSI从超卖区域向上穿越
+        if prev_rsi < oversold and curr_rsi >= oversold:
+            # 强买入：RSI急速上升（变化>5）
+            strength = SignalStrength.STRONG if (curr_rsi - prev_rsi) > 5 else SignalStrength.WEAK
+            signals.append({
+                'date': date,
+                'price': price,
+                'type': SignalType.BUY,
+                'strength': strength
+            })
+
+        # 卖出信号：RSI从超买区域向下穿越
+        elif prev_rsi > overbought and curr_rsi <= overbought:
+            # 强卖出：RSI急速下降
+            strength = SignalStrength.STRONG if (prev_rsi - curr_rsi) > 5 else SignalStrength.WEAK
+            signals.append({
+                'date': date,
+                'price': price,
+                'type': SignalType.SELL,
+                'strength': strength
+            })
+
+    return signals
+
+
+def calculate_bollinger_bands(df: pd.DataFrame, period: int = 20, std_dev: float = 2.0) -> pd.DataFrame:
+    """
+    计算布林带指标
+
+    中轨 = N日移动平均线
+    上轨 = 中轨 + K × N日标准差
+    下轨 = 中轨 - K × N日标准差
+    """
+    bands = pd.DataFrame(index=df.index)
+    bands['middle'] = df['closing'].rolling(window=period).mean()
+    std = df['closing'].rolling(window=period).std()
+    bands['upper'] = bands['middle'] + (std_dev * std)
+    bands['lower'] = bands['middle'] - (std_dev * std)
+    return bands
+
+
+def calculate_bollinger_signals(
+    df: pd.DataFrame,
+    period: int = 20,
+    std_dev: float = 2.0
+) -> List[Dict]:
+    """
+    基于布林带策略生成交易信号
+
+    买入信号：价格触及或跌破下轨后反弹
+    卖出信号：价格触及或突破上轨后回落
+    """
+    signals = []
+
+    if len(df) < period + 1:
+        return signals
+
+    bands = calculate_bollinger_bands(df, period, std_dev)
+
+    for i in range(1, len(df)):
+        if pd.isna(bands.iloc[i]['lower']) or pd.isna(bands.iloc[i]['upper']):
+            continue
+
+        date = df.iloc[i]['date']
+        price = float(df.iloc[i]['closing'])
+        curr_close = df.iloc[i]['closing']
+        prev_close = df.iloc[i-1]['closing']
+        lower = bands.iloc[i]['lower']
+        upper = bands.iloc[i]['upper']
+        prev_lower = bands.iloc[i-1]['lower']
+        prev_upper = bands.iloc[i-1]['upper']
+
+        # 买入信号：价格从下轨下方反弹
+        if prev_close <= prev_lower and curr_close > lower:
+            # 强买入：价格大幅反弹
+            strength = SignalStrength.STRONG if (curr_close - lower) / lower > 0.02 else SignalStrength.WEAK
+            signals.append({
+                'date': date,
+                'price': price,
+                'type': SignalType.BUY,
+                'strength': strength
+            })
+
+        # 卖出信号：价格从上轨上方回落
+        elif prev_close >= prev_upper and curr_close < upper:
+            # 强卖出：价格大幅回落
+            strength = SignalStrength.STRONG if (upper - curr_close) / upper > 0.02 else SignalStrength.WEAK
+            signals.append({
+                'date': date,
+                'price': price,
+                'type': SignalType.SELL,
+                'strength': strength
+            })
+
+    return signals
+
+
+def calculate_kdj(df: pd.DataFrame, n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
+    """
+    计算KDJ指标（随机指标）
+
+    RSV = (收盘价 - N日内最低价) / (N日内最高价 - N日内最低价) × 100
+    K = RSV的M1日移动平均
+    D = K的M2日移动平均
+    J = 3K - 2D
+    """
+    kdj = pd.DataFrame(index=df.index)
+
+    # 计算RSV
+    low_n = df['lowest'].rolling(window=n).min()
+    high_n = df['highest'].rolling(window=n).max()
+    rsv = (df['closing'] - low_n) / (high_n - low_n) * 100
+
+    # 计算K、D、J
+    kdj['K'] = rsv.ewm(alpha=1/m1, adjust=False).mean()
+    kdj['D'] = kdj['K'].ewm(alpha=1/m2, adjust=False).mean()
+    kdj['J'] = 3 * kdj['K'] - 2 * kdj['D']
+
+    return kdj
+
+
+def calculate_kdj_signals(
+    df: pd.DataFrame,
+    n: int = 9,
+    m1: int = 3,
+    m2: int = 3,
+    oversold: int = 20,
+    overbought: int = 80
+) -> List[Dict]:
+    """
+    基于KDJ指标生成交易信号
+
+    买入信号：
+    1. K线和D线都在20以下（超卖区）
+    2. K线上穿D线（金叉）
+
+    卖出信号：
+    1. K线和D线都在80以上（超买区）
+    2. K线下穿D线（死叉）
+    """
+    signals = []
+
+    if len(df) < n + m1 + m2:
+        return signals
+
+    kdj = calculate_kdj(df, n, m1, m2)
+
+    for i in range(1, len(df)):
+        if pd.isna(kdj.iloc[i]['K']) or pd.isna(kdj.iloc[i]['D']):
+            continue
+
+        date = df.iloc[i]['date']
+        price = float(df.iloc[i]['closing'])
+        curr_k = kdj.iloc[i]['K']
+        curr_d = kdj.iloc[i]['D']
+        prev_k = kdj.iloc[i-1]['K']
+        prev_d = kdj.iloc[i-1]['D']
+
+        # 买入信号：金叉且在超卖区
+        if prev_k <= prev_d and curr_k > curr_d:
+            # 强买入：在深度超卖区（K和D都小于20）
+            if curr_k < oversold and curr_d < oversold:
+                strength = SignalStrength.STRONG
+            else:
+                strength = SignalStrength.WEAK
+
+            signals.append({
+                'date': date,
+                'price': price,
+                'type': SignalType.BUY,
+                'strength': strength
+            })
+
+        # 卖出信号：死叉且在超买区
+        elif prev_k >= prev_d and curr_k < curr_d:
+            # 强卖出：在深度超买区（K和D都大于80）
+            if curr_k > overbought and curr_d > overbought:
+                strength = SignalStrength.STRONG
+            else:
+                strength = SignalStrength.WEAK
+
+            signals.append({
+                'date': date,
+                'price': price,
+                'type': SignalType.SELL,
+                'strength': strength
+            })
+
+    return signals

@@ -58,19 +58,25 @@ def show_page(stock, t: StockHistoryType):
             StrategyType.MACD_STRATEGY: StrategyType.MACD_STRATEGY.fullText,
             StrategyType.SMA_STRATEGY: StrategyType.SMA_STRATEGY.fullText,
             StrategyType.TURTLE_STRATEGY: StrategyType.TURTLE_STRATEGY.fullText,
-            StrategyType.CBR_STRATEGY: StrategyType.CBR_STRATEGY.fullText
+            StrategyType.CBR_STRATEGY: StrategyType.CBR_STRATEGY.fullText,
+            StrategyType.RSI_STRATEGY: StrategyType.RSI_STRATEGY.fullText,
+            StrategyType.BOLL_STRATEGY: StrategyType.BOLL_STRATEGY.fullText,
+            StrategyType.KDJ_STRATEGY: StrategyType.KDJ_STRATEGY.fullText
         }
         selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
         if selected_strategy_key not in st.session_state:
             # 根据时间周期类型设置默认选中的策略
             if t in [StockHistoryType.W, StockHistoryType.M]:  # 周线和月线
-                st.session_state[selected_strategy_key] = list(strategy_options.keys())  # 默认选中所有策略
-            else:
-                # 天线和30分钟线默认不选中CBR策略
                 st.session_state[selected_strategy_key] = [
                     StrategyType.MACD_STRATEGY,
                     StrategyType.SMA_STRATEGY,
                     StrategyType.TURTLE_STRATEGY
+                ]
+            else:
+                # 天线和30分钟线默认选MACD和SMA
+                st.session_state[selected_strategy_key] = [
+                    StrategyType.MACD_STRATEGY,
+                    StrategyType.SMA_STRATEGY
                 ]
 
         selected_strategies = st.session_state.get(selected_strategy_key, [])
@@ -864,7 +870,14 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
                 </div>
             """, unsafe_allow_html=True)
 
-            # 显示关键指标
+            # 显示核心指标 - 一行3个
+            st.markdown("""
+                <div class="chart-header">
+                    <span class="chart-icon">💰</span>
+                    <span class="chart-title">核心收益指标</span>
+                </div>
+            """, unsafe_allow_html=True)
+
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.markdown(f"""
@@ -882,80 +895,87 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
                         """, unsafe_allow_html=True)
 
             with col3:
+                return_color = "#00c853" if backtest_result['total_return'] >= 0 else "#ff1744"
                 st.markdown(f"""
                         <div class="metric-sub-card metric-card-3">
                             <div class="metric-label">总收益率</div>
-                            <div class="metric-value">{backtest_result['total_return']:.2f}</div>
+                            <div class="metric-value" style="color: {return_color}">{backtest_result['total_return']:.2f}%</div>
                         </div>
                         """, unsafe_allow_html=True)
 
             st.markdown("")
             st.markdown("""
-                <div class="chart-header">
-                    <span class="chart-icon">🔍</span>
-                    <span class="chart-title">风险指标</span>
-                </div>
-            """, unsafe_allow_html=True)
+               <div class="chart-header">
+                   <span class="chart-icon">📊</span>
+                   <span class="chart-title">交易质量指标</span>
+               </div>
+           """, unsafe_allow_html=True)
 
-            col4, col5, col6 = st.columns(3)
+            col4, col5, col6, col7 = st.columns(4)
             with col4:
+                win_rate_color = "#00c853" if strategy_metrics['win_rate'] >= 50 else "#ff9800"
                 st.markdown(f"""
-                        <div class="metric-sub-card metric-card-4">
-                            <div class="metric-label">夏普比率</div>
-                            <div class="metric-value">{risk_metrics['sharpe_ratio']:.2f}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                       <div class="metric-sub-card metric-card-4">
+                           <div class="metric-label">胜率</div>
+                           <div class="metric-value" style="color: {win_rate_color}">{strategy_metrics['win_rate']:.1f}%</div>
+                           <div class="metric-sub-label">{strategy_metrics['winning_trades']}胜/{strategy_metrics['losing_trades']}负</div>
+                       </div>
+                       """, unsafe_allow_html=True)
             with col5:
+                profit_loss_color = "#00c853" if strategy_metrics['profit_loss_ratio'] >= 1 else "#ff9800"
                 st.markdown(f"""
                        <div class="metric-sub-card metric-card-5">
-                           <div class="metric-label">年化波动率</div>
-                           <div class="metric-value">{risk_metrics['volatility'] * 100:.2f}%</div>
+                           <div class="metric-label">盈亏比</div>
+                           <div class="metric-value" style="color: {profit_loss_color}">{strategy_metrics['profit_loss_ratio']:.2f}</div>
                        </div>
                        """, unsafe_allow_html=True)
             with col6:
                 st.markdown(f"""
                        <div class="metric-sub-card metric-card-6">
-                           <div class="metric-label">最大回撤</div>
-                           <div class="metric-value">{risk_metrics['max_drawdown'] * 100:.2f}%</div>
+                           <div class="metric-label">总交易次数</div>
+                           <div class="metric-value">{strategy_metrics['total_trades']}</div>
                        </div>
                        """, unsafe_allow_html=True)
-
-            st.markdown("")
-            st.markdown("""
-               <div class="chart-header">
-                   <span class="chart-icon">🔍</span>
-                   <span class="chart-title">交易策略</span>
-               </div>
-           """, unsafe_allow_html=True)
-            col7, col8, col9, col10 = st.columns(4)
             with col7:
                 st.markdown(f"""
-                       <div class="metric-sub-card metric-card-7">
-                           <div class="metric-label">总信号数</div>
-                           <div class="metric-value">{strategy_metrics['total_signals']}</div>
-                       </div>
-                       """, unsafe_allow_html=True)
-            with col8:
-                st.markdown(f"""
-                      <div class="metric-sub-card metric-card-8">
-                          <div class="metric-label">买入信号</div>
-                          <div class="metric-value">{strategy_metrics['buy_signals']}</div>
-                      </div>
-                      """, unsafe_allow_html=True)
-            with col9:
-                st.markdown(f"""
-                      <div class="metric-sub-card metric-card-9">
-                          <div class="metric-label">卖出信号</div>
-                          <div class="metric-value">{strategy_metrics['sell_signals']}</div>
-                      </div>
-                      """, unsafe_allow_html=True)
-            with col10:
-                st.markdown(f"""
-                      <div class="metric-sub-card metric-card-9">
-                          <div class="metric-label">平均持股天数</div>
+                      <div class="metric-sub-card metric-card-7">
+                          <div class="metric-label">平均持股</div>
                           <div class="metric-value">{strategy_metrics['avg_holding_period']:.1f}天</div>
                       </div>
                       """, unsafe_allow_html=True)
+
+            st.markdown("")
+            st.markdown("""
+                <div class="chart-header">
+                    <span class="chart-icon">⚠️</span>
+                    <span class="chart-title">风险指标</span>
+                </div>
+            """, unsafe_allow_html=True)
+
+            col8, col9, col10 = st.columns(3)
+            with col8:
+                sharpe_color = "#00c853" if risk_metrics['sharpe_ratio'] >= 1 else ("#ff9800" if risk_metrics['sharpe_ratio'] >= 0 else "#ff1744")
+                st.markdown(f"""
+                        <div class="metric-sub-card metric-card-8">
+                            <div class="metric-label">夏普比率</div>
+                            <div class="metric-value" style="color: {sharpe_color}">{risk_metrics['sharpe_ratio']:.2f}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            with col9:
+                st.markdown(f"""
+                       <div class="metric-sub-card metric-card-9">
+                           <div class="metric-label">年化波动率</div>
+                           <div class="metric-value">{risk_metrics['volatility'] * 100:.2f}%</div>
+                       </div>
+                       """, unsafe_allow_html=True)
+            with col10:
+                drawdown_color = "#00c853" if risk_metrics['max_drawdown'] >= -0.1 else ("#ff9800" if risk_metrics['max_drawdown'] >= -0.2 else "#ff1744")
+                st.markdown(f"""
+                       <div class="metric-sub-card metric-card-10">
+                           <div class="metric-label">最大回撤</div>
+                           <div class="metric-value" style="color: {drawdown_color}">{risk_metrics['max_drawdown'] * 100:.2f}%</div>
+                       </div>
+                       """, unsafe_allow_html=True)
 
 
             st.markdown("")
