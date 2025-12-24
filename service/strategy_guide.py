@@ -1,124 +1,224 @@
-"""
-策略介绍页面
-
-为每个交易策略提供详细的介绍和使用说明
-"""
 import streamlit as st
+
+from enums import strategy
 from enums.strategy import StrategyType
 
 
-def show_strategy_guide_page():
-    """显示策略介绍总览页面"""
-    st.markdown("""
-        <div class="table-header">
-            <div class="table-title">📚 交易策略学习中心</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 策略分类
-    st.markdown("## 策略分类")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown("""
-        ### 📈 趋势跟踪策略
-        - **MACD策略** - 动量指标之王
-        - **SMA策略** - 移动平均线交叉
-        - **海龟策略** - 突破系统经典
-        """)
-
-    with col2:
-        st.markdown("""
-        ### 📊 超买超卖策略
-        - **RSI策略** - 相对强弱指标
-        - **KDJ策略** - 随机指标
-        """)
-
-    with col3:
-        st.markdown("""
-        ### 🔄 其他策略
-        - **布林带策略** - 波动性通道
-        - **CBR策略** - 反转确认
-        """)
-
-    st.markdown("---")
-
-    # 策略选择
-    st.markdown("## 选择策略查看详情")
-
-    strategy_options = {
-        "MACD策略": StrategyType.MACD_STRATEGY,
-        "SMA策略": StrategyType.SMA_STRATEGY,
-        "海龟策略": StrategyType.TURTLE_STRATEGY,
-        "CBR策略": StrategyType.CBR_STRATEGY,
-        "RSI策略": StrategyType.RSI_STRATEGY,
-        "布林带策略": StrategyType.BOLL_STRATEGY,
-        "KDJ策略": StrategyType.KDJ_STRATEGY,
-    }
-
-    selected_strategy = st.selectbox(
-        "选择一个策略",
-        options=list(strategy_options.keys()),
-        label_visibility="collapsed"
+def show_page():
+    st.markdown(
+        f"""
+          <div class="table-header">
+              <div class="table-title">策略概览</div>
+          </div>
+          """,
+        unsafe_allow_html=True
     )
 
-    if selected_strategy:
-        strategy_type = strategy_options[selected_strategy]
-        show_strategy_detail(strategy_type)
 
+    # 定义策略分组
+    trend_strategies = [StrategyType.MACD_STRATEGY,StrategyType.SMA_STRATEGY, StrategyType.TURTLE_STRATEGY]
+    overbought_oversold_strategies = [StrategyType.RSI_STRATEGY,StrategyType.KDJ_STRATEGY]
+    other_strategies = [StrategyType.BOLL_STRATEGY,StrategyType.CBR_STRATEGY]
 
-def show_strategy_detail(strategy_type: StrategyType):
-    """显示具体策略的详细信息"""
+    st.markdown(f"""
+             <div class="chart-header">
+                 <span class="chart-icon">🔍</span>
+                 <span class="chart-title">趋势跟踪策略</span>
+             </div>
+    """, unsafe_allow_html=True)
 
-    # 根据策略类型显示不同内容
-    if strategy_type == StrategyType.MACD_STRATEGY:
-        show_macd_strategy()
-    elif strategy_type == StrategyType.SMA_STRATEGY:
-        show_sma_strategy()
-    elif strategy_type == StrategyType.TURTLE_STRATEGY:
-        show_turtle_strategy()
-    elif strategy_type == StrategyType.CBR_STRATEGY:
-        show_cbr_strategy()
-    elif strategy_type == StrategyType.RSI_STRATEGY:
-        show_rsi_strategy()
-    elif strategy_type == StrategyType.BOLL_STRATEGY:
-        show_bollinger_strategy()
-    elif strategy_type == StrategyType.KDJ_STRATEGY:
-        show_kdj_strategy()
+    # 使用网格布局显示策略卡片
+    for i in range(0, len(trend_strategies), 3):
+        cols = st.columns(3)
+        for j, col in enumerate(cols):
+            if i + j < len(trend_strategies):
+                strategy = trend_strategies[i + j]
+                with col:
+                    st.markdown(
+                        f"""
+                          <div class="stock-card">
+                              <div class="stock-card-header">
+                                  <div class="stock-card-title">
+                                      <span class="stock-name">{strategy.fullText}</span>
+                                  </div>
+                              </div>
+                              <div class="stock-card-body">
+                                  <div class="stock-info-row">
+                                      <span class="info-label">描述</span>
+                                      <span class="info-value">{strategy.desc}</span>
+                                  </div>
+                              </div>
 
+                          </div>
+                        """
+                        , unsafe_allow_html=True)
+                    if st.button(
+                            "详情",
+                            key=f"btn_{strategy.value}",
+                            use_container_width=True
+                    ):
+                        # 将选中的策略存储到session state中
+                        st.session_state['selected_strategy'] = strategy
+
+    st.markdown(f"""
+             <div class="chart-header">
+                 <span class="chart-icon">🔍</span>
+                 <span class="chart-title">超买超卖策略</span>
+             </div>
+    """, unsafe_allow_html=True)
+    for i in range(0, len(overbought_oversold_strategies), 3):
+        cols = st.columns(3)
+        for j, col in enumerate(cols):
+            if i + j < len(overbought_oversold_strategies):
+                strategy = overbought_oversold_strategies[i + j]
+                with col:
+                    st.markdown(
+                        f"""
+                          <div class="stock-card">
+                              <div class="stock-card-header">
+                                  <div class="stock-card-title">
+                                      <span class="stock-name">{strategy.fullText}</span>
+                                  </div>
+                              </div>
+                              <div class="stock-card-body">
+                                  <div class="stock-info-row">
+                                      <span class="info-label">描述</span>
+                                      <span class="info-value">{strategy.desc}</span>
+                                  </div>
+                              </div>
+
+                          </div>
+                        """
+                        , unsafe_allow_html=True)
+                    if st.button(
+                            "详情",
+                            key=f"btn_{strategy.value}",
+                            use_container_width=True
+                    ):
+                        # 将选中的策略存储到session state中
+                        st.session_state['selected_strategy'] = strategy
+
+    st.markdown(f"""
+             <div class="chart-header">
+                 <span class="chart-icon">🔍</span>
+                 <span class="chart-title">其他策略</span>
+             </div>
+    """, unsafe_allow_html=True)
+
+    # 使用网格布局显示其他策略卡片
+    for i in range(0, len(other_strategies), 3):
+        cols = st.columns(3)
+        for j, col in enumerate(cols):
+            if i + j < len(other_strategies):
+                strategy = other_strategies[i + j]
+                with col:
+                    st.markdown(
+                        f"""
+                          <div class="stock-card">
+                              <div class="stock-card-header">
+                                  <div class="stock-card-title">
+                                      <span class="stock-name">{strategy.fullText}</span>
+                                  </div>
+                              </div>
+                              <div class="stock-card-body">
+                                  <div class="stock-info-row">
+                                      <span class="info-label">描述</span>
+                                      <span class="info-value">{strategy.desc}</span>
+                                  </div>
+                              </div>
+
+                          </div>
+                        """
+                        , unsafe_allow_html=True)
+                    if st.button(
+                            "详情",
+                            key=f"btn_{strategy.value}",
+                            use_container_width=True
+                    ):
+                        # 将选中的策略存储到session state中
+                        st.session_state['selected_strategy'] = strategy
+
+    # 检查是否需要显示弹窗
+    if 'selected_strategy' in st.session_state:
+        selected_strategy = st.session_state['selected_strategy']
+        show_detail_dialog(selected_strategy)
+
+@st.dialog("策略详情", width="large")
+def show_detail_dialog(strategy):
+    # 显示策略标题
+    st.markdown(
+        f"""
+             <div class="table-header">
+                 <div class="table-title">{strategy.fullText} - {strategy.desc}</div>
+             </div>
+             """,
+        unsafe_allow_html=True
+    )
+    # 根据策略类型调用对应的详情函数
+    strategy_mapping = {
+        StrategyType.MACD_STRATEGY: show_macd_strategy,
+        StrategyType.SMA_STRATEGY: show_sma_strategy,
+        StrategyType.TURTLE_STRATEGY: show_turtle_strategy,
+        StrategyType.CBR_STRATEGY: show_cbr_strategy,
+        StrategyType.RSI_STRATEGY: show_rsi_strategy,
+        StrategyType.BOLL_STRATEGY: show_bollinger_strategy,
+        StrategyType.KDJ_STRATEGY: show_kdj_strategy,
+    }
+    handler = strategy_mapping.get(strategy)
+    if handler:
+        handler()
 
 def show_macd_strategy():
-    """MACD策略详情"""
-    st.markdown("---")
-    st.markdown("## 📊 MACD策略 - 趋势动量之王")
-
-    # 基本信息
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("策略类型", "趋势跟踪")
+        st.markdown(f"""
+               <div class="metric-sub-card metric-card-1">
+                   <div class="metric-label">策略类型</div>
+                   <div class="metric-value">趋势跟踪</div>
+               </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.metric("适用周期", "日/周/月线")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-2">
+                  <div class="metric-label">适用周期</div>
+                  <div class="metric-value">日/周/月线</div>
+              </div>
+       """, unsafe_allow_html=True)
     with col3:
-        st.metric("难度等级", "⭐⭐")
-
-    # 策略原理
-    st.markdown("### 📖 策略原理")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-3">
+                  <div class="metric-label">难度等级</div>
+                  <div class="metric-value">⭐⭐</div>
+              </div>
+       """, unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"""
+                   <div class="chart-header">
+                       <span class="chart-icon">📖</span>
+                       <span class="chart-title">策略原理</span>
+                   </div>
+          """, unsafe_allow_html=True)
     st.markdown("""
-    MACD（Moving Average Convergence Divergence）由Gerald Appel在1970年代发明，是**最经典的技术指标之一**。
+        MACD（Moving Average Convergence Divergence）由Gerald Appel在1970年代发明
+        
+        **最经典的技术指标之一**
+    
+        **核心思想**：通过快慢两条移动平均线的差值变化来判断趋势的强弱和转折点
+    
+        **计算公式**：
+        - **DIFF（快线）** = 12日EMA - 26日EMA
+        - **DEA（慢线）** = DIFF的9日EMA
+        - **MACD柱** = (DIFF - DEA) × 2
+    
+        其中EMA是指数移动平均线（Exponential Moving Average）
+        """)
 
-    **核心思想**：通过快慢两条移动平均线的差值变化来判断趋势的强弱和转折点。
-
-    **计算公式**：
-    - **DIFF（快线）** = 12日EMA - 26日EMA
-    - **DEA（慢线）** = DIFF的9日EMA
-    - **MACD柱** = (DIFF - DEA) × 2
-
-    其中EMA是指数移动平均线（Exponential Moving Average）。
-    """)
-
-    # 信号规则
-    st.markdown("### 🎯 交易信号")
+    st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">🎯</span>
+                           <span class="chart-title">交易信号</span>
+                       </div>
+              """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -146,12 +246,18 @@ def show_macd_strategy():
         """)
 
     # 优缺点
-    st.markdown("### ⚖️ 优缺点分析")
+    st.markdown(f"""
+                          <div class="chart-header">
+                              <span class="chart-icon">⚖️</span>
+                              <span class="chart-title">优缺点</span>
+                          </div>
+    """, unsafe_allow_html=True)
+
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.success("""
+        st.markdown("""
         **✅ 优点**
         - 趋势跟踪能力强，适合捕捉中长期趋势
         - 信号明确，容易判断（金叉买入，死叉卖出）
@@ -161,7 +267,7 @@ def show_macd_strategy():
         """)
 
     with col2:
-        st.error("""
+        st.markdown("""
         **❌ 缺点**
         - 震荡市场会产生虚假信号
         - 存在一定的滞后性（基于移动平均）
@@ -170,8 +276,13 @@ def show_macd_strategy():
         """)
 
     # 实战技巧
-    st.markdown("### 💡 实战技巧")
-    st.info("""
+    st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">💡</span>
+                      <span class="chart-title">实战技巧</span>
+                  </div>
+        """, unsafe_allow_html=True)
+    st.markdown("""
     1. **结合趋势使用**：在明确的上升或下降趋势中使用效果最好
     2. **零轴判断**：DIFF在零轴上方金叉更可靠，在零轴下方死叉更可靠
     3. **柱状图辅助**：MACD柱状图由负转正可提前预示金叉
@@ -180,7 +291,13 @@ def show_macd_strategy():
     """)
 
     # 参数说明
-    st.markdown("### ⚙️ 参数说明")
+    st.markdown(f"""
+              <div class="chart-header">
+                  <span class="chart-icon">⚙️</span>
+                  <span class="chart-title">参数说明</span>
+              </div>
+    """, unsafe_allow_html=True)
+
     st.markdown("""
     | 参数 | 默认值 | 说明 |
     |------|--------|------|
@@ -195,7 +312,12 @@ def show_macd_strategy():
     """)
 
     # 示例
-    st.markdown("### 📈 信号示例")
+    st.markdown(f"""
+              <div class="chart-header">
+                  <span class="chart-icon">📈</span>
+                  <span class="chart-title">信号示例</span>
+              </div>
+    """, unsafe_allow_html=True)
     st.markdown("""
     ```
     日期       收盘价    DIFF    DEA     信号
@@ -210,23 +332,39 @@ def show_macd_strategy():
 
 
 def show_sma_strategy():
-    """SMA策略详情"""
-    st.markdown("---")
-    st.markdown("## 📏 SMA策略 - 移动平均线交叉")
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("策略类型", "趋势跟踪")
+        st.markdown(f"""
+                  <div class="metric-sub-card metric-card-1">
+                      <div class="metric-label">策略类型</div>
+                      <div class="metric-value">趋势跟踪</div>
+                  </div>
+           """, unsafe_allow_html=True)
     with col2:
-        st.metric("适用周期", "日/周/月线")
+        st.markdown(f"""
+                 <div class="metric-sub-card metric-card-2">
+                     <div class="metric-label">适用周期</div>
+                     <div class="metric-value">日/周/月线</div>
+                 </div>
+          """, unsafe_allow_html=True)
     with col3:
-        st.metric("难度等级", "⭐")
-
-    st.markdown("### 📖 策略原理")
+        st.markdown(f"""
+                 <div class="metric-sub-card metric-card-3">
+                     <div class="metric-label">难度等级</div>
+                     <div class="metric-value">⭐</div>
+                 </div>
+          """, unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"""
+                      <div class="chart-header">
+                          <span class="chart-icon">📖</span>
+                          <span class="chart-title">策略原理</span>
+                      </div>
+             """, unsafe_allow_html=True)
     st.markdown("""
-    SMA（Simple Moving Average）是**最简单也最经典**的技术分析工具。
+    SMA（Simple Moving Average）是**最简单也最经典**的技术分析工具
 
-    **核心思想**：短期均线代表短期趋势，长期均线代表长期趋势。当短期均线上穿长期均线时，表示短期趋势转强，产生买入信号。
+    **核心思想**：短期均线代表短期趋势，长期均线代表长期趋势。当短期均线上穿长期均线时，表示短期趋势转强，产生买入信号
 
     **本系统使用的均线**：
     - **MA5**：5日移动平均线（短期趋势）
@@ -235,7 +373,12 @@ def show_sma_strategy():
     - **MA250**：250日移动平均线（年线，长期趋势）
     """)
 
-    st.markdown("### 🎯 交易信号")
+    st.markdown(f"""
+                           <div class="chart-header">
+                               <span class="chart-icon">🎯</span>
+                               <span class="chart-title">交易信号</span>
+                           </div>
+                  """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -246,7 +389,7 @@ def show_sma_strategy():
         1. **MA5上穿MA10**
         2. **MACD DIFF > 0** 且 **DEA > 0**（趋势确认）
 
-        这种双重确认可以**降低虚假信号**。
+        这种双重确认可以**降低虚假信号**
         """)
 
     with col2:
@@ -259,12 +402,17 @@ def show_sma_strategy():
         **特点**：简单直接，容易执行
         """)
 
-    st.markdown("### ⚖️ 优缺点分析")
+    st.markdown(f"""
+                              <div class="chart-header">
+                                  <span class="chart-icon">⚖️</span>
+                                  <span class="chart-title">优缺点</span>
+                              </div>
+        """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.success("""
+        st.markdown("""
         **✅ 优点**
         - 非常简单，新手易于理解和使用
         - 信号明确，不需要复杂判断
@@ -273,15 +421,20 @@ def show_sma_strategy():
         """)
 
     with col2:
-        st.error("""
+        st.markdown("""
         **❌ 缺点**
         - 滞后性较强（毕竟是移动平均）
         - 震荡市场频繁产生虚假信号
         - 可能错过趋势初期的最佳入场点
         """)
 
-    st.markdown("### 💡 实战技巧")
-    st.info("""
+    st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">💡</span>
+                      <span class="chart-title">实战技巧</span>
+                  </div>
+        """, unsafe_allow_html=True)
+    st.markdown("""
     1. **多头排列**：MA5 > MA10 > MA30 > MA250，强势上涨趋势
     2. **空头排列**：MA5 < MA10 < MA30 < MA250，强势下跌趋势
     3. **年线支撑**：MA250常作为重要的支撑/压力位
@@ -291,23 +444,41 @@ def show_sma_strategy():
 
 
 def show_rsi_strategy():
-    """RSI策略详情"""
-    st.markdown("---")
-    st.markdown("## 📊 RSI策略 - 相对强弱指标")
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("策略类型", "超买超卖")
+        st.markdown(f"""
+               <div class="metric-sub-card metric-card-1">
+                   <div class="metric-label">策略类型</div>
+                   <div class="metric-value">超买超卖</div>
+               </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.metric("适用周期", "日/周线")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-2">
+                  <div class="metric-label">适用周期</div>
+                  <div class="metric-value">日/周线</div>
+              </div>
+       """, unsafe_allow_html=True)
     with col3:
-        st.metric("难度等级", "⭐⭐")
-
-    st.markdown("### 📖 策略原理")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-3">
+                  <div class="metric-label">难度等级</div>
+                  <div class="metric-value">⭐⭐</div>
+              </div>
+       """, unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"""
+                   <div class="chart-header">
+                       <span class="chart-icon">📖</span>
+                       <span class="chart-title">策略原理</span>
+                   </div>
+          """, unsafe_allow_html=True)
     st.markdown("""
-    RSI（Relative Strength Index）由Welles Wilder在**1978年**发明，是衡量价格变动速度和幅度的**动量震荡指标**。
+    RSI（Relative Strength Index）由Welles Wilder在**1978年**发明
+    
+    是衡量价格变动速度和幅度的**动量震荡指标**
 
-    **核心思想**：通过比较一段时期内价格上涨幅度和下跌幅度的平均值来衡量买卖力量的强弱。
+    **核心思想**：通过比较一段时期内价格上涨幅度和下跌幅度的平均值来衡量买卖力量的强弱
 
     **计算公式**：
     ```
@@ -321,7 +492,12 @@ def show_rsi_strategy():
     - **50**：中性区
     """)
 
-    st.markdown("### 🎯 交易信号")
+    st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">🎯</span>
+                           <span class="chart-title">交易信号</span>
+                       </div>
+              """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -345,12 +521,17 @@ def show_rsi_strategy():
         **原理**：超买后回调，获利了结
         """)
 
-    st.markdown("### ⚖️ 优缺点分析")
+    st.markdown(f"""
+                          <div class="chart-header">
+                              <span class="chart-icon">⚖️</span>
+                              <span class="chart-title">优缺点</span>
+                          </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.success("""
+        st.markdown("""
         **✅ 优点**
         - 反应灵敏，适合短线交易
         - 超买超卖判断准确
@@ -360,7 +541,7 @@ def show_rsi_strategy():
         """)
 
     with col2:
-        st.error("""
+        st.markdown("""
         **❌ 缺点**
         - 强趋势中会过早退出
         - 可能长时间处于超买/超卖区
@@ -368,8 +549,13 @@ def show_rsi_strategy():
         - 参数敏感，需要调优
         """)
 
-    st.markdown("### 💡 实战技巧")
-    st.info("""
+    st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">💡</span>
+                      <span class="chart-title">实战技巧</span>
+                  </div>
+        """, unsafe_allow_html=True)
+    st.markdown("""
     1. **趋势配合**：在上升趋势中，RSI常在40-90区间波动；下降趋势中在10-60区间
     2. **背离信号**：
        - 价格创新高但RSI不创新高 → 顶背离，警惕下跌
@@ -381,7 +567,12 @@ def show_rsi_strategy():
     5. **钝化现象**：强趋势中RSI可能持续在超买/超卖区，不要盲目反向操作
     """)
 
-    st.markdown("### ⚙️ 参数说明")
+    st.markdown(f"""
+              <div class="chart-header">
+                  <span class="chart-icon">⚙️</span>
+                  <span class="chart-title">参数说明</span>
+              </div>
+    """, unsafe_allow_html=True)
     st.markdown("""
     | 参数 | 默认值 | 说明 |
     |------|--------|------|
@@ -397,35 +588,57 @@ def show_rsi_strategy():
 
 
 def show_bollinger_strategy():
-    """布林带策略详情"""
-    st.markdown("---")
-    st.markdown("## 📈 布林带策略 - 波动性通道")
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("策略类型", "波动性")
+        st.markdown(f"""
+               <div class="metric-sub-card metric-card-1">
+                   <div class="metric-label">策略类型</div>
+                   <div class="metric-value">波动性</div>
+               </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.metric("适用周期", "日/周线")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-2">
+                  <div class="metric-label">适用周期</div>
+                  <div class="metric-value">日/周线</div>
+              </div>
+       """, unsafe_allow_html=True)
     with col3:
-        st.metric("难度等级", "⭐⭐⭐")
-
-    st.markdown("### 📖 策略原理")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-3">
+                  <div class="metric-label">难度等级</div>
+                  <div class="metric-value">⭐⭐⭐</div>
+              </div>
+       """, unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"""
+                   <div class="chart-header">
+                       <span class="chart-icon">📖</span>
+                       <span class="chart-title">策略原理</span>
+                   </div>
+          """, unsafe_allow_html=True)
     st.markdown("""
-    布林带（Bollinger Bands）由John Bollinger在**1980年代**发明，是基于**统计学标准差**的动态通道指标。
+    布林带（Bollinger Bands）由John Bollinger在**1980年代**发明，是基于**统计学标准差**的动态通道指标
 
-    **核心思想**：价格围绕均值波动，当偏离过大时会回归。通道宽度随波动性自动调整。
+    **核心思想**：价格围绕均值波动，当偏离过大时会回归。通道宽度随波动性自动调整
 
     **计算公式**：
     - **中轨** = N日简单移动平均线（SMA）
     - **上轨** = 中轨 + K × N日标准差
     - **下轨** = 中轨 - K × N日标准差
-
+    
     **默认参数**：N=20，K=2
+    
 
-    **统计意义**：价格有95%的概率在上下轨之间波动（假设正态分布）。
+    **统计意义**：价格有95%的概率在上下轨之间波动（假设正态分布）
     """)
 
-    st.markdown("### 🎯 交易信号")
+    st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">🎯</span>
+                           <span class="chart-title">交易信号</span>
+                       </div>
+              """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -449,12 +662,16 @@ def show_bollinger_strategy():
         **原理**：价格超涨，均值回归
         """)
 
-    st.markdown("### ⚖️ 优缺点分析")
-
+    st.markdown(f"""
+                          <div class="chart-header">
+                              <span class="chart-icon">⚖️</span>
+                              <span class="chart-title">优缺点</span>
+                          </div>
+    """, unsafe_allow_html=True)
     col1, col2 = st.columns(2)
 
     with col1:
-        st.success("""
+        st.markdown("""
         **✅ 优点**
         - 动态调整，适应市场波动变化
         - 结合了价格和波动性两个维度
@@ -464,7 +681,7 @@ def show_bollinger_strategy():
         """)
 
     with col2:
-        st.error("""
+        st.markdown("""
         **❌ 缺点**
         - 强趋势中通道会持续扩张
         - 触及轨道不一定反转
@@ -472,8 +689,13 @@ def show_bollinger_strategy():
         - 横盘时信号较少
         """)
 
-    st.markdown("### 💡 实战技巧")
-    st.info("""
+    st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">💡</span>
+                      <span class="chart-title">实战技巧</span>
+                  </div>
+        """, unsafe_allow_html=True)
+    st.markdown("""
     1. **通道收窄**：布林带变窄（Squeeze）预示即将出现大行情
     2. **通道扩张**：布林带变宽预示波动加剧
     3. **中轨作用**：
@@ -487,7 +709,12 @@ def show_bollinger_strategy():
     6. **配合RSI**：触及下轨且RSI<30，买入信号更可靠
     """)
 
-    st.markdown("### ⚙️ 参数说明")
+    st.markdown(f"""
+              <div class="chart-header">
+                  <span class="chart-icon">⚙️</span>
+                  <span class="chart-title">参数说明</span>
+              </div>
+    """, unsafe_allow_html=True)
     st.markdown("""
     | 参数 | 默认值 | 说明 |
     |------|--------|------|
@@ -503,23 +730,39 @@ def show_bollinger_strategy():
 
 
 def show_kdj_strategy():
-    """KDJ策略详情"""
-    st.markdown("---")
-    st.markdown("## 📊 KDJ策略 - 随机指标")
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("策略类型", "超买超卖")
+        st.markdown(f"""
+               <div class="metric-sub-card metric-card-1">
+                   <div class="metric-label">策略类型</div>
+                   <div class="metric-value">超买超卖</div>
+               </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.metric("适用周期", "日/周线")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-2">
+                  <div class="metric-label">适用周期</div>
+                  <div class="metric-value">日/周线</div>
+              </div>
+       """, unsafe_allow_html=True)
     with col3:
-        st.metric("难度等级", "⭐⭐")
-
-    st.markdown("### 📖 策略原理")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-3">
+                  <div class="metric-label">难度等级</div>
+                  <div class="metric-value">⭐⭐</div>
+              </div>
+       """, unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"""
+                   <div class="chart-header">
+                       <span class="chart-icon">📖</span>
+                       <span class="chart-title">策略原理</span>
+                   </div>
+          """, unsafe_allow_html=True)
     st.markdown("""
-    KDJ指标由George Lane在**1950年代**发明，又称**随机指标**（Stochastic Oscillator）。
+    KDJ指标由George Lane在**1950年代**发明，又称**随机指标**（Stochastic Oscillator）
 
-    **核心思想**：比较收盘价在最近一段时间内最高最低价区间的相对位置。上涨时收盘价趋向最高价，下跌时趋向最低价。
+    **核心思想**：比较收盘价在最近一段时间内最高最低价区间的相对位置。上涨时收盘价趋向最高价，下跌时趋向最低价
 
     **计算公式**：
     ```
@@ -534,7 +777,12 @@ def show_kdj_strategy():
     **取值范围**：0-100（J值可能超出）
     """)
 
-    st.markdown("### 🎯 交易信号")
+    st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">🎯</span>
+                           <span class="chart-title">交易信号</span>
+                       </div>
+              """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -558,12 +806,17 @@ def show_kdj_strategy():
         **原理**：超买回落，做空信号
         """)
 
-    st.markdown("### ⚖️ 优缺点分析")
+    st.markdown(f"""
+                          <div class="chart-header">
+                              <span class="chart-icon">⚖️</span>
+                              <span class="chart-title">优缺点</span>
+                          </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.success("""
+        st.markdown("""
         **✅ 优点**
         - 灵敏度高，反应迅速
         - 适合短线和波段交易
@@ -573,7 +826,7 @@ def show_kdj_strategy():
         """)
 
     with col2:
-        st.error("""
+        st.markdown("""
         **❌ 缺点**
         - 震荡市场信号过多
         - 强趋势中会产生虚假信号
@@ -581,8 +834,13 @@ def show_kdj_strategy():
         - 参数敏感
         """)
 
-    st.markdown("### 💡 实战技巧")
-    st.info("""
+    st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">💡</span>
+                      <span class="chart-title">实战技巧</span>
+                  </div>
+        """, unsafe_allow_html=True)
+    st.markdown("""
     1. **KDJ金叉死叉**：
        - 20以下金叉 → 强买入（超卖反弹）
        - 80以上死叉 → 强卖出（超买回落）
@@ -607,7 +865,12 @@ def show_kdj_strategy():
        - 下降趋势：关注高位死叉
     """)
 
-    st.markdown("### ⚙️ 参数说明")
+    st.markdown(f"""
+              <div class="chart-header">
+                  <span class="chart-icon">⚙️</span>
+                  <span class="chart-title">参数说明</span>
+              </div>
+    """, unsafe_allow_html=True)
     st.markdown("""
     | 参数 | 默认值 | 说明 |
     |------|--------|------|
@@ -625,23 +888,39 @@ def show_kdj_strategy():
 
 
 def show_turtle_strategy():
-    """海龟策略详情"""
-    st.markdown("---")
-    st.markdown("## 🐢 海龟策略 - 突破系统经典")
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("策略类型", "突破系统")
+        st.markdown(f"""
+               <div class="metric-sub-card metric-card-1">
+                   <div class="metric-label">策略类型</div>
+                   <div class="metric-value">突破系统</div>
+               </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.metric("适用周期", "周/月线")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-2">
+                  <div class="metric-label">适用周期</div>
+                  <div class="metric-value">周/月线</div>
+              </div>
+       """, unsafe_allow_html=True)
     with col3:
-        st.metric("难度等级", "⭐⭐⭐")
-
-    st.markdown("### 📖 策略原理")
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-3">
+                  <div class="metric-label">难度等级</div>
+                  <div class="metric-value">⭐⭐⭐</div>
+              </div>
+       """, unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"""
+                   <div class="chart-header">
+                       <span class="chart-icon">📖</span>
+                       <span class="chart-title">策略原理</span>
+                   </div>
+          """, unsafe_allow_html=True)
     st.markdown("""
-    海龟交易法则源自**1980年代**著名的"海龟交易实验"。Richard Dennis和William Eckhardt通过训练新手证明交易可以被教授。
+    海龟交易法则源自**1980年代**著名的"海龟交易实验", Richard Dennis和William Eckhardt通过训练新手证明交易可以被教授
 
-    **核心思想**：基于唐奇安通道（Donchian Channels）的突破系统。当价格突破近期最高/最低价时，说明趋势可能形成。
+    **核心思想**：基于唐奇安通道（Donchian Channels）的突破系统。当价格突破近期最高/最低价时，说明趋势可能形成
 
     **通道计算**：
     - **上轨** = 过去N天的最高价
@@ -656,7 +935,12 @@ def show_turtle_strategy():
     ATR用于衡量市场波动性和信号强度。
     """)
 
-    st.markdown("### 🎯 交易信号")
+    st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">🎯</span>
+                           <span class="chart-title">交易信号</span>
+                       </div>
+              """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -680,12 +964,17 @@ def show_turtle_strategy():
         **原理**：跌破近期低点，趋势结束
         """)
 
-    st.markdown("### ⚖️ 优缺点分析")
+    st.markdown(f"""
+                          <div class="chart-header">
+                              <span class="chart-icon">⚖️</span>
+                              <span class="chart-title">优缺点</span>
+                          </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.success("""
+        st.markdown("""
         **✅ 优点**
         - 经过实战验证的经典策略
         - 趋势跟踪能力极强
@@ -695,7 +984,7 @@ def show_turtle_strategy():
         """)
 
     with col2:
-        st.error("""
+        st.markdown("""
         **❌ 缺点**
         - 震荡市场频繁止损
         - 需要较长的观察周期
@@ -704,8 +993,13 @@ def show_turtle_strategy():
         - 需要严格纪律执行
         """)
 
-    st.markdown("### 💡 实战技巧")
-    st.info("""
+    st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">💡</span>
+                      <span class="chart-title">实战技巧</span>
+                  </div>
+        """, unsafe_allow_html=True)
+    st.markdown("""
     1. **原版海龟法则**：
        - 入场：突破20日最高价
        - 加仓：每上涨0.5ATR加仓一次（最多4次）
@@ -731,7 +1025,12 @@ def show_turtle_strategy():
        - 一次大趋势的盈利可以覆盖多次小亏损
     """)
 
-    st.markdown("### ⚙️ 参数说明")
+    st.markdown(f"""
+              <div class="chart-header">
+                  <span class="chart-icon">⚙️</span>
+                  <span class="chart-title">参数说明</span>
+              </div>
+    """, unsafe_allow_html=True)
     st.markdown("""
     | 参数 | 默认值 | 说明 |
     |------|--------|------|
@@ -747,23 +1046,39 @@ def show_turtle_strategy():
 
 
 def show_cbr_strategy():
-    """CBR策略详情"""
-    st.markdown("---")
-    st.markdown("## 🔄 CBR策略 - 反转确认策略")
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("策略类型", "反转策略")
+        st.markdown(f"""
+                   <div class="metric-sub-card metric-card-1">
+                       <div class="metric-label">策略类型</div>
+                       <div class="metric-value">反转策略</div>
+                   </div>
+            """, unsafe_allow_html=True)
     with col2:
-        st.metric("适用周期", "周/月线")
+        st.markdown(f"""
+                  <div class="metric-sub-card metric-card-2">
+                      <div class="metric-label">适用周期</div>
+                      <div class="metric-value">周/月线</div>
+                  </div>
+           """, unsafe_allow_html=True)
     with col3:
-        st.metric("难度等级", "⭐⭐⭐⭐")
-
-    st.markdown("### 📖 策略原理")
+        st.markdown(f"""
+                  <div class="metric-sub-card metric-card-3">
+                      <div class="metric-label">难度等级</div>
+                      <div class="metric-value">⭐⭐⭐⭐</div>
+                  </div>
+           """, unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">📖</span>
+                           <span class="chart-title">策略原理</span>
+                       </div>
+              """, unsafe_allow_html=True)
     st.markdown("""
-    CBR（Confirmation-Based Reversal）是一种**基于价格形态和MACD确认的反转策略**。
+    CBR（Confirmation-Based Reversal）是一种**基于价格形态和MACD确认的反转策略**
 
-    **核心思想**：通过观察连续3天的K线形态变化，结合MACD指标确认，捕捉趋势反转的机会。
+    **核心思想**：通过观察连续3天的K线形态变化，结合MACD指标确认，捕捉趋势反转的机会
 
     **时间窗口**：
     - **T-2**：前天
@@ -775,7 +1090,12 @@ def show_cbr_strategy():
     2. MACD指标确认（金叉/死叉）
     """)
 
-    st.markdown("### 🎯 交易信号")
+    st.markdown(f"""
+                   <div class="chart-header">
+                       <span class="chart-icon">🎯</span>
+                       <span class="chart-title">交易信号</span>
+                   </div>
+""", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -807,12 +1127,17 @@ def show_cbr_strategy():
         **原理**：价格先上涨再跌破，反转信号
         """)
 
-    st.markdown("### ⚖️ 优缺点分析")
+    st.markdown(f"""
+                          <div class="chart-header">
+                              <span class="chart-icon">⚖️</span>
+                              <span class="chart-title">优缺点</span>
+                          </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.success("""
+        st.markdown("""
         **✅ 优点**
         - 捕捉反转机会，买在相对低点
         - 双重确认降低虚假信号
@@ -821,7 +1146,7 @@ def show_cbr_strategy():
         """)
 
     with col2:
-        st.error("""
+        st.markdown("""
         **❌ 缺点**
         - 需要更长时间框架（至少3天）
         - 信号较少，等待时间长
@@ -829,8 +1154,13 @@ def show_cbr_strategy():
         - 判断较复杂，需要经验
         """)
 
-    st.markdown("### 💡 实战技巧")
-    st.info("""
+    st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">💡</span>
+                      <span class="chart-title">实战技巧</span>
+                  </div>
+        """, unsafe_allow_html=True)
+    st.markdown("""
     1. **最佳时机**：
        - 下跌趋势末期的反转向上
        - 上涨趋势末期的反转向下
@@ -853,7 +1183,12 @@ def show_cbr_strategy():
        - 缩量反转需谨慎对待
     """)
 
-    st.markdown("### 📈 信号示例")
+    st.markdown(f"""
+              <div class="chart-header">
+                  <span class="chart-icon">📈</span>
+                  <span class="chart-title">信号示例</span>
+              </div>
+    """, unsafe_allow_html=True)
     st.markdown("""
     ```
     买入示例：

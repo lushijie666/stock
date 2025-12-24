@@ -716,7 +716,7 @@ div:has(input[placeholder*="搜索股票"]) {
 
 .info-value {
     color: #1e293b;
-    font-weight: 400;
+    font-weight: 500;
     flex: 1;
     word-break: break-word;
     min-width: 0;
