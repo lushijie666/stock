@@ -400,9 +400,33 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
 
         logging.info(f"开始获取美股[{KEY_PREFIX}][{t.text}]数据..., 股票:{code}, 开始日期: {start_date}, 结束日期: {end_date}")
 
-        # akshare 需要带前缀的股票代码（如 105.AAPL）
-        # 根据测试，大部分美股使用 105 前缀
-        symbol = f"105.{code}"
+        # 从数据库获取股票信息，提取前缀
+        prefix = "105"  # 默认前缀
+        try:
+            with get_db_session() as session:
+                from models.stock import Stock
+                stock = session.query(Stock).filter(
+                    Stock.code == code,
+                    Stock.category == Category.US_XX
+                ).first()
+
+                if stock and stock.full_name:
+                    # full_name 格式: 名称(前缀)，例如: 英伟达(105)
+                    import re
+                    match = re.search(r'\((\d+)\)$', stock.full_name)
+                    if match:
+                        prefix = match.group(1)
+                        logging.info(f"从数据库获取到美股前缀: {prefix}, full_name: {stock.full_name}")
+                    else:
+                        logging.warning(f"无法从 full_name 提取前缀，使用默认值: {prefix}, full_name: {stock.full_name}")
+                else:
+                    logging.warning(f"未找到股票或 full_name 为空，使用默认前缀: {prefix}")
+        except Exception as e:
+            logging.warning(f"查询股票前缀失败，使用默认值: {prefix}, 错误: {str(e)}")
+
+        # akshare 需要带前缀的股票代码（如 105.AAPL 或 106.BABA）
+        symbol = f"{prefix}.{code}"
+        logging.info(f"使用美股代码: {symbol} (前缀: {prefix}, 代码: {code})")
 
         try:
             # 30分钟数据使用分时接口

@@ -440,14 +440,12 @@ def remove_follow(category: Category, stock_code: str):
     except Exception as e:
         show_message(f"取消关注失败：{str(e)}", type="error")
 
-def reload(category: Category, us_category: str = None):
+def reload(category: Category):
     """
     刷新股票数据
 
     Args:
         category: 股票分类
-        us_category: 美股分类，仅当category为US_XX时有效
-                    可选值: '科技类', '金融类', '医药食品类', '媒体类', '汽车能源类', '制造零售类'
     """
     def build_filter(args: Dict[str, Any], session: Session) -> List:
         return [
@@ -461,8 +459,7 @@ def reload(category: Category, us_category: str = None):
         mark_existing=True,
         excluded_columns=['is_followed', 'followed_at']
     )
-    return history_handler.refresh(
-        category=category, us_category=us_category)
+    return history_handler.refresh(category=category)
 
 def fetch(category: Category) -> list:
     # 拉取 https://akshare.akfamily.xyz/data/stock/stock.html#id11
@@ -500,28 +497,29 @@ def fetch(category: Category) -> list:
         # 处理美股数据
         elif category == Category.US_XX:
             logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
-            for symbol in {
+            data = []  # 在循环外初始化，收集所有分类的数据
+            for symbol in [
                 "科技类",
                 "金融类",
                 "医药食品类",
                 "媒体类",
                 "汽车能源类",
                 "制造零售类",
-            }:
-                df = ak.stock_us_famous_spot_em(symbol= symbol)
+            ]:
+                df = ak.stock_us_famous_spot_em(symbol=symbol)
                 logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, symbol: {symbol}, 共 {len(df)} 条记录")
-                data = []
                 for i, row in df.iterrows():
-                    #logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {row}")
                     try:
                         raw_code = row.get("代码", "")
                         if not raw_code or pd.isna(raw_code):
                             logging.warning(f"跳过无效美股数据，第{i}行，代码为空")
                             continue
 
+                        # 提取前缀和代码
                         if '.' in str(raw_code):
-                            code = str(raw_code).split('.', 1)[1]  # 提取 'NXLIW' 部分
+                            prefix, code = str(raw_code).split('.', 1)
                         else:
+                            prefix = ""
                             code = str(raw_code)
 
                         # 添加数据验证，跳过空代码或无效数据
@@ -533,19 +531,24 @@ def fetch(category: Category) -> list:
                         if any(existing_stock.code == code for existing_stock in data):
                             logging.warning(f"跳过重复美股数据，代码: {code}")
                             continue
+
                         name = row.get("名称", "")
                         if not name or pd.isna(name):
                             logging.warning(f"跳过无效美股数据，第{i}行，名称为空")
                             continue
+
+                        # 将原始名称和前缀保存到 full_name 中
+                        full_name = f"{name}({prefix})" if prefix else str(name)
+
                         s = Stock(
                             category=category,
                             code=code,
                             name=clean_name(str(name)),
-                            full_name=str(name),
+                            full_name=full_name,  # 保存前缀信息，格式：名称(前缀)
                             ipo_at=None,
                             total_capital=None,
                             flow_capital=None,
-                            industry=symbol,
+                            industry=symbol,  # 使用美股分类作为行业
                         )
                         s.pinyin = s.generate_pinyin()
                         logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {s}")
