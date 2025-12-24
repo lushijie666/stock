@@ -88,7 +88,7 @@ class TurtleStrategy(BaseStrategy):
             }
         )
 
-class CBR_STRATEGY(BaseStrategy):
+class CBRStrategy(BaseStrategy):
     """CBR (Confirmation-Based Reversal) 策略"""
     def __init__(self):
         super().__init__("CBR策略")

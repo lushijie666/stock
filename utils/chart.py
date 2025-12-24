@@ -998,22 +998,24 @@ class ChartBuilder:
 
         # 添加策略收益线
         line.add_yaxis(
-            "策略收益",
+            "策略收益(%)",
             strategy_values,
             is_smooth=True,
             color="#2e7ed6",
             linestyle_opts=opts.LineStyleOpts(width=3),
-            symbol="none"
+            symbol="none",
+            label_opts=opts.LabelOpts(is_show=False)
         )
 
-        # 添加基准收益线
+        # 添加基准收益线（买入持有）
         line.add_yaxis(
-            "基准收益",
+            "基准收益(%)",
             benchmark_values,
             is_smooth=True,
             color="#2caf18",
             linestyle_opts=opts.LineStyleOpts(width=3, type_="dashed"),
-            symbol="none"
+            symbol="none",
+            label_opts=opts.LabelOpts(is_show=False)
         )
         line.set_global_opts(
             title_opts=opts.TitleOpts(
@@ -1022,18 +1024,19 @@ class ChartBuilder:
             ),
             legend_opts=opts.LegendOpts(
                 type_="scroll",
-                pos_top="50%",
+                pos_top="5%",
                 pos_left="right",
-                orient="vertical",  # 改为垂直排列
-                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                orient="vertical",
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=12),
             ),
             tooltip_opts=opts.TooltipOpts(
                 trigger="axis",
                 axis_pointer_type="cross",
-                background_color="rgba(245, 245, 245, 0.8)",
+                background_color="rgba(245, 245, 245, 0.9)",
                 border_width=1,
                 border_color="#ccc",
-                textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                formatter="{b}<br/>{a}: {c}%"
             ),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
@@ -1041,13 +1044,13 @@ class ChartBuilder:
                 boundary_gap=False,
                 axisline_opts=opts.AxisLineOpts(
                     is_on_zero=False,
-                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")
                 ),
                 splitline_opts=opts.SplitLineOpts(
                     is_show=True,
-                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")
                 ),
-                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
+                axislabel_opts=opts.LabelOpts(color="#000000", rotate=45),
                 min_="dataMin",
                 max_="dataMax"
             ),
@@ -1055,18 +1058,31 @@ class ChartBuilder:
                 is_scale=True,
                 splitline_opts=opts.SplitLineOpts(
                     is_show=True,
-                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")
                 ),
-                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+                axislabel_opts=opts.LabelOpts(
+                    color="#000000",
+                    formatter="{value}%"
+                ),
+                axisline_opts=opts.AxisLineOpts(
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")
+                )
             ),
             datazoom_opts=[
                 opts.DataZoomOpts(
                     is_show=True,
                     type_="slider",
-                    pos_top="0%",  # 放在顶部
-                    pos_left="10%",  # 左侧边距
-                    pos_right="10%",  # 右侧边距
-                    xaxis_index=[0, 1],
+                    pos_top="90%",
+                    pos_left="10%",
+                    pos_right="10%",
+                    xaxis_index=[0],
+                    range_start=0,
+                    range_end=100,
+                ),
+                opts.DataZoomOpts(
+                    is_show=False,
+                    type_="inside",
+                    xaxis_index=[0],
                     range_start=0,
                     range_end=100,
                 ),
@@ -1302,89 +1318,125 @@ class ChartBuilder:
     @staticmethod
     def create_position_chart(dates, positions, cash_values):
         """
-        创建持仓变化图表
+        创建持仓变化图表（堆叠面积图）
         """
-        line_chart = Line()
-        line_chart.add_xaxis(dates)
+        # 计算总资产
+        total_values = [p + c for p, c in zip(positions, cash_values)]
 
-        # 持仓价值线
-        line_chart.add_yaxis(
-            "持仓价值",
+        bar = Bar()
+        bar.add_xaxis(dates)
+
+        # 添加持仓价值（堆叠柱状图）
+        bar.add_yaxis(
+            "持仓价值(¥)",
             positions,
-            is_smooth=True,
-            color="#2ca02c",
-            linestyle_opts=opts.LineStyleOpts(width=3),
-            symbol="none"
+            stack="资产",
+            color="#5470c6",
+            label_opts=opts.LabelOpts(is_show=False),
+            itemstyle_opts=opts.ItemStyleOpts(
+                border_color="#fff",
+                border_width=0
+            )
         )
 
-        # 现金价值线
-        line_chart.add_yaxis(
-            "现金价值",
+        # 添加现金价值（堆叠柱状图）
+        bar.add_yaxis(
+            "现金价值(¥)",
             cash_values,
-            is_smooth=True,
-            color="#d62728",
-            linestyle_opts=opts.LineStyleOpts(width=3),
-            symbol="none"
+            stack="资产",
+            color="#91cc75",
+            label_opts=opts.LabelOpts(is_show=False),
+            itemstyle_opts=opts.ItemStyleOpts(
+                border_color="#fff",
+                border_width=0
+            )
         )
 
-        line_chart.set_global_opts(
+        # 添加总资产线
+        line = Line()
+        line.add_xaxis(dates)
+        line.add_yaxis(
+            "总资产(¥)",
+            total_values,
+            is_smooth=True,
+            color="#ee6666",
+            linestyle_opts=opts.LineStyleOpts(width=3),
+            symbol="circle",
+            symbol_size=6,
+            label_opts=opts.LabelOpts(is_show=False),
+        )
+
+        bar.set_global_opts(
             title_opts=opts.TitleOpts(
                 title="",
                 pos_left="left",
             ),
             legend_opts=opts.LegendOpts(
                 type_="scroll",
-                pos_top="50%",
+                pos_top="5%",
                 pos_left="right",
-                orient="vertical",  # 改为垂直排列
-                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                orient="vertical",
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=12),
             ),
             tooltip_opts=opts.TooltipOpts(
                 trigger="axis",
                 axis_pointer_type="cross",
-                background_color="rgba(245, 245, 245, 0.8)",
+                background_color="rgba(245, 245, 245, 0.9)",
                 border_width=1,
                 border_color="#ccc",
-                textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                formatter="{b}<br/>{a}: ¥{c}"
             ),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
                 is_scale=True,
-                boundary_gap=False,
+                boundary_gap=True,
                 axisline_opts=opts.AxisLineOpts(
-                    is_on_zero=False,
-                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")
                 ),
                 splitline_opts=opts.SplitLineOpts(
-                    is_show=True,
-                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                    is_show=False
                 ),
-                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
-                min_="dataMin",
-                max_="dataMax"
+                axislabel_opts=opts.LabelOpts(color="#000000", rotate=45),
             ),
             yaxis_opts=opts.AxisOpts(
                 is_scale=True,
                 splitline_opts=opts.SplitLineOpts(
                     is_show=True,
-                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")
                 ),
-                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+                axislabel_opts=opts.LabelOpts(
+                    color="#000000",
+                    formatter="¥{value}"
+                ),
+                axisline_opts=opts.AxisLineOpts(
+                    linestyle_opts=opts.LineStyleOpts(color="#666666")
+                )
             ),
             datazoom_opts=[
                 opts.DataZoomOpts(
                     is_show=True,
                     type_="slider",
-                    pos_top="0%",  # 放在顶部
-                    pos_left="10%",  # 左侧边距
-                    pos_right="10%",  # 右侧边距
-                    xaxis_index=[0, 1],
+                    pos_top="90%",
+                    pos_left="10%",
+                    pos_right="10%",
+                    xaxis_index=[0],
+                    range_start=0,
+                    range_end=100,
+                ),
+                opts.DataZoomOpts(
+                    is_show=False,
+                    type_="inside",
+                    xaxis_index=[0],
                     range_start=0,
                     range_end=100,
                 ),
             ]
         )
-        return line_chart
+
+        # 组合柱状图和折线图
+        bar.overlap(line)
+        return bar
 
     @staticmethod
     def create_macd_chart(dates: list, diff: list, dea: list, hist: list,
