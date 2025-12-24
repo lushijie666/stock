@@ -440,7 +440,15 @@ def remove_follow(category: Category, stock_code: str):
     except Exception as e:
         show_message(f"取消关注失败：{str(e)}", type="error")
 
-def reload(category: Category):
+def reload(category: Category, us_category: str = None):
+    """
+    刷新股票数据
+
+    Args:
+        category: 股票分类
+        us_category: 美股分类，仅当category为US_XX时有效
+                    可选值: '科技类', '金融类', '医药食品类', '媒体类', '汽车能源类', '制造零售类'
+    """
     def build_filter(args: Dict[str, Any], session: Session) -> List:
         return [
             Stock.category == category,
@@ -454,7 +462,7 @@ def reload(category: Category):
         excluded_columns=['is_followed', 'followed_at']
     )
     return history_handler.refresh(
-        category=category)
+        category=category, us_category=us_category)
 
 def fetch(category: Category) -> list:
     # 拉取 https://akshare.akfamily.xyz/data/stock/stock.html#id11
