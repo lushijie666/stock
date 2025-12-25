@@ -5,6 +5,8 @@ from enums.strategy import StrategyType
 
 
 def show_page():
+    if 'selected_strategy' in st.session_state:
+        del st.session_state['selected_strategy']
     st.markdown(
         f"""
           <div class="table-header">

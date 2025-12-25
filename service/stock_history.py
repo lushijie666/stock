@@ -400,8 +400,6 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
 
         logging.info(f"开始获取美股[{KEY_PREFIX}][{t.text}]数据..., 股票:{code}, 开始日期: {start_date}, 结束日期: {end_date}")
 
-        # 从数据库获取股票信息，提取前缀
-        prefix = "105"  # 默认前缀
         try:
             with get_db_session() as session:
                 from models.stock import Stock
@@ -409,25 +407,20 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                     Stock.code == code,
                     Stock.category == Category.US_XX
                 ).first()
-
-                if stock and stock.full_name:
-                    # full_name 格式: 名称(前缀)，例如: 英伟达(105)
-                    import re
-                    match = re.search(r'\((\d+)\)$', stock.full_name)
-                    if match:
-                        prefix = match.group(1)
-                        logging.info(f"从数据库获取到美股前缀: {prefix}, full_name: {stock.full_name}")
-                    else:
-                        logging.warning(f"无法从 full_name 提取前缀，使用默认值: {prefix}, full_name: {stock.full_name}")
-                else:
-                    logging.warning(f"未找到股票或 full_name 为空，使用默认前缀: {prefix}")
+                if not stock:
+                    logging.error(f"未找到股票: {code}")
+                    _us_stock_limiter.handle_success()
+                    return []
+                try:
+                    symbol = stock.get_us_stock_symbol()
+                    logging.info(f"使用美股代码: {symbol} (股票: {stock.name}({stock.code}))")
+                except Exception as symbol_error:
+                    logging.warning(f"获取股票 {code} 的symbol失败: {str(symbol_error)}，使用默认前缀")
+                    symbol = f"105.{code}"  # 默认回退方案
         except Exception as e:
-            logging.warning(f"查询股票前缀失败，使用默认值: {prefix}, 错误: {str(e)}")
-
-        # akshare 需要带前缀的股票代码（如 105.AAPL 或 106.BABA）
-        symbol = f"{prefix}.{code}"
-        logging.info(f"使用美股代码: {symbol} (前缀: {prefix}, 代码: {code})")
-
+            logging.error(f"查询股票信息失败: {str(e)}")
+            _us_stock_limiter.handle_success()
+            return []
         try:
             # 30分钟数据使用分时接口
             if t == StockHistoryType.THIRTY_M:
@@ -482,7 +475,7 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
 
             data_list = []
             for index, row in df.iterrows():
-                # 根据不同的时间类型创建相应的模型实例
+
                 model_instance = None
 
                 # 30分钟数据的字段名不同（来自分时接口）
@@ -493,7 +486,6 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                         date_str = str(row['时间'])
                     else:
                         date_str = str(index)
-
                     model_instance = StockHistory30M(
                         category=Category.US_XX,
                         code=code,
@@ -508,7 +500,6 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                 else:
                     # 日线、周线、月线数据字段：日期、开盘、收盘、最高、最低、成交量、成交额、振幅、涨跌幅、涨跌额、换手率
                     date_str = str(row['日期'])
-
                     if t == StockHistoryType.W:
                         model_instance = StockHistoryW(
                             category=Category.US_XX,
@@ -551,6 +542,8 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                             turnover_ratio=clean_numeric_value(row['换手率']),
                             change=clean_numeric_value(row['涨跌幅'])
                         )
+                logging.info(
+                    f"获取美股[{KEY_PREFIX}][{t.text}]数据为..., 分类: {model_instance.category.fullText}, 股票:{symbol}, 日期: {model_instance.date}, 信息为: {model_instance}")
                 data_list.append(model_instance)
             logging.info(
                 f"获取美股[{KEY_PREFIX}][{t.text}]数据成功..., 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, 共{len(data_list)}条记录")

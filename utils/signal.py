@@ -7,7 +7,8 @@ import pandas as pd
 from enums.signal import SignalStrength
 from enums.strategy import StrategyType
 
-from utils.strategy import StrategyResult, MACDStrategy, SMAStrategy, TurtleStrategy, CBRStrategy
+from utils.strategy import StrategyResult, MACDStrategy, SMAStrategy, TurtleStrategy, CBRStrategy, RSIStrategy, \
+    BollingerStrategy, KDJStrategy
 
 
 def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = None, merge_and_filter: bool = True) -> List[Dict]:
@@ -84,6 +85,9 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
         StrategyType.SMA_STRATEGY: SMAStrategy(),
         StrategyType.TURTLE_STRATEGY: TurtleStrategy(),
         StrategyType.CBR_STRATEGY: CBRStrategy(),
+        StrategyType.RSI_STRATEGY: RSIStrategy(),
+        StrategyType.BOLL_STRATEGY: BollingerStrategy(),
+        StrategyType.KDJ_STRATEGY: KDJStrategy(),
     }
 
     results = {}

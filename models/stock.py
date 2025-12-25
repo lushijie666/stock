@@ -92,3 +92,29 @@ class Stock(Base):
         except Exception as e:
             logging.error(f"获取{category.text}股票代码列表失败: {str(e)}")
             return []
+
+    def get_us_stock_prefix(self) -> str:
+        """
+        获取美股股票的前缀
+        从 full_name 字段中提取前缀，格式如: "英伟达(105)" -> "105"
+        如果无法提取，则返回默认前缀 "105"
+        """
+        if not self.full_name:
+            return "105"
+
+        import re
+        match = re.search(r'\((\d+)\)$', self.full_name)
+        if match:
+            return match.group(1)
+        else:
+            logging.warning(f"无法从 full_name 提取前缀，使用默认值: 105, full_name: {self.full_name}")
+            return "105"
+
+    def get_us_stock_symbol(self) -> str:
+        """
+        获取美股股票的完整symbol，格式如: "105.AAPL"
+        """
+        if self.category != Category.US_XX:
+            raise ValueError(f"股票 {self.code} 不是美股分类")
+        prefix = self.get_us_stock_prefix()
+        return f"{prefix}.{self.code}"

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime as dt
 
 from config.database import Base
@@ -5,6 +6,33 @@ from sqlalchemy import Column, BigInteger, String, Numeric, Date, DateTime, Bool
 
 from enums.history_type import StockHistoryType
 
+
+class BaseStockHistory(Base):
+    """股票历史数据基类"""
+    __abstract__ = True  # 抽象基类
+
+    def __str__(self):
+        return self.to_json()
+
+    def to_json(self):
+        """转换为 JSON 字符串"""
+        return json.dumps(self.to_dict(), ensure_ascii=False, separators=(',', ':'))  # 移除缩进，紧凑格式
+
+    def to_dict(self):
+        """转换为字典，子类可重写此方法以自定义输出"""
+        result = {}
+        for column in self.__table__.columns:
+            value = getattr(self, column.name)
+            if isinstance(value, dt):
+                value = value.isoformat()
+            elif hasattr(value, 'to_eng_float'):  # 处理 Numeric 类型
+                value = float(value) if value is not None else None
+            elif isinstance(value, int) and value is not None:
+                value = int(value)
+            elif isinstance(value, float) and value is not None:
+                value = float(value)
+            result[column.name] = value
+        return result
 
 def get_history_model(history_type: StockHistoryType):
     model_mapping = {
@@ -15,7 +43,7 @@ def get_history_model(history_type: StockHistoryType):
     }
     return model_mapping.get(history_type, StockHistoryD)
 
-class StockHistoryD(Base):
+class StockHistoryD(BaseStockHistory):
     __tablename__ = "stock_history_d"
 
     # 添加唯一约束
@@ -48,7 +76,7 @@ class StockHistoryD(Base):
             setattr(self, key, value)
 
 
-class StockHistoryW(Base):
+class StockHistoryW(BaseStockHistory):
     __tablename__ = "stock_history_w"
 
     # 添加唯一约束
@@ -80,7 +108,7 @@ class StockHistoryW(Base):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-class StockHistoryM(Base):
+class StockHistoryM(BaseStockHistory):
     __tablename__ = "stock_history_m"
 
     # 添加唯一约束
@@ -113,7 +141,7 @@ class StockHistoryM(Base):
             setattr(self, key, value)
 
 
-class StockHistory30M(Base):
+class StockHistory30M(BaseStockHistory):
     __tablename__ = "stock_history_30m"
 
     # 添加唯一约束

@@ -65,19 +65,7 @@ def show_page(stock, t: StockHistoryType):
         }
         selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
         if selected_strategy_key not in st.session_state:
-            # 根据时间周期类型设置默认选中的策略
-            if t in [StockHistoryType.W, StockHistoryType.M]:  # 周线和月线
-                st.session_state[selected_strategy_key] = [
-                    StrategyType.MACD_STRATEGY,
-                    StrategyType.SMA_STRATEGY,
-                    StrategyType.TURTLE_STRATEGY
-                ]
-            else:
-                # 天线和30分钟线默认选MACD和SMA
-                st.session_state[selected_strategy_key] = [
-                    StrategyType.MACD_STRATEGY,
-                    StrategyType.SMA_STRATEGY
-                ]
+            st.session_state[selected_strategy_key] = StrategyType.get_default_strategies_by_type(t)
 
         selected_strategies = st.session_state.get(selected_strategy_key, [])
         cols = st.columns(len(strategy_options))

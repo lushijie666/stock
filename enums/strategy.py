@@ -44,3 +44,47 @@ class StrategyType(Enum):
             cls.BOLL_STRATEGY,
             cls.KDJ_STRATEGY
         ]
+
+    @classmethod
+    def get_default_strategies_by_type(cls, t):
+        """根据时间周期类型获取默认策略配置"""
+        from enums.history_type import StockHistoryType  # 延迟导入避免循环依赖
+
+        strategy_mapping = {
+            StockHistoryType.D: [  # 日线
+                cls.MACD_STRATEGY,
+                cls.SMA_STRATEGY,
+                cls.RSI_STRATEGY,
+                cls.KDJ_STRATEGY,
+                cls.BOLL_STRATEGY,
+            ],
+            StockHistoryType.W: [  # 周线
+                cls.MACD_STRATEGY,
+                cls.SMA_STRATEGY,
+                cls.TURTLE_STRATEGY,
+                cls.RSI_STRATEGY,
+                cls.KDJ_STRATEGY,
+                cls.BOLL_STRATEGY,
+                cls.CBR_STRATEGY,
+            ],
+            StockHistoryType.M: [  # 月线
+                cls.MACD_STRATEGY,
+                cls.SMA_STRATEGY,
+                cls.TURTLE_STRATEGY,
+                cls.CBR_STRATEGY,
+            ],
+
+            StockHistoryType.THIRTY_M: [  # 30分钟线
+                cls.MACD_STRATEGY,
+                cls.SMA_STRATEGY,
+                cls.RSI_STRATEGY,
+                cls.KDJ_STRATEGY,
+            ]
+        }
+        return strategy_mapping.get(t, [
+            cls.MACD_STRATEGY,
+            cls.SMA_STRATEGY,
+            cls.RSI_STRATEGY,
+            cls.KDJ_STRATEGY,
+            cls.BOLL_STRATEGY,
+        ])
