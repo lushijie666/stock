@@ -61,7 +61,8 @@ def show_page(stock, t: StockHistoryType):
             StrategyType.CBR_STRATEGY: StrategyType.CBR_STRATEGY.fullText,
             StrategyType.RSI_STRATEGY: StrategyType.RSI_STRATEGY.fullText,
             StrategyType.BOLL_STRATEGY: StrategyType.BOLL_STRATEGY.fullText,
-            StrategyType.KDJ_STRATEGY: StrategyType.KDJ_STRATEGY.fullText
+            StrategyType.KDJ_STRATEGY: StrategyType.KDJ_STRATEGY.fullText,
+            StrategyType.CANDLESTICK_STRATEGY: StrategyType.CANDLESTICK_STRATEGY.fullText
         }
         selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
         if selected_strategy_key not in st.session_state:

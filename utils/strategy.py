@@ -183,6 +183,46 @@ class KDJStrategy(BaseStrategy):
             }
         )
 
+
+class CandlestickStrategy(BaseStrategy):
+    """蜡烛图形态策略 - K线形态识别"""
+    def __init__(self,
+                 body_min_ratio: float = 0.6,
+                 shadow_ratio: float = 2.0,
+                 trend_ma_period: int = 20):
+        super().__init__("蜡烛图策略")
+        self.body_min_ratio = body_min_ratio
+        self.shadow_ratio = shadow_ratio
+        self.trend_ma_period = trend_ma_period
+
+    def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
+        signals = calculate_candlestick_signals(
+            df,
+            body_min_ratio=self.body_min_ratio,
+            shadow_ratio=self.shadow_ratio,
+            trend_ma_period=self.trend_ma_period
+        )
+        return StrategyResult(
+            strategy_type=StrategyType.CANDLESTICK_STRATEGY,
+            signals=signals,
+            metadata={
+                "description": "基于经典K线形态的交易信号识别",
+                "patterns": [
+                    "锤子线/上吊线",
+                    "倒锤子线/流星线",
+                    "十字星",
+                    "看涨吞没/看跌吞没",
+                    "乌云盖顶/刺透形态",
+                    "晨星/黄昏星",
+                    "三只白兵/三只乌鸦"
+                ],
+                "body_min_ratio": self.body_min_ratio,
+                "shadow_ratio": self.shadow_ratio,
+                "trend_ma_period": self.trend_ma_period
+            }
+        )
+
+
 def calculate_macd(df: pd.DataFrame, fast_period=12, slow_period=26, signal_period=9):
     df = df.copy()
     df['EMA12'] = df['closing'].ewm(span=fast_period, adjust=False).mean()
@@ -1110,3 +1150,343 @@ def calculate_kdj_signals(
             })
 
     return signals
+
+def calculate_candlestick_signals(
+    df: pd.DataFrame,
+    body_min_ratio: float = 0.6,
+    shadow_ratio: float = 2.0,
+    trend_ma_period: int = 20
+) -> List[Dict]:
+    """
+    蜡烛图形态识别策略
+    
+    识别15+种经典K线形态：
+    - 单K线：锤子线、倒锤子线、上吊线、流星线、十字星
+    - 双K线：看涨吞没、看跌吞没、乌云盖顶、刺透形态
+    - 三K线：晨星、黄昏星、三只白兵、三只乌鸦
+    
+    参数：
+        df: 股票数据DataFrame
+        body_min_ratio: 实体最小比例（相对总长度）
+        shadow_ratio: 影线比例阈值（相对实体）
+        trend_ma_period: 趋势判断MA周期
+    """
+    signals = []
+    
+    if len(df) < max(trend_ma_period, 3):
+        return signals
+    
+    # 计算趋势MA
+    df = df.copy()
+    df['MA'] = df['closing'].rolling(window=trend_ma_period).mean()
+    
+    for i in range(2, len(df)):  # 从第3根K线开始，确保有足够的历史数据
+        # 获取当前和前两根K线数据
+        curr = df.iloc[i]
+        prev1 = df.iloc[i-1]
+        prev2 = df.iloc[i-2]
+        
+        # 分析K线特征
+        curr_info = _analyze_candle(curr)
+        prev1_info = _analyze_candle(prev1)
+        prev2_info = _analyze_candle(prev2)
+        
+        # 判断趋势
+        trend = _get_trend(curr, df, trend_ma_period)
+        
+        # 检测单K线形态
+        single_pattern = _detect_single_candle_pattern(
+            curr_info, trend, body_min_ratio, shadow_ratio
+        )
+        if single_pattern:
+            signals.append({
+                'date': curr['date'],
+                'price': float(curr['closing']),
+                'type': single_pattern['type'],
+                'strength': single_pattern['strength'],
+                'pattern_name': single_pattern['name']
+            })
+        
+        # 检测双K线形态
+        double_pattern = _detect_double_candle_pattern(
+            prev1_info, curr_info, trend
+        )
+        if double_pattern:
+            signals.append({
+                'date': curr['date'],
+                'price': float(curr['closing']),
+                'type': double_pattern['type'],
+                'strength': double_pattern['strength'],
+                'pattern_name': double_pattern['name']
+            })
+        
+        # 检测三K线形态
+        triple_pattern = _detect_triple_candle_pattern(
+            prev2_info, prev1_info, curr_info, trend
+        )
+        if triple_pattern:
+            signals.append({
+                'date': curr['date'],
+                'price': float(curr['closing']),
+                'type': triple_pattern['type'],
+                'strength': triple_pattern['strength'],
+                'pattern_name': triple_pattern['name']
+            })
+    
+    return signals
+
+
+def _analyze_candle(row) -> Dict:
+    """分析单根K线的特征"""
+    open_price = float(row['opening'])
+    close_price = float(row['closing'])
+    high_price = float(row['highest'])
+    low_price = float(row['lowest'])
+    
+    # 实体
+    body = abs(close_price - open_price)
+    
+    # 影线
+    upper_shadow = high_price - max(open_price, close_price)
+    lower_shadow = min(open_price, close_price) - low_price
+    
+    # 总长度
+    total_range = high_price - low_price
+    
+    # 颜色（阳线 or 阴线）
+    is_bullish = close_price > open_price
+    
+    # 实体在总长度中的比例
+    body_ratio = body / total_range if total_range > 0 else 0
+    
+    return {
+        'open': open_price,
+        'close': close_price,
+        'high': high_price,
+        'low': low_price,
+        'body': body,
+        'upper_shadow': upper_shadow,
+        'lower_shadow': lower_shadow,
+        'total_range': total_range,
+        'is_bullish': is_bullish,
+        'body_ratio': body_ratio
+    }
+
+
+def _get_trend(curr, df, ma_period: int) -> str:
+    """判断当前趋势"""
+    if pd.isna(curr['MA']):
+        return 'neutral'
+    
+    price = float(curr['closing'])
+    ma = float(curr['MA'])
+    
+    # 价格相对MA的偏离
+    deviation = (price - ma) / ma if ma > 0 else 0
+    
+    if deviation > 0.02:  # 超过MA 2%
+        return 'uptrend'
+    elif deviation < -0.02:  # 低于MA 2%
+        return 'downtrend'
+    else:
+        return 'neutral'
+
+
+def _detect_single_candle_pattern(
+    candle: Dict,
+    trend: str,
+    body_min_ratio: float,
+    shadow_ratio: float
+) -> Dict or None:
+    """检测单K线形态"""
+    
+    # 1. 锤子线（Hammer）- 下跌趋势中出现
+    if trend == 'downtrend':
+        # 特征：下影线很长，上影线很短，实体小
+        if (candle['lower_shadow'] >= candle['body'] * shadow_ratio and
+            candle['upper_shadow'] <= candle['body'] * 0.1 and
+            candle['body'] > 0):
+            return {
+                'name': '锤子线',
+                'type': SignalType.BUY,
+                'strength': SignalStrength.STRONG
+            }
+    
+    # 2. 上吊线（Hanging Man）- 上涨趋势中出现
+    if trend == 'uptrend':
+        if (candle['lower_shadow'] >= candle['body'] * shadow_ratio and
+            candle['upper_shadow'] <= candle['body'] * 0.1 and
+            candle['body'] > 0):
+            return {
+                'name': '上吊线',
+                'type': SignalType.SELL,
+                'strength': SignalStrength.WEAK  # 需要确认
+            }
+    
+    # 3. 倒锤子线（Inverted Hammer）- 下跌趋势中出现
+    if trend == 'downtrend':
+        if (candle['upper_shadow'] >= candle['body'] * shadow_ratio and
+            candle['lower_shadow'] <= candle['body'] * 0.1 and
+            candle['body'] > 0):
+            return {
+                'name': '倒锤子线',
+                'type': SignalType.BUY,
+                'strength': SignalStrength.WEAK  # 需要确认
+            }
+    
+    # 4. 流星线（Shooting Star）- 上涨趋势中出现
+    if trend == 'uptrend':
+        if (candle['upper_shadow'] >= candle['body'] * shadow_ratio and
+            candle['lower_shadow'] <= candle['body'] * 0.1 and
+            candle['body'] > 0):
+            return {
+                'name': '流星线',
+                'type': SignalType.SELL,
+                'strength': SignalStrength.STRONG
+            }
+    
+    # 5. 十字星（Doji）- 趋势转折信号
+    if candle['body_ratio'] < 0.1:  # 实体很小
+        if trend == 'uptrend':
+            return {
+                'name': '十字星',
+                'type': SignalType.SELL,
+                'strength': SignalStrength.WEAK
+            }
+        elif trend == 'downtrend':
+            return {
+                'name': '十字星',
+                'type': SignalType.BUY,
+                'strength': SignalStrength.WEAK
+            }
+    
+    return None
+
+
+def _detect_double_candle_pattern(
+    prev: Dict,
+    curr: Dict,
+    trend: str
+) -> Dict or None:
+    """检测双K线组合形态"""
+    
+    # 1. 看涨吞没（Bullish Engulfing）
+    if (trend == 'downtrend' and
+        not prev['is_bullish'] and  # 前一根是阴线
+        curr['is_bullish'] and      # 当前是阳线
+        curr['open'] < prev['close'] and  # 当前开盘低于前一根收盘
+        curr['close'] > prev['open']):    # 当前收盘高于前一根开盘
+        return {
+            'name': '看涨吞没',
+            'type': SignalType.BUY,
+            'strength': SignalStrength.STRONG
+        }
+    
+    # 2. 看跌吞没（Bearish Engulfing）
+    if (trend == 'uptrend' and
+        prev['is_bullish'] and      # 前一根是阳线
+        not curr['is_bullish'] and  # 当前是阴线
+        curr['open'] > prev['close'] and  # 当前开盘高于前一根收盘
+        curr['close'] < prev['open']):    # 当前收盘低于前一根开盘
+        return {
+            'name': '看跌吞没',
+            'type': SignalType.SELL,
+            'strength': SignalStrength.STRONG
+        }
+    
+    # 3. 乌云盖顶（Dark Cloud Cover）
+    if (trend == 'uptrend' and
+        prev['is_bullish'] and      # 前一根是大阳线
+        not curr['is_bullish'] and  # 当前是阴线
+        prev['body'] > prev['total_range'] * 0.6 and  # 前一根实体够大
+        curr['open'] > prev['high'] and  # 当前开盘高于前一根最高
+        curr['close'] < (prev['open'] + prev['close']) / 2):  # 收盘在前一根实体中部以下
+        return {
+            'name': '乌云盖顶',
+            'type': SignalType.SELL,
+            'strength': SignalStrength.STRONG
+        }
+    
+    # 4. 刺透形态（Piercing Pattern）
+    if (trend == 'downtrend' and
+        not prev['is_bullish'] and  # 前一根是大阴线
+        curr['is_bullish'] and      # 当前是阳线
+        prev['body'] > prev['total_range'] * 0.6 and  # 前一根实体够大
+        curr['open'] < prev['low'] and  # 当前开盘低于前一根最低
+        curr['close'] > (prev['open'] + prev['close']) / 2):  # 收盘在前一根实体中部以上
+        return {
+            'name': '刺透形态',
+            'type': SignalType.BUY,
+            'strength': SignalStrength.STRONG
+        }
+    
+    return None
+
+
+def _detect_triple_candle_pattern(
+    candle1: Dict,
+    candle2: Dict,
+    candle3: Dict,
+    trend: str
+) -> Dict or None:
+    """检测三K线组合形态"""
+    
+    # 1. 晨星（Morning Star）
+    if (trend == 'downtrend' and
+        not candle1['is_bullish'] and  # 第一根是大阴线
+        candle1['body'] > candle1['total_range'] * 0.6 and
+        candle2['body'] < candle2['total_range'] * 0.3 and  # 第二根实体小
+        candle3['is_bullish'] and      # 第三根是大阳线
+        candle3['body'] > candle3['total_range'] * 0.6 and
+        candle3['close'] > (candle1['open'] + candle1['close']) / 2):  # 第三根收盘进入第一根实体
+        return {
+            'name': '晨星',
+            'type': SignalType.BUY,
+            'strength': SignalStrength.STRONG
+        }
+    
+    # 2. 黄昏星（Evening Star）
+    if (trend == 'uptrend' and
+        candle1['is_bullish'] and      # 第一根是大阳线
+        candle1['body'] > candle1['total_range'] * 0.6 and
+        candle2['body'] < candle2['total_range'] * 0.3 and  # 第二根实体小
+        not candle3['is_bullish'] and  # 第三根是大阴线
+        candle3['body'] > candle3['total_range'] * 0.6 and
+        candle3['close'] < (candle1['open'] + candle1['close']) / 2):  # 第三根收盘进入第一根实体
+        return {
+            'name': '黄昏星',
+            'type': SignalType.SELL,
+            'strength': SignalStrength.STRONG
+        }
+    
+    # 3. 三只白兵（Three White Soldiers）
+    if (candle1['is_bullish'] and candle2['is_bullish'] and candle3['is_bullish'] and
+        candle2['close'] > candle1['close'] and  # 收盘价递增
+        candle3['close'] > candle2['close'] and
+        candle2['open'] > candle1['open'] and candle2['open'] < candle1['close'] and  # 开盘在前一根实体内
+        candle3['open'] > candle2['open'] and candle3['open'] < candle2['close'] and
+        candle1['upper_shadow'] < candle1['body'] * 0.3 and  # 上影线较短
+        candle2['upper_shadow'] < candle2['body'] * 0.3 and
+        candle3['upper_shadow'] < candle3['body'] * 0.3):
+        return {
+            'name': '三只白兵',
+            'type': SignalType.BUY,
+            'strength': SignalStrength.STRONG
+        }
+    
+    # 4. 三只乌鸦（Three Black Crows）
+    if (not candle1['is_bullish'] and not candle2['is_bullish'] and not candle3['is_bullish'] and
+        candle2['close'] < candle1['close'] and  # 收盘价递减
+        candle3['close'] < candle2['close'] and
+        candle2['open'] < candle1['open'] and candle2['open'] > candle1['close'] and  # 开盘在前一根实体内
+        candle3['open'] < candle2['open'] and candle3['open'] > candle2['close'] and
+        candle1['lower_shadow'] < candle1['body'] * 0.3 and  # 下影线较短
+        candle2['lower_shadow'] < candle2['body'] * 0.3 and
+        candle3['lower_shadow'] < candle3['body'] * 0.3):
+        return {
+            'name': '三只乌鸦',
+            'type': SignalType.SELL,
+            'strength': SignalStrength.STRONG
+        }
+    
+    return None

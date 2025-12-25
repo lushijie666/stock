@@ -20,7 +20,7 @@ def show_page():
     # 定义策略分组
     trend_strategies = [StrategyType.MACD_STRATEGY,StrategyType.SMA_STRATEGY, StrategyType.TURTLE_STRATEGY]
     overbought_oversold_strategies = [StrategyType.RSI_STRATEGY,StrategyType.KDJ_STRATEGY]
-    other_strategies = [StrategyType.BOLL_STRATEGY,StrategyType.CBR_STRATEGY]
+    other_strategies = [StrategyType.BOLL_STRATEGY,StrategyType.CBR_STRATEGY,StrategyType.CANDLESTICK_STRATEGY]
 
     st.markdown(f"""
              <div class="chart-header">
@@ -165,6 +165,7 @@ def show_detail_dialog(strategy):
         StrategyType.RSI_STRATEGY: show_rsi_strategy,
         StrategyType.BOLL_STRATEGY: show_bollinger_strategy,
         StrategyType.KDJ_STRATEGY: show_kdj_strategy,
+        StrategyType.CANDLESTICK_STRATEGY: show_candlestick_strategy,
     }
     handler = strategy_mapping.get(strategy)
     if handler:
@@ -1208,3 +1209,456 @@ def show_cbr_strategy():
     → 满足条件：上涨后跌破，卖出信号！
     ```
     """)
+
+def show_candlestick_strategy():
+    """蜡烛图策略详情页"""
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"""
+               <div class="metric-sub-card metric-card-1">
+                   <div class="metric-label">策略类型</div>
+                   <div class="metric-value">形态识别</div>
+               </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-2">
+                  <div class="metric-label">适用周期</div>
+                  <div class="metric-value">日/周/月线</div>
+              </div>
+       """, unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"""
+              <div class="metric-sub-card metric-card-3">
+                  <div class="metric-label">难度等级</div>
+                  <div class="metric-value">⭐⭐⭐⭐</div>
+              </div>
+       """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # 策略原理
+    st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">📖</span>
+                   <span class="chart-title">策略原理</span>
+               </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    ### 什么是蜡烛图（K线图）？
+    
+    蜡烛图源于18世纪日本米市交易，是由一位叫本间宗久的米商发明。它通过绘制开盘价、收盘价、最高价和最低价四个价格，
+    形成类似蜡烛的图形，因此得名。
+    
+    **K线组成部分**：
+    - **实体（Body）**：开盘价和收盘价之间的矩形区域
+    - **上影线（Upper Shadow）**：实体上方到最高价的线段
+    - **下影线（Lower Shadow）**：实体下方到最低价的线段
+    
+    **颜色含义**：
+    - **阳线（红色/白色）**：收盘价 > 开盘价，表示上涨
+    - **阴线（绿色/黑色）**：收盘价 < 开盘价，表示下跌
+    
+    ### 形态识别原理
+    
+    通过识别特定的K线组合形态，可以预测价格的反转或延续趋势。本策略实现了15+种经典形态识别。
+    """)
+
+    st.divider()
+
+    # 识别的形态类型
+    st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">📊</span>
+                   <span class="chart-title">形态分类</span>
+               </div>
+    """, unsafe_allow_html=True)
+
+    # 单K线形态
+    st.markdown("### 1. 单K线反转形态")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **🔨 锤子线（Hammer）** - 强烈看涨
+        - 特征：下影线长（≥2倍实体），上影线短
+        - 出现位置：下跌趋势末端
+        - 信号强度：★★★★☆
+        - 含义：价格探底回升，多方开始反击
+        
+        **🔻 倒锤子线（Inverted Hammer）** - 看涨
+        - 特征：上影线长（≥2倍实体），下影线短
+        - 出现位置：下跌趋势末端
+        - 信号强度：★★★☆☆
+        - 含义：买方试探性上攻，需确认
+        """)
+    
+    with col2:
+        st.markdown("""
+        **☄️ 流星线（Shooting Star）** - 强烈看跌
+        - 特征：上影线长（≥2倍实体），下影线短
+        - 出现位置：上涨趋势顶部
+        - 信号强度：★★★★☆
+        - 含义：价格冲高回落，卖压沉重
+        
+        **🔺 上吊线（Hanging Man）** - 看跌
+        - 特征：下影线长（≥2倍实体），上影线短
+        - 出现位置：上涨趋势顶部
+        - 信号强度：★★★☆☆
+        - 含义：获利盘涌出，需要警惕
+        """)
+    
+    st.markdown("""
+    **➕ 十字星（Doji）** - 趋势转折
+    - 特征：开盘价 ≈ 收盘价（实体极小）
+    - 出现位置：任何趋势中
+    - 信号强度：★★☆☆☆
+    - 含义：多空力量均衡，趋势可能反转
+    """)
+
+    # 双K线形态
+    st.markdown("### 2. 双K线组合形态")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **📈 看涨吞没（Bullish Engulfing）**
+        - 形态：第一根阴线 + 第二根大阳线完全吞没第一根
+        - 出现位置：下跌趋势
+        - 信号强度：★★★★★
+        - 交易建议：强烈买入信号，可积极建仓
+        
+        **🌅 刺透形态（Piercing Pattern）**
+        - 形态：大阴线 + 阳线收盘在前一根实体中部以上
+        - 出现位置：下跌趋势
+        - 信号强度：★★★★☆
+        - 交易建议：看涨信号，可考虑买入
+        """)
+    
+    with col2:
+        st.markdown("""
+        **📉 看跌吞没（Bearish Engulfing）**
+        - 形态：第一根阳线 + 第二根大阴线完全吞没第一根
+        - 出现位置：上涨趋势
+        - 信号强度：★★★★★
+        - 交易建议：强烈卖出信号，应及时止盈
+        
+        **☁️ 乌云盖顶（Dark Cloud Cover）**
+        - 形态：大阳线 + 阴线收盘在前一根实体中部以下
+        - 出现位置：上涨趋势
+        - 信号强度：★★★★☆
+        - 交易建议：看跌信号，可考虑卖出
+        """)
+
+    # 三K线形态
+    st.markdown("### 3. 三K线组合形态")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **🌟 晨星（Morning Star）**
+        - 形态：大阴线 + 小实体 + 大阳线
+        - 出现位置：下跌趋势末端
+        - 信号强度：★★★★★
+        - 交易建议：黎明来临，强烈买入
+        
+        **⚔️ 三只白兵（Three White Soldiers）**
+        - 形态：连续三根阳线，收盘价递增
+        - 出现位置：下跌趋势或盘整后
+        - 信号强度：★★★★★
+        - 交易建议：多头强势，可追涨
+        """)
+    
+    with col2:
+        st.markdown("""
+        **⭐ 黄昏星（Evening Star）**
+        - 形态：大阳线 + 小实体 + 大阴线
+        - 出现位置：上涨趋势顶部
+        - 信号强度：★★★★★
+        - 交易建议：黄昏降临，强烈卖出
+        
+        **🦅 三只乌鸦（Three Black Crows）**
+        - 形态：连续三根阴线，收盘价递减
+        - 出现位置：上涨趋势或盘整后
+        - 信号强度：★★★★★
+        - 交易建议：空头强势，应止损离场
+        """)
+
+    st.divider()
+
+    # 优缺点分析
+    st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">⚖️</span>
+                   <span class="chart-title">优缺点分析</span>
+               </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        ### ✅ 优点
+        
+        1. **直观易懂**
+           - 图形化展示，容易识别和记忆
+           - 不需要复杂的数学计算
+        
+        2. **历史悠久**
+           - 300年实战验证
+           - 全球交易员广泛使用
+        
+        3. **即时反应**
+           - 实时反映市场情绪
+           - 可以快速做出交易决策
+        
+        4. **适用性广**
+           - 适用于所有金融市场
+           - 不受时间周期限制
+        
+        5. **可组合使用**
+           - 可与技术指标结合
+           - 提高信号准确性
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### ❌ 缺点
+        
+        1. **主观性强**
+           - 形态识别存在个人判断差异
+           - 需要经验积累
+        
+        2. **假信号多**
+           - 震荡市场中容易出现假信号
+           - 需要其他指标确认
+        
+        3. **滞后性**
+           - 形态完成后才能确认
+           - 可能错过最佳入场点
+        
+        4. **需要确认**
+           - 单一形态可靠性有限
+           - 最好等待下一根K线确认
+        
+        5. **学习曲线**
+           - 形态众多，需要时间掌握
+           - 实战经验很重要
+        """)
+
+    st.divider()
+
+    # 实用建议
+    st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">💡</span>
+                   <span class="chart-title">实用建议</span>
+               </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    ### 🎯 最佳实践
+    
+    1. **确认趋势**
+       - 在明确的趋势中，形态信号更可靠
+       - 使用移动平均线等指标辅助判断趋势
+    
+    2. **成交量配合**
+       - 反转形态出现时，成交量应放大
+       - 成交量确认可以提高信号可靠性
+    
+    3. **等待确认**
+       - 不要在形态未完成时就交易
+       - 最好等待下一根K线确认形态
+    
+    4. **结合其他指标**
+       - 配合RSI、MACD等技术指标
+       - 在支撑位/阻力位出现的形态更有效
+    
+    5. **风险控制**
+       - 设置止损位（形态最低/最高点）
+       - 控制仓位，不要满仓操作
+    
+    ### ⚠️ 注意事项
+    
+    - **盘整期谨慎**：在横盘整理期间，形态信号可靠性降低
+    - **单一形态不足**：不要仅依赖单一形态做决策
+    - **时间周期选择**：日线和周线的形态比分钟线更可靠
+    - **市场环境**：牛市中看涨形态效果更好，熊市中看跌形态效果更好
+    - **假突破警惕**：特别是在重要支撑/阻力位附近
+    """)
+
+    st.divider()
+
+    # 参数说明
+    st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">⚙️</span>
+                   <span class="chart-title">参数说明</span>
+               </div>
+    """, unsafe_allow_html=True)
+
+    param_data = {
+        "参数名称": [
+            "body_min_ratio",
+            "shadow_ratio",
+            "trend_ma_period"
+        ],
+        "默认值": [
+            "0.6",
+            "2.0",
+            "20"
+        ],
+        "参数含义": [
+            "实体最小比例（相对总长度），用于识别大实体K线",
+            "影线比例阈值（相对实体），用于识别长影线",
+            "趋势判断MA周期，用于判断当前趋势方向"
+        ],
+        "调整方向": [
+            "提高→要求实体更大，形态更标准",
+            "提高→要求影线更长，形态更极端",
+            "增加→趋势判断更平滑，减少→更敏感"
+        ]
+    }
+
+    import pandas as pd
+    st.dataframe(
+        pd.DataFrame(param_data),
+        hide_index=True,
+        use_container_width=True
+    )
+
+    st.divider()
+
+    # 示例说明
+    st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">📝</span>
+                   <span class="chart-title">信号示例</span>
+               </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    ### 看涨吞没形态示例
+    
+    **场景**：某股票连续下跌后
+    
+    **K线表现**：
+    - Day 1: 开盘100，收盘95，最高101，最低94（阴线）
+    - Day 2: 开盘94，收盘103，最高104，最低93（阳线）
+    
+    **形态特征**：
+    - Day 2开盘价(94) < Day 1收盘价(95) ✓
+    - Day 2收盘价(103) > Day 1开盘价(100) ✓
+    - Day 2完全吞没Day 1 ✓
+    
+    **信号判断**：**强烈买入信号** ⭐⭐⭐⭐⭐
+    
+    **交易策略**：
+    - 入场：Day 2收盘或Day 3开盘买入
+    - 止损：设在Day 2最低点93以下
+    - 目标：根据风险收益比设定（至少1:2）
+    
+    ---
+    
+    ### 黄昏星形态示例
+    
+    **场景**：某股票上涨一段时间后
+    
+    **K线表现**：
+    - Day 1: 开盘100，收盘108，最高109，最低99（大阳线）
+    - Day 2: 开盘110，收盘111，最高112，最低109（小阳线/十字星）
+    - Day 3: 开盘109，收盘102，最高110，最低101（大阴线）
+    
+    **形态特征**：
+    - Day 1是大阳线 ✓
+    - Day 2实体小，有跳空 ✓
+    - Day 3是大阴线，收盘在Day 1实体中部以下 ✓
+    
+    **信号判断**：**强烈卖出信号** ⭐⭐⭐⭐⭐
+    
+    **交易策略**：
+    - 出场：Day 3收盘或Day 4开盘卖出
+    - 止损：如果持有空单，设在Day 2最高点112以上
+    - 目标：根据风险收益比设定
+    """)
+
+    st.divider()
+
+    # 历史与发展
+    st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">📚</span>
+                   <span class="chart-title">历史与发展</span>
+               </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    ### 🏛️ 起源历史
+    
+    **发明者**：本间宗久（Homma Munehisa，1724-1803）
+    
+    **时间地点**：18世纪日本大阪的米市交易所
+    
+    **历史背景**：
+    - 本间宗久是日本酒田地区的米商
+    - 通过研究米价波动规律，发明了蜡烛图
+    - 据说他连续100次交易无一失手
+    - 被誉为"酒田战法"
+    
+    ### 🌏 传播发展
+    
+    **1. 日本时期（18-19世纪）**
+    - 在日本商品交易中广泛使用
+    - 形成了完整的理论体系
+    
+    **2. 现代复兴（1990年代）**
+    - 1991年，Steve Nison出版《日本蜡烛图技术》
+    - 将蜡烛图系统介绍给西方
+    - 迅速成为全球交易员必备工具
+    
+    **3. 当代应用（2000年至今）**
+    - 结合计算机技术，实现自动识别
+    - 与现代技术指标结合使用
+    - 应用于股票、期货、外汇、数字货币等所有市场
+    
+    ### 📖 经典著作
+    
+    1. **《日本蜡烛图技术》** - Steve Nison（1991）
+       - 蜡烛图技术的圣经
+       - 系统介绍各种形态及应用
+    
+    2. **《蜡烛图方法：从入门到精通》** - Stephen Bigalow（2001）
+       - 实战导向，适合初学者
+       - 包含大量实例分析
+    
+    3. **《酒田战法》** - 日本经典（原著年代不详）
+       - 本间宗久的原始理论
+       - 日本蜡烛图的理论基础
+    
+    ### 🎓 学习建议
+    
+    1. **理论学习**（1-2周）
+       - 掌握各种形态的定义和特征
+       - 理解形态背后的市场心理
+    
+    2. **识别训练**（1-2个月）
+       - 在历史图表中寻找形态
+       - 记录每种形态的出现频率
+    
+    3. **模拟交易**（2-3个月）
+       - 根据形态信号进行模拟交易
+       - 统计成功率和盈亏比
+    
+    4. **实战应用**（持续学习）
+       - 小仓位实战，积累经验
+       - 不断总结和优化策略
+       - 形成自己的交易系统
+    """)
+
+    # 返回按钮
+    st.divider()
+    if st.button("返回策略列表", key="back_to_list", use_container_width=True):
+        if 'selected_strategy' in st.session_state:
+            del st.session_state['selected_strategy']
+        st.rerun()

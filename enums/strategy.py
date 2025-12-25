@@ -10,6 +10,7 @@ class StrategyType(Enum):
     RSI_STRATEGY = ("rsi", "R", "RSI策略", "相对强弱指标")
     BOLL_STRATEGY = ("boll", "B", "布林带策略", "波动性通道")
     KDJ_STRATEGY = ("kdj", "K", "KDJ策略", "随机指标")
+    CANDLESTICK_STRATEGY = ("candle", "CS", "蜡烛图策略", "K线形态识别")
 
     def __new__(cls, value, code, text, desc):
         obj = object.__new__(cls)
@@ -42,7 +43,8 @@ class StrategyType(Enum):
             cls.CBR_STRATEGY,
             cls.RSI_STRATEGY,
             cls.BOLL_STRATEGY,
-            cls.KDJ_STRATEGY
+            cls.KDJ_STRATEGY,
+            cls.CANDLESTICK_STRATEGY
         ]
 
     @classmethod
@@ -57,6 +59,7 @@ class StrategyType(Enum):
                 cls.RSI_STRATEGY,
                 cls.KDJ_STRATEGY,
                 cls.BOLL_STRATEGY,
+                cls.CANDLESTICK_STRATEGY,  # 蜡烛图适合日线
             ],
             StockHistoryType.W: [  # 周线
                 cls.MACD_STRATEGY,
@@ -66,12 +69,14 @@ class StrategyType(Enum):
                 cls.KDJ_STRATEGY,
                 cls.BOLL_STRATEGY,
                 cls.CBR_STRATEGY,
+                cls.CANDLESTICK_STRATEGY,  # 蜡烛图适合周线
             ],
             StockHistoryType.M: [  # 月线
                 cls.MACD_STRATEGY,
                 cls.SMA_STRATEGY,
                 cls.TURTLE_STRATEGY,
                 cls.CBR_STRATEGY,
+                cls.CANDLESTICK_STRATEGY,  # 蜡烛图适合月线
             ],
 
             StockHistoryType.THIRTY_M: [  # 30分钟线
