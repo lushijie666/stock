@@ -38,6 +38,7 @@ class StockTradeD(Base):
     strategy_type = Column(String(32))   # 策略类型
     signal_type = Column(String(32)) # 信号类型
     signal_strength = Column(String(32)) # 信号强度
+    pattern_name = Column(String(64))    # 形态名称（蜡烛图策略专用）
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -63,6 +64,7 @@ class StockTradeW(Base):
     strategy_type = Column(String(32))   # 策略类型
     signal_type = Column(String(32)) # 信号类型
     signal_strength = Column(String(32)) # 信号强度
+    pattern_name = Column(String(64))    # 形态名称（蜡烛图策略专用）
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -89,6 +91,7 @@ class StockTradeM(Base):
     strategy_type = Column(String(32))   # 策略类型
     signal_type = Column(String(32)) # 信号类型
     signal_strength = Column(String(32)) # 信号强度
+    pattern_name = Column(String(64))    # 形态名称（蜡烛图策略专用）
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -114,6 +117,7 @@ class StockTrade30M(Base):
     strategy_type = Column(String(32))   # 策略类型
     signal_type = Column(String(32)) # 信号类型
     signal_strength = Column(String(32)) # 信号强度
+    pattern_name = Column(String(64))    # 形态名称（蜡烛图策略专用）
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

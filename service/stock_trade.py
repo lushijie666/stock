@@ -49,9 +49,22 @@ def show_page(category: Category, t: StockHistoryType):
         model = get_trade_model(t)
         # 获取所有策略类型的完整文本显示
         all_strategies = [strategy.fullText for strategy in StrategyType]
-        strategy_options = ["请选择策略"] + sorted(all_strategies)
-        strategy_map = {strategy.fullText: strategy.code for strategy in StrategyType}  # 创建显示文本到代码的映射
-        strategy_map["请选择策略"] = "全部"  # 添加默认选项映射
+        strategy_options = ["策略类型"] + sorted(all_strategies)
+        strategy_map = {strategy.fullText: strategy.code for strategy in StrategyType}
+        strategy_map["策略类型"] = "全部"
+
+        # 获取所有信号类型的完整文本显示
+        all_signal_types = [signal_type.fullText for signal_type in SignalType]
+        signal_type_options = ["信号类型"] + sorted(all_signal_types)
+        signal_type_map = {signal_type.fullText: signal_type.value for signal_type in SignalType}
+        signal_type_map["信号类型"] = "全部"
+
+        # 获取所有信号强度的完整文本显示
+        all_signal_strengths = [signal_strength.fullText for signal_strength in SignalStrength]
+        signal_strength_options = ["信号强度"] + sorted(all_signal_strengths)
+        signal_strength_map = {signal_strength.fullText: signal_strength.value for signal_strength in SignalStrength}
+        signal_strength_map["信号强度"] = "全部"
+
         with get_db_session() as session:
             # 其他数据按日期排序
             query = session.query(
@@ -62,6 +75,7 @@ def show_page(category: Category, t: StockHistoryType):
                 model.signal_type,
                 model.signal_strength,
                 model.strategy_type,
+                model.pattern_name,
                 model.updated_at,
             ).join(Stock, model.code == Stock.code).filter(
                 model.category == category,
@@ -81,6 +95,7 @@ def show_page(category: Category, t: StockHistoryType):
                     'signal_type': st.column_config.TextColumn('信号类型', help="信号类型"),
                     'signal_strength': st.column_config.TextColumn('信号强度', help="信号强度"),
                     'strategy_type': st.column_config.TextColumn('策略', help="策略类型"),
+                    'pattern_name': st.column_config.TextColumn('模式', help="K线形态名称"),
                     'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
                 },
                 # 格式化函数
@@ -88,7 +103,8 @@ def show_page(category: Category, t: StockHistoryType):
                     'pinyin': format_pinyin_short,
                     'signal_type': lambda x: SignalType.lookup(x).fullText,
                     'signal_strength': lambda x: SignalStrength.lookup(x).fullText,
-                    'strategy_type': lambda x: ', '.join([StrategyType.lookup(code.strip()).fullText for code in x.split(',')]) if x and ',' in x else ( StrategyType.lookup(x).fullText if x else '')
+                    'strategy_type': lambda x: ', '.join([StrategyType.lookup(code.strip()).fullText for code in x.split(',')]) if x and ',' in x else ( StrategyType.lookup(x).fullText if x else ''),
+                    'pattern_name': lambda x: x if x else '-'  # 形态名称，无形态时显示 -
                 },
                 search_config=SearchConfig(
                     fields=[
@@ -110,10 +126,37 @@ def show_page(category: Category, t: StockHistoryType):
                             label="策略类型",
                             type="select",
                             options=strategy_options,
-                            default="请选择策略",
+                            default="策略类型",
+                            filter_func=lambda query, value: (
+                                query.filter(
+                                    or_(
+                                        model.strategy_type.like(f"{strategy_map.get(value, value)},%"),  # 策略在开头
+                                        model.strategy_type.like(f"%{strategy_map.get(value, value)},%"),  # 策略在中间
+                                        model.strategy_type.like(f"%{strategy_map.get(value, value)}"),  # 策略在结尾
+                                        model.strategy_type == strategy_map.get(value, value)  # 单一策略
+                                    )
+                                ) if value and value != "策略类型" and strategy_map.get(value,value) != "全部" else query
+                            )
+                        ),
+                        SearchField(
+                            field="signal_type",
+                            label="信号类型",
+                            type="select",
+                            options=signal_type_options,
+                            default="信号类型",
                             filter_func=lambda query, value: query.filter(
-                                model.strategy_type.like(f"%{strategy_map.get(value, value)}%")
-                            ) if value and value != "请选择策略" else query
+                                model.signal_type.like(f"%{signal_type_map.get(value, value)}%")
+                            ) if value and value != "信号类型" else query
+                        ),
+                        SearchField(
+                            field="signal_strength",
+                            label="信号强度",
+                            type="select",
+                            options=signal_strength_options,
+                            default="信号强度",
+                            filter_func=lambda query, value: query.filter(
+                                model.signal_strength.like(f"%{signal_strength_map.get(value, value)}%")
+                            ) if value and value != "信号强度" else query
                         ),
                         SearchField(
                             field="start_date",
@@ -133,7 +176,7 @@ def show_page(category: Category, t: StockHistoryType):
                             placeholder="输入结束日期",
                             filter_func=lambda q, v: q.filter(model.date <= datetime.combine(v, datetime.max.time())) if v else q                        )
                     ],
-                    layout=[1, 1, 1, 1]
+                    layout=[1, 1, 1, 1, 1, 1]
                 ),
                 action_config=ActionConfig(
                     buttons=[
@@ -298,6 +341,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
+                pattern_name=signal.get('pattern_name', ''),
                 removed=False
             )
         elif t == StockHistoryType.M:
@@ -308,6 +352,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
+                pattern_name=signal.get('pattern_name', ''),
                 removed=False
             )
         elif t == StockHistoryType.THIRTY_M:
@@ -318,6 +363,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
+                pattern_name=signal.get('pattern_name', ''),
                 removed=False
             )
         else:
@@ -328,6 +374,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
+                pattern_name=signal.get('pattern_name', ''),
                 removed=False
             )
         stock_trades.append(model_instance)

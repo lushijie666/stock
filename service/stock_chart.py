@@ -281,8 +281,8 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                         '价格': round(s['price'], 2),
                         '策略': ', '.join([StrategyType.lookup(code.strip()).fullText for code in s.get('strategy_code', '').split(',')])
                             if s.get('strategy_code') and ',' in s.get('strategy_code', '')
-                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知')
-
+                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知'),
+                        '模式': s.get('pattern_name', '-')  # 添加K线形态列
                     }
                     for s in all_signals
                 ]).sort_values('日期（时间）')
@@ -666,7 +666,8 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                         '价格': round(s['price'], 2),
                         '策略': ', '.join([StrategyType.lookup(code.strip()).fullText for code in s.get('strategy_code', '').split(',')])
                             if s.get('strategy_code') and ',' in s.get('strategy_code', '')
-                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知')
+                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知'),
+                        '模式': s.get('pattern_name', '-')  # 添加K线形态列
                     }
                     for s in all_signals
                 ]).sort_values('日期（时间）')

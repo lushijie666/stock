@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 from enums import strategy
@@ -10,7 +11,7 @@ def show_page():
     st.markdown(
         f"""
           <div class="table-header">
-              <div class="table-title">策略概览</div>
+              <div class="table-title">策略指南</div>
           </div>
           """,
         unsafe_allow_html=True
@@ -1265,8 +1266,6 @@ def show_candlestick_strategy():
     通过识别特定的K线组合形态，可以预测价格的反转或延续趋势。本策略实现了15+种经典形态识别。
     """)
 
-    st.divider()
-
     # 识别的形态类型
     st.markdown(f"""
                <div class="chart-header">
@@ -1385,8 +1384,6 @@ def show_candlestick_strategy():
         - 交易建议：空头强势，应止损离场
         """)
 
-    st.divider()
-
     # 优缺点分析
     st.markdown(f"""
                <div class="chart-header">
@@ -1446,8 +1443,6 @@ def show_candlestick_strategy():
            - 实战经验很重要
         """)
 
-    st.divider()
-
     # 实用建议
     st.markdown(f"""
                <div class="chart-header">
@@ -1488,8 +1483,6 @@ def show_candlestick_strategy():
     - **假突破警惕**：特别是在重要支撑/阻力位附近
     """)
 
-    st.divider()
-
     # 参数说明
     st.markdown(f"""
                <div class="chart-header">
@@ -1521,14 +1514,11 @@ def show_candlestick_strategy():
         ]
     }
 
-    import pandas as pd
     st.dataframe(
         pd.DataFrame(param_data),
         hide_index=True,
         use_container_width=True
     )
-
-    st.divider()
 
     # 示例说明
     st.markdown(f"""
@@ -1559,8 +1549,6 @@ def show_candlestick_strategy():
     - 止损：设在Day 2最低点93以下
     - 目标：根据风险收益比设定（至少1:2）
     
-    ---
-    
     ### 黄昏星形态示例
     
     **场景**：某股票上涨一段时间后
@@ -1582,8 +1570,6 @@ def show_candlestick_strategy():
     - 止损：如果持有空单，设在Day 2最高点112以上
     - 目标：根据风险收益比设定
     """)
-
-    st.divider()
 
     # 历史与发展
     st.markdown(f"""
@@ -1655,10 +1641,3 @@ def show_candlestick_strategy():
        - 不断总结和优化策略
        - 形成自己的交易系统
     """)
-
-    # 返回按钮
-    st.divider()
-    if st.button("返回策略列表", key="back_to_list", use_container_width=True):
-        if 'selected_strategy' in st.session_state:
-            del st.session_state['selected_strategy']
-        st.rerun()
