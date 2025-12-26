@@ -1745,9 +1745,19 @@ class FusionStrategy(BaseStrategy):
                 StrategyType.CANDLESTICK_STRATEGY: 1.5
             }
 
-        # 使用自适应权重进行加权融合
+        # 如果用户设置了自定义权重，将用户权重作为调整系数应用到自适应权重上
+        if self.weights:
+            final_weights = {}
+            for strategy_type, adaptive_weight in adaptive_weights.items():
+                user_weight = self.weights.get(strategy_type, 1.0)
+                # 用户权重作为调整系数：最终权重 = 自适应权重 × 用户权重
+                final_weights[strategy_type] = adaptive_weight * user_weight
+        else:
+            final_weights = adaptive_weights
+
+        # 使用最终权重进行加权融合
         original_weights = self.weights
-        self.weights = adaptive_weights
+        self.weights = final_weights
         result = self._weighted_fusion(all_strategy_signals)
         self.weights = original_weights  # 恢复原始权重
 
