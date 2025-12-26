@@ -1091,7 +1091,8 @@ def _format_pattern_text(signal):
     格式化形态文本，按照不同策略分别展示详细信息
 
     展示规则：
-    - 融合策略：显示参与的各个策略及其强度，如 [CBR策略(强)、KDJ策略(弱)]
+    - 融合策略（投票模式）：显示参与的各个策略及其强度，如 [CBR策略(强)、KDJ策略(弱)]
+    - 融合策略（加权/自适应模式）：显示权重、强度、得分，如 [MACD策略(权重1.0×强=2.0)、SMA策略(权重1.5×弱=1.5)]
     - 蜡烛图策略：显示识别的形态名称，如 [看涨吞没、晨星]
     - 其他策略：显示 [-]
     - 多个策略：用空格分隔每个策略的信息
@@ -1112,25 +1113,53 @@ def _format_pattern_text(signal):
 
         for strategy in strategies:
             if strategy == StrategyType.FUSION_STRATEGY:
-                # 融合策略：显示参与的各个策略明细
-                details = signal.get('details', {})
-                if details:
+                # 融合策略：根据 details 结构判断模式并显示相应信息
+                details = signal.get('details')
+
+                if isinstance(details, dict):
+                    # 投票模式：details 是字典 {SignalType.BUY: [...], SignalType.SELL: [...]}
                     signal_type = signal.get('type')
                     if signal_type in details:
                         strategy_list = details[signal_type]
                         if strategy_list:
                             formatted_strategies = []
                             for s in strategy_list:
-                                strategy_type = s.get('strategy')
+                                strategy_type_obj = s.get('strategy')
                                 strength = s.get('strength')
-                                if strategy_type and strength:
+                                if strategy_type_obj and strength:
                                     formatted_strategies.append(
-                                        f"{strategy_type.text}({strength.display_name})"
+                                        f"{strategy_type_obj.text}({strength.display_name})"
                                     )
                             if formatted_strategies:
                                 pattern_parts.append(f"[{('、'.join(formatted_strategies))}]")
                             else:
                                 pattern_parts.append('[-]')
+                        else:
+                            pattern_parts.append('[-]')
+                    else:
+                        pattern_parts.append('[-]')
+
+                elif isinstance(details, list):
+                    # 加权/自适应模式：details 是列表，包含 weight 和 score
+                    if details:
+                        formatted_strategies = []
+                        total_score = signal.get('score', 0)
+                        for s in details:
+                            strategy_type_obj = s.get('strategy')
+                            strength = s.get('strength')
+                            weight = s.get('weight', 1.0)
+                            score = s.get('score', 0)
+
+                            if strategy_type_obj and strength:
+                                # 格式：策略名(权重×强度=得分)
+                                formatted_strategies.append(
+                                    f"{strategy_type_obj.text}(权重{weight:.1f}×{strength.display_name}={score:.1f})"
+                                )
+
+                        if formatted_strategies:
+                            # 添加总分信息
+                            detail_str = '、'.join(formatted_strategies)
+                            pattern_parts.append(f"[{detail_str} | 总分:{total_score:.1f}]")
                         else:
                             pattern_parts.append('[-]')
                     else:
@@ -1154,23 +1183,53 @@ def _format_pattern_text(signal):
     else:
         # 单个策略的情况
         if strategy_code == 'FS':
-            # 融合策略：显示参与的各个策略明细
-            details = signal.get('details', {})
-            if details:
+            # 融合策略：根据 details 结构判断模式并显示相应信息
+            details = signal.get('details')
+
+            if isinstance(details, dict):
+                # 投票模式：details 是字典 {SignalType.BUY: [...], SignalType.SELL: [...]}
                 signal_type = signal.get('type')
                 if signal_type in details:
                     strategy_list = details[signal_type]
                     if strategy_list:
                         formatted_strategies = []
                         for s in strategy_list:
-                            strategy_type = s.get('strategy')
+                            strategy_type_obj = s.get('strategy')
                             strength = s.get('strength')
-                            if strategy_type and strength:
+                            if strategy_type_obj and strength:
                                 formatted_strategies.append(
-                                    f"{strategy_type.text}({strength.display_name})"
+                                    f"{strategy_type_obj.text}({strength.display_name})"
                                 )
                         return f"[{('、'.join(formatted_strategies))}]" if formatted_strategies else '-'
-            return '-'
+                return '-'
+
+            elif isinstance(details, list):
+                # 加权/自适应模式：details 是列表，包含 weight 和 score
+                if details:
+                    formatted_strategies = []
+                    total_score = signal.get('score', 0)
+                    for s in details:
+                        strategy_type_obj = s.get('strategy')
+                        strength = s.get('strength')
+                        weight = s.get('weight', 1.0)
+                        score = s.get('score', 0)
+
+                        if strategy_type_obj and strength:
+                            # 格式：策略名(权重×强度=得分)
+                            formatted_strategies.append(
+                                f"{strategy_type_obj.text}(权重{weight:.1f}×{strength.display_name}={score:.1f})"
+                            )
+
+                    if formatted_strategies:
+                        # 添加总分信息
+                        detail_str = '、'.join(formatted_strategies)
+                        return f"[{detail_str} | 总分:{total_score:.1f}]"
+                    else:
+                        return '-'
+                else:
+                    return '-'
+            else:
+                return '-'
 
         elif strategy_code == 'CS':
             # 蜡烛图策略：显示形态名称
