@@ -154,7 +154,7 @@ def show_page(stock, t: StockHistoryType):
                 if fusion_mode_key not in st.session_state:
                     st.session_state[fusion_mode_key] = "voting"
                 if fusion_consensus_key not in st.session_state:
-                    st.session_state[fusion_consensus_key] = 3
+                    st.session_state[fusion_consensus_key] = 2
 
                 # 融合模式选择
                 fusion_mode = st.selectbox(
@@ -162,7 +162,6 @@ def show_page(stock, t: StockHistoryType):
                     options=["voting", "weighted", "adaptive"],
                     format_func=lambda x: {"voting": "🗳️ 投票模式（稳健）", "weighted": "⚖️ 加权模式（灵活）", "adaptive": "🤖 自适应模式（智能）"}[x],
                     key=fusion_mode_key,
-                    help="投票模式：多数策略一致才触发\n加权模式：根据策略权重计算综合得分\n自适应模式：根据市场环境动态调整"
                 )
 
                 if fusion_mode == "voting":

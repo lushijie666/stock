@@ -7,6 +7,7 @@ import pandas as pd
 from enums.signal import SignalType, SignalStrength
 from models.stock_history import get_history_model
 from utils.db import get_db_session
+from utils.signal import calculate_all_signals_by_strategy
 
 
 class StrategyResult:
@@ -1533,17 +1534,8 @@ class FusionStrategy(BaseStrategy):
         }
 
     def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
-        """
-        生成融合信号
-
-        Args:
-            df: 股票历史数据
-
-        Returns:
-            融合后的信号结果
-        """
-        # 获取所有基础策略的信号
-        all_strategy_signals = self._collect_all_strategy_signals(df)
+        all_strategies = StrategyType.all_base_strategies()
+        all_strategy_signals = calculate_all_signals_by_strategy(df, all_strategies, False)
 
         # 根据模式选择融合方法
         if self.mode == 'voting':
@@ -1567,52 +1559,20 @@ class FusionStrategy(BaseStrategy):
             }
         )
 
-    def _collect_all_strategy_signals(self, df: pd.DataFrame) -> Dict[str, List[Dict]]:
-        """收集所有策略的信号"""
-        strategies = {
-            'M': MACDStrategy(),
-            'S': SMAStrategy(),
-            'T': TurtleStrategy(),
-            'C': CBRStrategy(),
-            'R': RSIStrategy(),
-            'B': BollingerStrategy(),
-            'K': KDJStrategy(),
-            'CS': CandlestickStrategy()
-        }
-
-        all_signals = {}
-        for code, strategy in strategies.items():
-            try:
-                result = strategy.generate_signals(df)
-                all_signals[code] = result.signals
-            except Exception as e:
-                # 如果某个策略失败，记录但继续
-                all_signals[code] = []
-
-        return all_signals
-
-    def _voting_fusion(self, all_strategy_signals: Dict[str, List[Dict]]) -> List[Dict]:
+    def _voting_fusion(self, all_strategy_signals: Dict[StrategyType, StrategyResult]) -> List[Dict]:
         """
         投票融合：多个策略达成一致才发出信号
-
-        Args:
-            all_strategy_signals: 所有策略的信号字典 {strategy_code: signals}
-
-        Returns:
-            融合后的信号列表
         """
         # 按日期分组统计
         date_signals = {}
 
-        for strategy_code, signals in all_strategy_signals.items():
-            for signal in signals:
+        for strategy_type, result in all_strategy_signals.items():
+            for signal in result.signals:
                 date = signal['date']
                 if date not in date_signals:
-                    date_signals[date] = {'BUY': [], 'SELL': []}
-
-                signal_type = 'BUY' if signal['type'] == SignalType.BUY else 'SELL'
-                date_signals[date][signal_type].append({
-                    'strategy': strategy_code,
+                    date_signals[date] = {SignalType.BUY: [], SignalType.SELL: []}
+                date_signals[date][signal['type']].append({
+                    'strategy': strategy_type,
                     'strength': signal['strength'],
                     'pattern': signal.get('pattern_name', ''),
                     'price': signal.get('price', 0)
@@ -1623,64 +1583,53 @@ class FusionStrategy(BaseStrategy):
 
         for date, signals in date_signals.items():
             # 买入信号投票
-            if len(signals['BUY']) >= self.min_consensus:
-                strength = self._calculate_consensus_strength(signals['BUY'])
-                avg_price = sum(s['price'] for s in signals['BUY']) / len(signals['BUY'])
+            if len(signals[SignalType.BUY]) >= self.min_consensus:
+                strength = self._calculate_consensus_strength(signals[SignalType.BUY])
+                avg_price = sum(s['price'] for s in signals[SignalType.BUY]) / len(signals[SignalType.BUY])
 
                 fusion_signals.append({
                     'date': date,
                     'price': avg_price,
                     'type': SignalType.BUY,
                     'strength': strength,
-                    'consensus_count': len(signals['BUY']),
-                    'details': '、'.join([
-                        f"{StrategyType.lookup(s['strategy']).text}({s['strength'].display_name})"
-                        for s in signals['BUY']
-                        if StrategyType.lookup(s['strategy'])
-                    ])
+                    'consensus_count': len(signals[SignalType.BUY]),
+                    'details': signals,
                 })
 
             # 卖出信号投票
-            if len(signals['SELL']) >= self.min_consensus:
-                strength = self._calculate_consensus_strength(signals['SELL'])
-                avg_price = sum(s['price'] for s in signals['SELL']) / len(signals['SELL'])
+            if len(signals[SignalType.SELL]) >= self.min_consensus:
+                strength = self._calculate_consensus_strength(signals[SignalType.SELL])
+                avg_price = sum(s['price'] for s in signals[SignalType.SELL]) / len(signals[SignalType.SELL])
 
                 fusion_signals.append({
                     'date': date,
                     'price': avg_price,
                     'type': SignalType.SELL,
                     'strength': strength,
-                    'consensus_count': len(signals['SELL']),
-                    'details': '、'.join([
-                        f"{StrategyType.lookup(s['strategy']).text}({s['strength'].display_name})"
-                        for s in signals['SELL']
-                        if StrategyType.lookup(s['strategy'])
-                    ])
+                    'consensus_count': len(signals[SignalType.SELL]),
+                    'details': signals,
                 })
 
         return fusion_signals
 
-    def _weighted_fusion(self, all_strategy_signals: Dict[str, List[Dict]]) -> List[Dict]:
+    def _weighted_fusion(self, all_strategy_signals: Dict[StrategyType, StrategyResult]) -> List[Dict]:
         """
         加权融合：根据策略权重计算综合得分
-
-        Args:
-            all_strategy_signals: 所有策略的信号字典
 
         Returns:
             融合后的信号列表
         """
         date_scores = {}
 
-        for strategy_code, signals in all_strategy_signals.items():
-            weight = self.weights.get(strategy_code, 1.0)
+        for strategy_type, signals in all_strategy_signals.items():
+            weight = self.weights.get(strategy_type, 1.0)
 
             for signal in signals:
                 date = signal['date']
                 if date not in date_scores:
                     date_scores[date] = {
-                        'BUY': {'score': 0, 'details': [], 'prices': []},
-                        'SELL': {'score': 0, 'details': [], 'prices': []}
+                        SignalType.BUY: {'score': 0, 'details': [], 'prices': []},
+                        SignalType.SELL: {'score': 0, 'details': [], 'prices': []}
                     }
 
                 # 信号强度转换为数值
@@ -1689,59 +1638,51 @@ class FusionStrategy(BaseStrategy):
                 # 计算加权得分
                 score = strength_value * weight
 
-                signal_type = 'BUY' if signal['type'] == SignalType.BUY else 'SELL'
-                date_scores[date][signal_type]['score'] += score
-                date_scores[date][signal_type]['details'].append({
-                    'strategy': strategy_code,
+                date_scores[date][signal['type']]['score'] += score
+                date_scores[date][signal['type']]['details'].append({
+                    'strategy': strategy_type,
                     'strength': signal['strength'],
                     'weight': weight,
-                    'score': score
+                    'score': score,
+                    'single':signal,
                 })
-                date_scores[date][signal_type]['prices'].append(signal.get('price', 0))
+                date_scores[date][signal['type']]['prices'].append(signal.get('price', 0))
 
         # 生成融合信号
         fusion_signals = []
 
         for date, scores in date_scores.items():
             # 买入信号
-            if scores['BUY']['score'] >= self.threshold:
-                strength = SignalStrength.STRONG if scores['BUY']['score'] >= 5.0 else SignalStrength.WEAK
-                avg_price = sum(scores['BUY']['prices']) / len(scores['BUY']['prices']) if scores['BUY']['prices'] else 0
+            if scores[SignalType.BUY]['score'] >= self.threshold:
+                strength = SignalStrength.STRONG if scores[SignalType.BUY]['score'] >= 5.0 else SignalStrength.WEAK
+                avg_price = sum(scores[SignalType.BUY]['prices']) / len(scores[SignalType.BUY]['prices']) if scores[SignalType.BUY]['prices'] else 0
 
                 fusion_signals.append({
                     'date': date,
                     'price': avg_price,
                     'type': SignalType.BUY,
                     'strength': strength,
-                    'score': scores['BUY']['score'],
-                    'details': '、'.join([
-                        f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].display_name}={d['score']:.1f})"
-                        for d in scores['BUY']['details']
-                        if StrategyType.lookup(d['strategy'])
-                    ])
+                    'score': scores[SignalType.BUY]['score'],
+                    'details': scores[SignalType.BUY]['details']
                 })
 
             # 卖出信号
-            if scores['SELL']['score'] >= self.threshold:
-                strength = SignalStrength.STRONG if scores['SELL']['score'] >= 5.0 else SignalStrength.WEAK
-                avg_price = sum(scores['SELL']['prices']) / len(scores['SELL']['prices']) if scores['SELL']['prices'] else 0
+            if scores[SignalType.SELL]['score'] >= self.threshold:
+                strength = SignalStrength.STRONG if scores[SignalType.SELL]['score'] >= 5.0 else SignalStrength.WEAK
+                avg_price = sum(scores[SignalType.SELL]['prices']) / len(scores[SignalType.SELL]['prices']) if scores[SignalType.SELL]['prices'] else 0
 
                 fusion_signals.append({
                     'date': date,
                     'price': avg_price,
                     'type': SignalType.SELL,
                     'strength': strength,
-                    'score': scores['SELL']['score'],
-                    'details': '、'.join([
-                        f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].display_name}={d['score']:.1f})"
-                        for d in scores['SELL']['details']
-                        if StrategyType.lookup(d['strategy'])
-                    ])
+                    'score': scores[SignalType.SELL]['score'],
+                    'details': scores[SignalType.SELL]['details']
                 })
 
         return fusion_signals
 
-    def _adaptive_fusion(self, df: pd.DataFrame, all_strategy_signals: Dict[str, List[Dict]]) -> List[Dict]:
+    def _adaptive_fusion(self, df: pd.DataFrame, all_strategy_signals: Dict[StrategyType, StrategyResult]) -> List[Dict]:
         """
         自适应融合：根据市场环境动态调整策略权重
 

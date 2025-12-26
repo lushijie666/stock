@@ -46,16 +46,16 @@ def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = Non
         # 为每个信号添加策略显示文本
         for signal in filtered_signals:
             if 'strategies' in signal:
-                strategy_names = [s.value for s in signal['strategies']]
-                signal['strategy_code'] = f"{','.join(strategy_names)}"
+                strategy_codes = [s.code for s in signal['strategies']]
+                signal['strategy_code'] = f"{','.join(strategy_codes)}"
             elif 'strategy' in signal:
-                signal['strategy_code'] = f"{signal['strategy'].value}"
+                signal['strategy_code'] = f"{signal['strategy'].code}"
 
         return filtered_signals
 
     # 为未合并的信号也添加策略显示文本
     for signal in all_signals:
-        signal['strategy_code'] = f"{signal['strategy'].value}"
+        signal['strategy_code'] = f"{signal['strategy'].code}"
 
     # 按日期排序后返回
     all_signals.sort(key=lambda x: x['date'])
@@ -89,7 +89,7 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
         StrategyType.BOLL_STRATEGY: BollingerStrategy(),
         StrategyType.KDJ_STRATEGY: KDJStrategy(),
         StrategyType.CANDLESTICK_STRATEGY: CandlestickStrategy(),
-        StrategyType.FUSION_STRATEGY: FusionStrategy(mode='voting', min_consensus=3),  # 默认使用投票模式
+        StrategyType.FUSION_STRATEGY: FusionStrategy(mode='voting', min_consensus=2),
     }
 
     results = {}

@@ -35,8 +35,8 @@ class StrategyType(Enum):
         return None
 
     @classmethod
-    def all_strategies(cls):
-        """返回所有可用的策略类型（不包括融合策略）"""
+    def all_base_strategies(cls):
+        """返回所有可用的策略类型(去掉融合的)"""
         return [
             cls.MACD_STRATEGY,
             cls.SMA_STRATEGY,
@@ -45,7 +45,22 @@ class StrategyType(Enum):
             cls.RSI_STRATEGY,
             cls.BOLL_STRATEGY,
             cls.KDJ_STRATEGY,
-            cls.CANDLESTICK_STRATEGY
+            cls.CANDLESTICK_STRATEGY,
+        ]
+
+    @classmethod
+    def all_strategies(cls):
+        """返回所有可用的策略类型"""
+        return [
+            cls.MACD_STRATEGY,
+            cls.SMA_STRATEGY,
+            cls.TURTLE_STRATEGY,
+            cls.CBR_STRATEGY,
+            cls.RSI_STRATEGY,
+            cls.BOLL_STRATEGY,
+            cls.KDJ_STRATEGY,
+            cls.CANDLESTICK_STRATEGY,
+            cls.FUSION_STRATEGY,
         ]
 
     @classmethod
@@ -94,3 +109,15 @@ class StrategyType(Enum):
             cls.KDJ_STRATEGY,
             cls.BOLL_STRATEGY,
         ])
+
+class FusionStrategyModel(Enum):
+    """策略类型枚举"""
+    VOTING_MODEL = ("voting", "投票模式")
+    WEIGHTED_MODEL = ("weighted", "加权模式")
+    ADAPTIVE_MODEL = ("adaptive", "自适应模式")
+
+    def __new__(cls, code, text):
+        obj = object.__new__(cls)
+        obj.code = code
+        obj.text = text
+        return obj
