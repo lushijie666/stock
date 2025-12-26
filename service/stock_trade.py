@@ -95,7 +95,7 @@ def show_page(category: Category, t: StockHistoryType):
                     'signal_type': st.column_config.TextColumn('信号类型', help="信号类型"),
                     'signal_strength': st.column_config.TextColumn('信号强度', help="信号强度"),
                     'strategy_type': st.column_config.TextColumn('策略', help="策略类型"),
-                    'pattern_name': st.column_config.TextColumn('模式', help="K线形态名称"),
+                    'pattern_name': st.column_config.TextColumn('模式', help="K线形态名称", width="large"),
                     'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
                 },
                 # 格式化函数

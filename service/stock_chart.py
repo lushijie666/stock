@@ -1091,8 +1091,8 @@ def _format_pattern_text(signal):
     格式化形态文本，按照不同策略分别展示详细信息
 
     展示规则：
-    - 融合策略（投票模式）：显示参与的各个策略及其强度，如 [CBR策略(强)、KDJ策略(弱)]
-    - 融合策略（加权/自适应模式）：显示权重、强度、得分，如 [MACD策略(权重1.0×强=2.0)、SMA策略(权重1.5×弱=1.5)]
+    - 融合策略（投票模式）：显示参与的各个策略及其强度，如 [CBR策略(强)、KDJ策略(弱) | 3策略]
+    - 融合策略（加权/自适应模式）：显示权重、强度、得分，如 [MACD策略(权重1.0×强=2.0) | 总分:7.5]
     - 蜡烛图策略：显示识别的形态名称，如 [看涨吞没、晨星]
     - 其他策略：显示 [-]
     - 多个策略：用空格分隔每个策略的信息
@@ -1100,7 +1100,6 @@ def _format_pattern_text(signal):
     from enums.signal import SignalType
 
     strategy_code = signal.get('strategy_code', '')
-
     if not strategy_code:
         return '-'
 
@@ -1108,137 +1107,126 @@ def _format_pattern_text(signal):
     strategies = signal.get('strategies', [])
 
     if strategies:
-        # 有多个策略的情况
-        pattern_parts = []
-
-        for strategy in strategies:
-            if strategy == StrategyType.FUSION_STRATEGY:
-                # 融合策略：根据 details 结构判断模式并显示相应信息
-                details = signal.get('details')
-
-                if isinstance(details, dict):
-                    # 投票模式：details 是字典 {SignalType.BUY: [...], SignalType.SELL: [...]}
-                    signal_type = signal.get('type')
-                    if signal_type in details:
-                        strategy_list = details[signal_type]
-                        if strategy_list:
-                            formatted_strategies = []
-                            for s in strategy_list:
-                                strategy_type_obj = s.get('strategy')
-                                strength = s.get('strength')
-                                if strategy_type_obj and strength:
-                                    formatted_strategies.append(
-                                        f"{strategy_type_obj.text}({strength.display_name})"
-                                    )
-                            if formatted_strategies:
-                                pattern_parts.append(f"[{('、'.join(formatted_strategies))}]")
-                            else:
-                                pattern_parts.append('[-]')
-                        else:
-                            pattern_parts.append('[-]')
-                    else:
-                        pattern_parts.append('[-]')
-
-                elif isinstance(details, list):
-                    # 加权/自适应模式：details 是列表，包含 weight 和 score
-                    if details:
-                        formatted_strategies = []
-                        total_score = signal.get('score', 0)
-                        for s in details:
-                            strategy_type_obj = s.get('strategy')
-                            strength = s.get('strength')
-                            weight = s.get('weight', 1.0)
-                            score = s.get('score', 0)
-
-                            if strategy_type_obj and strength:
-                                # 格式：策略名(权重×强度=得分)
-                                formatted_strategies.append(
-                                    f"{strategy_type_obj.text}(权重{weight:.1f}×{strength.display_name}={score:.1f})"
-                                )
-
-                        if formatted_strategies:
-                            # 添加总分信息
-                            detail_str = '、'.join(formatted_strategies)
-                            pattern_parts.append(f"[{detail_str} | 总分:{total_score:.1f}]")
-                        else:
-                            pattern_parts.append('[-]')
-                    else:
-                        pattern_parts.append('[-]')
-                else:
-                    pattern_parts.append('[-]')
-
-            elif strategy == StrategyType.CANDLESTICK_STRATEGY:
-                # 蜡烛图策略：显示形态名称
-                pattern_name = signal.get('pattern_name', '')
-                if pattern_name:
-                    pattern_parts.append(f"[{pattern_name}]")
-                else:
-                    pattern_parts.append('[-]')
-            else:
-                # 其他策略：显示 [-]
-                pattern_parts.append('[-]')
-
-        return ' '.join(pattern_parts) if pattern_parts else '-'
-
+        # 多个策略的情况
+        return _format_multiple_strategies(signal, strategies)
     else:
         # 单个策略的情况
-        if strategy_code == 'FS':
-            # 融合策略：根据 details 结构判断模式并显示相应信息
-            details = signal.get('details')
+        return _format_single_strategy(signal, strategy_code)
 
-            if isinstance(details, dict):
-                # 投票模式：details 是字典 {SignalType.BUY: [...], SignalType.SELL: [...]}
-                signal_type = signal.get('type')
-                if signal_type in details:
-                    strategy_list = details[signal_type]
-                    if strategy_list:
-                        formatted_strategies = []
-                        for s in strategy_list:
-                            strategy_type_obj = s.get('strategy')
-                            strength = s.get('strength')
-                            if strategy_type_obj and strength:
-                                formatted_strategies.append(
-                                    f"{strategy_type_obj.text}({strength.display_name})"
-                                )
-                        return f"[{('、'.join(formatted_strategies))}]" if formatted_strategies else '-'
-                return '-'
 
-            elif isinstance(details, list):
-                # 加权/自适应模式：details 是列表，包含 weight 和 score
-                if details:
-                    formatted_strategies = []
-                    total_score = signal.get('score', 0)
-                    for s in details:
-                        strategy_type_obj = s.get('strategy')
-                        strength = s.get('strength')
-                        weight = s.get('weight', 1.0)
-                        score = s.get('score', 0)
+def _format_multiple_strategies(signal, strategies):
+    """格式化多个策略的模式信息"""
+    pattern_parts = []
 
-                        if strategy_type_obj and strength:
-                            # 格式：策略名(权重×强度=得分)
-                            formatted_strategies.append(
-                                f"{strategy_type_obj.text}(权重{weight:.1f}×{strength.display_name}={score:.1f})"
-                            )
-
-                    if formatted_strategies:
-                        # 添加总分信息
-                        detail_str = '、'.join(formatted_strategies)
-                        return f"[{detail_str} | 总分:{total_score:.1f}]"
-                    else:
-                        return '-'
-                else:
-                    return '-'
-            else:
-                return '-'
-
-        elif strategy_code == 'CS':
-            # 蜡烛图策略：显示形态名称
-            pattern_name = signal.get('pattern_name', '')
-            return f"[{pattern_name}]" if pattern_name else '-'
-
+    for strategy in strategies:
+        if strategy == StrategyType.FUSION_STRATEGY:
+            pattern_parts.append(_format_fusion_strategy(signal))
+        elif strategy == StrategyType.CANDLESTICK_STRATEGY:
+            pattern_parts.append(_format_candlestick_strategy(signal))
         else:
-            # 其他策略
-            return '[-]'
+            pattern_parts.append('[-]')
+
+    return ' '.join(pattern_parts) if pattern_parts else '-'
+
+
+def _format_single_strategy(signal, strategy_code):
+    """格式化单个策略的模式信息"""
+    if strategy_code == 'FS':
+        return _format_fusion_strategy(signal)
+    elif strategy_code == 'CS':
+        return _format_candlestick_strategy(signal)
+    else:
+        return '[-]'
+
+
+def _format_fusion_strategy(signal):
+    """
+    格式化融合策略的详细信息
+
+    根据 details 结构自动判断是投票模式还是加权/自适应模式
+    """
+    from enums.signal import SignalType
+
+    details = signal.get('details')
+
+    if isinstance(details, dict):
+        # 投票模式：details 是字典 {SignalType.BUY: [...], SignalType.SELL: [...]}
+        return _format_voting_fusion(signal, details)
+    elif isinstance(details, list):
+        # 加权/自适应模式：details 是列表
+        return _format_weighted_fusion(signal, details)
+    else:
+        return '[-]'
+
+
+def _format_voting_fusion(signal, details):
+    """格式化投票模式融合策略"""
+    from enums.signal import SignalType
+
+    signal_type = signal.get('type')
+    if signal_type not in details:
+        return '[-]'
+
+    strategy_list = details[signal_type]
+    if not strategy_list:
+        return '[-]'
+
+    # 格式化每个参与的策略
+    formatted_strategies = []
+    for s in strategy_list:
+        strategy_type_obj = s.get('strategy')
+        strength = s.get('strength')
+        if strategy_type_obj and strength:
+            formatted_strategies.append(
+                f"{strategy_type_obj.text}({strength.display_name})"
+            )
+
+    if not formatted_strategies:
+        return '[-]'
+
+    # 获取参与策略数
+    participated_count = len(strategy_list)
+
+    # 格式：[策略1、策略2 | X策略]
+    detail_str = '、'.join(formatted_strategies)
+    return f"[{detail_str} | {participated_count}策略]"
+
+
+def _format_weighted_fusion(signal, details):
+    """格式化加权/自适应模式融合策略"""
+    if not details:
+        return '[-]'
+
+    formatted_strategies = []
+    total_score = signal.get('score', 0)
+
+    for s in details:
+        strategy_type_obj = s.get('strategy')
+        strength = s.get('strength')
+        weight = s.get('weight', 1.0)
+        score = s.get('score', 0)
+
+        if strategy_type_obj and strength:
+            # 格式：策略名(权重×强度=得分)
+            formatted_strategies.append(
+                f"{strategy_type_obj.text}(权重{weight:.1f}×{strength.display_name}={score:.1f})"
+            )
+
+    if not formatted_strategies:
+        return '[-]'
+
+    # 格式：[策略1、策略2 | 总分:X.X]
+    detail_str = '、'.join(formatted_strategies)
+    return f"[{detail_str} | 总分:{total_score:.1f}]"
+
+
+def _format_candlestick_strategy(signal):
+    """格式化蜡烛图策略的形态信息"""
+    pattern_name = signal.get('pattern_name', '')
+    if pattern_name:
+        return f"[{pattern_name}]"
+    else:
+        return '[-]'
 
 
 def _get_fusion_config(stock, t: StockHistoryType):

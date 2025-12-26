@@ -2,6 +2,7 @@ from datetime import date
 
 from enums.history_type import StockHistoryType
 from enums.strategy import StrategyType, FusionStrategyModel
+from enums.candlestick_pattern import CandlestickPattern
 from typing import List, Dict, Any
 import pandas as pd
 from enums.signal import SignalType, SignalStrength
@@ -208,13 +209,13 @@ class CandlestickStrategy(BaseStrategy):
             metadata={
                 "description": "基于经典K线形态的交易信号识别",
                 "patterns": [
-                    "锤子线/上吊线",
-                    "倒锤子线/流星线",
-                    "十字星",
-                    "看涨吞没/看跌吞没",
-                    "乌云盖顶/刺透形态",
-                    "晨星/黄昏星",
-                    "三只白兵/三只乌鸦"
+                    f"{CandlestickPattern.HAMMER.text}/{CandlestickPattern.HANGING_MAN.text}",
+                    f"{CandlestickPattern.INVERTED_HAMMER.text}/{CandlestickPattern.SHOOTING_STAR.text}",
+                    CandlestickPattern.DOJI.text,
+                    f"{CandlestickPattern.BULLISH_ENGULFING.text}/{CandlestickPattern.BEARISH_ENGULFING.text}",
+                    f"{CandlestickPattern.DARK_CLOUD_COVER.text}/{CandlestickPattern.PIERCING_PATTERN.text}",
+                    f"{CandlestickPattern.MORNING_STAR.text}/{CandlestickPattern.EVENING_STAR.text}",
+                    f"{CandlestickPattern.THREE_WHITE_SOLDIERS.text}/{CandlestickPattern.THREE_BLACK_CROWS.text}"
                 ],
                 "body_min_ratio": self.body_min_ratio,
                 "shadow_ratio": self.shadow_ratio,
@@ -1307,55 +1308,55 @@ def _detect_single_candle_pattern(
             candle['upper_shadow'] <= candle['body'] * 0.1 and
             candle['body'] > 0):
             return {
-                'name': '锤子线',
+                'name': CandlestickPattern.HAMMER.text,
                 'type': SignalType.BUY,
                 'strength': SignalStrength.STRONG
             }
-    
+
     # 2. 上吊线（Hanging Man）- 上涨趋势中出现
     if trend == 'uptrend':
         if (candle['lower_shadow'] >= candle['body'] * shadow_ratio and
             candle['upper_shadow'] <= candle['body'] * 0.1 and
             candle['body'] > 0):
             return {
-                'name': '上吊线',
+                'name': CandlestickPattern.HANGING_MAN.text,
                 'type': SignalType.SELL,
                 'strength': SignalStrength.WEAK  # 需要确认
             }
-    
+
     # 3. 倒锤子线（Inverted Hammer）- 下跌趋势中出现
     if trend == 'downtrend':
         if (candle['upper_shadow'] >= candle['body'] * shadow_ratio and
             candle['lower_shadow'] <= candle['body'] * 0.1 and
             candle['body'] > 0):
             return {
-                'name': '倒锤子线',
+                'name': CandlestickPattern.INVERTED_HAMMER.text,
                 'type': SignalType.BUY,
                 'strength': SignalStrength.WEAK  # 需要确认
             }
-    
+
     # 4. 流星线（Shooting Star）- 上涨趋势中出现
     if trend == 'uptrend':
         if (candle['upper_shadow'] >= candle['body'] * shadow_ratio and
             candle['lower_shadow'] <= candle['body'] * 0.1 and
             candle['body'] > 0):
             return {
-                'name': '流星线',
+                'name': CandlestickPattern.SHOOTING_STAR.text,
                 'type': SignalType.SELL,
                 'strength': SignalStrength.STRONG
             }
-    
+
     # 5. 十字星（Doji）- 趋势转折信号
     if candle['body_ratio'] < 0.1:  # 实体很小
         if trend == 'uptrend':
             return {
-                'name': '十字星',
+                'name': CandlestickPattern.DOJI.text,
                 'type': SignalType.SELL,
                 'strength': SignalStrength.WEAK
             }
         elif trend == 'downtrend':
             return {
-                'name': '十字星',
+                'name': CandlestickPattern.DOJI.text,
                 'type': SignalType.BUY,
                 'strength': SignalStrength.WEAK
             }
@@ -1377,11 +1378,11 @@ def _detect_double_candle_pattern(
         curr['open'] < prev['close'] and  # 当前开盘低于前一根收盘
         curr['close'] > prev['open']):    # 当前收盘高于前一根开盘
         return {
-            'name': '看涨吞没',
+            'name': CandlestickPattern.BULLISH_ENGULFING.text,
             'type': SignalType.BUY,
             'strength': SignalStrength.STRONG
         }
-    
+
     # 2. 看跌吞没（Bearish Engulfing）
     if (trend == 'uptrend' and
         prev['is_bullish'] and      # 前一根是阳线
@@ -1389,11 +1390,11 @@ def _detect_double_candle_pattern(
         curr['open'] > prev['close'] and  # 当前开盘高于前一根收盘
         curr['close'] < prev['open']):    # 当前收盘低于前一根开盘
         return {
-            'name': '看跌吞没',
+            'name': CandlestickPattern.BEARISH_ENGULFING.text,
             'type': SignalType.SELL,
             'strength': SignalStrength.STRONG
         }
-    
+
     # 3. 乌云盖顶（Dark Cloud Cover）
     if (trend == 'uptrend' and
         prev['is_bullish'] and      # 前一根是大阳线
@@ -1402,11 +1403,11 @@ def _detect_double_candle_pattern(
         curr['open'] > prev['high'] and  # 当前开盘高于前一根最高
         curr['close'] < (prev['open'] + prev['close']) / 2):  # 收盘在前一根实体中部以下
         return {
-            'name': '乌云盖顶',
+            'name': CandlestickPattern.DARK_CLOUD_COVER.text,
             'type': SignalType.SELL,
             'strength': SignalStrength.STRONG
         }
-    
+
     # 4. 刺透形态（Piercing Pattern）
     if (trend == 'downtrend' and
         not prev['is_bullish'] and  # 前一根是大阴线
@@ -1415,7 +1416,7 @@ def _detect_double_candle_pattern(
         curr['open'] < prev['low'] and  # 当前开盘低于前一根最低
         curr['close'] > (prev['open'] + prev['close']) / 2):  # 收盘在前一根实体中部以上
         return {
-            'name': '刺透形态',
+            'name': CandlestickPattern.PIERCING_PATTERN.text,
             'type': SignalType.BUY,
             'strength': SignalStrength.STRONG
         }
@@ -1440,11 +1441,11 @@ def _detect_triple_candle_pattern(
         candle3['body'] > candle3['total_range'] * 0.6 and
         candle3['close'] > (candle1['open'] + candle1['close']) / 2):  # 第三根收盘进入第一根实体
         return {
-            'name': '晨星',
+            'name': CandlestickPattern.MORNING_STAR.text,
             'type': SignalType.BUY,
             'strength': SignalStrength.STRONG
         }
-    
+
     # 2. 黄昏星（Evening Star）
     if (trend == 'uptrend' and
         candle1['is_bullish'] and      # 第一根是大阳线
@@ -1454,11 +1455,11 @@ def _detect_triple_candle_pattern(
         candle3['body'] > candle3['total_range'] * 0.6 and
         candle3['close'] < (candle1['open'] + candle1['close']) / 2):  # 第三根收盘进入第一根实体
         return {
-            'name': '黄昏星',
+            'name': CandlestickPattern.EVENING_STAR.text,
             'type': SignalType.SELL,
             'strength': SignalStrength.STRONG
         }
-    
+
     # 3. 三只白兵（Three White Soldiers）
     if (candle1['is_bullish'] and candle2['is_bullish'] and candle3['is_bullish'] and
         candle2['close'] > candle1['close'] and  # 收盘价递增
@@ -1469,11 +1470,11 @@ def _detect_triple_candle_pattern(
         candle2['upper_shadow'] < candle2['body'] * 0.3 and
         candle3['upper_shadow'] < candle3['body'] * 0.3):
         return {
-            'name': '三只白兵',
+            'name': CandlestickPattern.THREE_WHITE_SOLDIERS.text,
             'type': SignalType.BUY,
             'strength': SignalStrength.STRONG
         }
-    
+
     # 4. 三只乌鸦（Three Black Crows）
     if (not candle1['is_bullish'] and not candle2['is_bullish'] and not candle3['is_bullish'] and
         candle2['close'] < candle1['close'] and  # 收盘价递减
@@ -1484,7 +1485,7 @@ def _detect_triple_candle_pattern(
         candle2['lower_shadow'] < candle2['body'] * 0.3 and
         candle3['lower_shadow'] < candle3['body'] * 0.3):
         return {
-            'name': '三只乌鸦',
+            'name': CandlestickPattern.THREE_BLACK_CROWS.text,
             'type': SignalType.SELL,
             'strength': SignalStrength.STRONG
         }
