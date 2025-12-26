@@ -1118,13 +1118,35 @@ def _format_multiple_strategies(signal, strategies):
     """格式化多个策略的模式信息"""
     pattern_parts = []
 
+    # 获取每个策略的详细信息字典
+    strategy_details_map = signal.get('strategy_details', {})
+
     for strategy in strategies:
-        if strategy == StrategyType.FUSION_STRATEGY:
-            pattern_parts.append(_format_fusion_strategy(signal))
-        elif strategy == StrategyType.CANDLESTICK_STRATEGY:
-            pattern_parts.append(_format_candlestick_strategy(signal))
+        # 如果有保存的策略详细信息，使用它
+        if strategy in strategy_details_map:
+            strategy_info = strategy_details_map[strategy]
+            # 创建临时signal对象，包含该策略的详细信息
+            temp_signal = {
+                'details': strategy_info.get('details'),
+                'pattern_name': strategy_info.get('pattern_name'),
+                'score': strategy_info.get('score'),
+                'type': signal.get('type')  # 保留原始信号类型
+            }
+
+            if strategy == StrategyType.FUSION_STRATEGY:
+                pattern_parts.append(_format_fusion_strategy(temp_signal))
+            elif strategy == StrategyType.CANDLESTICK_STRATEGY:
+                pattern_parts.append(_format_candlestick_strategy(temp_signal))
+            else:
+                pattern_parts.append('[-]')
         else:
-            pattern_parts.append('[-]')
+            # 没有保存的详细信息，使用原始signal（兼容旧数据）
+            if strategy == StrategyType.FUSION_STRATEGY:
+                pattern_parts.append(_format_fusion_strategy(signal))
+            elif strategy == StrategyType.CANDLESTICK_STRATEGY:
+                pattern_parts.append(_format_candlestick_strategy(signal))
+            else:
+                pattern_parts.append('[-]')
 
     return ' '.join(pattern_parts) if pattern_parts else '-'
 

@@ -181,11 +181,17 @@ def merge_signals_by_date(signals: List[Dict]) -> List[Dict]:
                     strategies = list(set([s['strategy'] for s in strong_signals]))
                     merged_signal['strategies'] = strategies
 
-                    # 如果是蜡烛图策略，合并所有的 pattern_name
-                    if merged_signal.get('strategy') == StrategyType.CANDLESTICK_STRATEGY:
-                        pattern_names = [s.get('pattern_name', '') for s in strong_signals if s.get('pattern_name')]
-                        if pattern_names:
-                            merged_signal['pattern_name'] = '、'.join(list(set(pattern_names)))
+                    # 保存每个策略的详细信息
+                    strategy_details = {}
+                    for s in strong_signals:
+                        strategy_type = s.get('strategy')
+                        if strategy_type:
+                            strategy_details[strategy_type] = {
+                                'details': s.get('details'),
+                                'pattern_name': s.get('pattern_name'),
+                                'score': s.get('score')
+                            }
+                    merged_signal['strategy_details'] = strategy_details
 
                 merged_signals.append(merged_signal)
             else:
@@ -196,11 +202,17 @@ def merge_signals_by_date(signals: List[Dict]) -> List[Dict]:
                     strategies = list(set([s['strategy'] for s in date_signals]))
                     weak_signal['strategies'] = strategies
 
-                    # 如果是蜡烛图策略，合并所有的 pattern_name
-                    if weak_signal.get('strategy') == StrategyType.CANDLESTICK_STRATEGY:
-                        pattern_names = [s.get('pattern_name', '') for s in date_signals if s.get('pattern_name')]
-                        if pattern_names:
-                            weak_signal['pattern_name'] = '、'.join(list(set(pattern_names)))
+                    # 保存每个策略的详细信息
+                    strategy_details = {}
+                    for s in date_signals:
+                        strategy_type = s.get('strategy')
+                        if strategy_type:
+                            strategy_details[strategy_type] = {
+                                'details': s.get('details'),
+                                'pattern_name': s.get('pattern_name'),
+                                'score': s.get('score')
+                            }
+                    weak_signal['strategy_details'] = strategy_details
 
                 merged_signals.append(weak_signal)
     return merged_signals
