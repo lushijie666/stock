@@ -1,7 +1,7 @@
 from datetime import date
 
 from enums.history_type import StockHistoryType
-from enums.strategy import StrategyType
+from enums.strategy import StrategyType, FusionStrategyModel
 from typing import List, Dict, Any
 import pandas as pd
 from enums.signal import SignalType, SignalStrength
@@ -1507,30 +1507,50 @@ class FusionStrategy(BaseStrategy):
 
     def __init__(
         self,
-        mode: str = 'voting',
-        min_consensus: int = 3,
-        weights: Dict[str, float] = None,
-        threshold: float = 3.0,
-        enable_market_detection: bool = False
+        mode: FusionStrategyModel = FusionStrategyModel.VOTING_MODEL,
+        min_consensus: int = None,
+        weights: Dict[StrategyType, float] = None,
+        threshold: float = None
     ):
-        super().__init__("融合策略")
-        self.mode = mode  # 'voting', 'weighted', 'adaptive'
-        self.min_consensus = min_consensus  # 投票模式：最小一致策略数
-        self.weights = weights or self._get_default_weights()  # 加权模式：策略权重
-        self.threshold = threshold  # 加权模式：触发阈值
-        self.enable_market_detection = enable_market_detection  # 是否启用市场检测
+        """
+        初始化融合策略
 
-    def _get_default_weights(self) -> Dict[str, float]:
+        Args:
+            mode: 融合模式（FusionStrategyModel枚举）
+            min_consensus: 投票模式：最小一致策略数（默认3）
+            weights: 加权/自适应模式：策略权重字典（注意：目前UI不支持自定义权重设置）
+            threshold: 加权模式：触发阈值（默认3.0）
+        """
+        super().__init__("融合策略")
+        self.mode = mode
+
+        # 根据模式设置默认参数
+        if mode == FusionStrategyModel.VOTING_MODEL:
+            self.min_consensus = min_consensus if min_consensus is not None else 3
+            self.weights = None
+            self.threshold = None
+        elif mode == FusionStrategyModel.WEIGHTED_MODEL:
+            self.min_consensus = None
+            self.weights = weights or self._get_default_weights()
+            self.threshold = threshold if threshold is not None else 3.0
+        elif mode == FusionStrategyModel.ADAPTIVE_MODEL:
+            self.min_consensus = None
+            self.weights = weights or self._get_default_weights()
+            self.threshold = threshold if threshold is not None else 3.0
+        else:
+            raise ValueError(f"未知的融合模式: {mode}")
+
+    def _get_default_weights(self) -> Dict[StrategyType, float]:
         """获取默认权重配置（平衡型）"""
         return {
-            'macd': 1.0,
-            'sma': 1.0,
-            'turtle': 1.0,
-            'cbr': 1.0,
-            'rsi': 1.0,
-            'boll': 1.0,
-            'kdj': 1.0,
-            'candle': 1.0
+            StrategyType.MACD_STRATEGY: 1.0,
+            StrategyType.SMA_STRATEGY: 1.0,
+            StrategyType.TURTLE_STRATEGY: 1.0,
+            StrategyType.CBR_STRATEGY: 1.0,
+            StrategyType.RSI_STRATEGY: 1.0,
+            StrategyType.BOLL_STRATEGY: 1.0,
+            StrategyType.KDJ_STRATEGY: 1.0,
+            StrategyType.CANDLESTICK_STRATEGY: 1.0
         }
 
     def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
@@ -1538,11 +1558,11 @@ class FusionStrategy(BaseStrategy):
         all_strategy_signals = calculate_all_signals_by_strategy(df, all_strategies, False)
 
         # 根据模式选择融合方法
-        if self.mode == 'voting':
+        if self.mode == FusionStrategyModel.VOTING_MODEL:
             fusion_signals = self._voting_fusion(all_strategy_signals)
-        elif self.mode == 'weighted':
+        elif self.mode == FusionStrategyModel.WEIGHTED_MODEL:
             fusion_signals = self._weighted_fusion(all_strategy_signals)
-        elif self.mode == 'adaptive':
+        elif self.mode == FusionStrategyModel.ADAPTIVE_MODEL:
             fusion_signals = self._adaptive_fusion(df, all_strategy_signals)
         else:
             raise ValueError(f"未知的融合模式: {self.mode}")
@@ -1551,11 +1571,11 @@ class FusionStrategy(BaseStrategy):
             strategy_type=StrategyType.FUSION_STRATEGY,
             signals=fusion_signals,
             metadata={
-                "description": f"融合策略 - {self.mode}模式",
-                "mode": self.mode,
-                "min_consensus": self.min_consensus if self.mode == 'voting' else None,
-                "weights": self.weights if self.mode in ['weighted', 'adaptive'] else None,
-                "threshold": self.threshold if self.mode == 'weighted' else None
+                "description": f"融合策略 - {self.mode.text}",
+                "mode": self.mode.code,
+                "min_consensus": self.min_consensus if self.mode == FusionStrategyModel.VOTING_MODEL else None,
+                "weights": self.weights if self.mode in [FusionStrategyModel.WEIGHTED_MODEL, FusionStrategyModel.ADAPTIVE_MODEL] else None,
+                "threshold": self.threshold if self.mode == FusionStrategyModel.WEIGHTED_MODEL else None
             }
         )
 
@@ -1700,26 +1720,26 @@ class FusionStrategy(BaseStrategy):
         if market_state == 'trending':
             # 趋势市场：侧重趋势跟随策略
             adaptive_weights = {
-                'macd': 2.0,
-                'sma': 2.0,
-                'turtle': 1.5,
-                'cbr': 1.0,
-                'rsi': 0.5,
-                'boll': 0.5,
-                'kdj': 0.5,
-                'candle': 1.0
+                StrategyType.MACD_STRATEGY: 2.0,
+                StrategyType.SMA_STRATEGY: 2.0,
+                StrategyType.TURTLE_STRATEGY: 1.5,
+                StrategyType.CBR_STRATEGY: 1.0,
+                StrategyType.RSI_STRATEGY: 0.5,
+                StrategyType.BOLL_STRATEGY: 0.5,
+                StrategyType.KDJ_STRATEGY: 0.5,
+                StrategyType.CANDLESTICK_STRATEGY: 1.0
             }
         else:
             # 震荡市场：侧重反转策略
             adaptive_weights = {
-                'macd': 0.5,
-                'sma': 0.5,
-                'turtle': 0.5,
-                'cbr': 0.5,
-                'rsi': 2.0,
-                'boll': 2.0,
-                'kdj': 2.0,
-                'candle': 1.5
+                StrategyType.MACD_STRATEGY: 0.5,
+                StrategyType.SMA_STRATEGY: 0.5,
+                StrategyType.TURTLE_STRATEGY: 0.5,
+                StrategyType.CBR_STRATEGY: 0.5,
+                StrategyType.RSI_STRATEGY: 2.0,
+                StrategyType.BOLL_STRATEGY: 2.0,
+                StrategyType.KDJ_STRATEGY: 2.0,
+                StrategyType.CANDLESTICK_STRATEGY: 1.5
             }
 
         # 使用自适应权重进行加权融合

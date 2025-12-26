@@ -5,7 +5,7 @@ import pandas as pd
 from sqlalchemy import func
 import streamlit_echarts
 
-from enums.strategy import StrategyType
+from enums.strategy import StrategyType, FusionStrategyModel
 from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
 from enums.patterns import Patterns
@@ -53,17 +53,30 @@ def _format_strategy_text(signal):
 
 def _format_pattern_text(signal):
     """格式化形态文本，对于融合策略显示参与的策略，对于蜡烛图显示形态名称"""
+    from enums.signal import SignalType
+
     strategy_code = signal.get('strategy_code', '')
 
     # 如果是融合策略，显示详细的策略信息
     if strategy_code == 'FS':
-        details = signal.get('details', '')
+        details = signal.get('details', {})
         if details:
-            return details
-        # 如果没有details，尝试从strategies字段获取
-        strategies = signal.get('strategies', '')
-        if strategies:
-            return strategies
+            # details 是一个字典: {SignalType.BUY: [...], SignalType.SELL: [...]}
+            # 需要根据当前信号类型获取对应的策略列表
+            signal_type = signal.get('type')
+            if signal_type in details:
+                strategy_list = details[signal_type]
+                if strategy_list:
+                    # 格式化每个参与的策略信息
+                    formatted_strategies = []
+                    for s in strategy_list:
+                        strategy_type = s.get('strategy')
+                        strength = s.get('strength')
+                        if strategy_type and strength:
+                            formatted_strategies.append(
+                                f"{strategy_type.text}({strength.display_name})"
+                            )
+                    return '、'.join(formatted_strategies) if formatted_strategies else '-'
         return '-'
 
     # 如果是蜡烛图策略，显示形态名称
@@ -152,19 +165,24 @@ def show_page(stock, t: StockHistoryType):
 
                 # 默认值
                 if fusion_mode_key not in st.session_state:
-                    st.session_state[fusion_mode_key] = "voting"
+                    st.session_state[fusion_mode_key] = FusionStrategyModel.VOTING_MODEL.code
                 if fusion_consensus_key not in st.session_state:
                     st.session_state[fusion_consensus_key] = 2
 
                 # 融合模式选择
-                fusion_mode = st.selectbox(
+                fusion_mode_code = st.selectbox(
                     "融合模式",
-                    options=["voting", "weighted", "adaptive"],
-                    format_func=lambda x: {"voting": "🗳️ 投票模式（稳健）", "weighted": "⚖️ 加权模式（灵活）", "adaptive": "🤖 自适应模式（智能）"}[x],
+                    options=[m.code for m in FusionStrategyModel],
+                    format_func=lambda x: {
+                        FusionStrategyModel.VOTING_MODEL.code: f"🗳️ {FusionStrategyModel.VOTING_MODEL.text}（稳健）",
+                        FusionStrategyModel.WEIGHTED_MODEL.code: f"⚖️ {FusionStrategyModel.WEIGHTED_MODEL.text}（灵活）",
+                        FusionStrategyModel.ADAPTIVE_MODEL.code: f"🤖 {FusionStrategyModel.ADAPTIVE_MODEL.text}（智能）"
+                    }[x],
                     key=fusion_mode_key,
                 )
 
-                if fusion_mode == "voting":
+                # 根据选择的模式显示不同的配置选项
+                if fusion_mode_code == FusionStrategyModel.VOTING_MODEL.code:
                     min_consensus = st.slider(
                         "最小一致策略数",
                         min_value=2,
@@ -173,6 +191,13 @@ def show_page(stock, t: StockHistoryType):
                         key=fusion_consensus_key,
                         help="至少几个策略发出相同信号才触发"
                     )
+                elif fusion_mode_code == FusionStrategyModel.WEIGHTED_MODEL.code:
+                    st.info("⚖️ 加权模式：根据策略权重计算综合得分\n\n📌 注意：权重配置目前暂不支持在UI中自定义，使用默认平衡权重")
+                elif fusion_mode_code == FusionStrategyModel.ADAPTIVE_MODEL.code:
+                    st.info("🤖 自适应模式：根据市场环境动态调整策略权重\n\n" +
+                           "• 趋势市场：侧重MACD、SMA等趋势跟随策略\n" +
+                           "• 震荡市场：侧重RSI、布林带、KDJ等反转策略\n\n" +
+                           "📌 注意：权重配置目前暂不支持在UI中自定义")
 
     chart_handlers = {
         "K线图": lambda: show_kline_chart(stock, t, selected_strategies),
