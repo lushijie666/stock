@@ -11,6 +11,7 @@ class StrategyType(Enum):
     BOLL_STRATEGY = ("boll", "B", "布林带策略", "波动性通道")
     KDJ_STRATEGY = ("kdj", "K", "KDJ策略", "随机指标")
     CANDLESTICK_STRATEGY = ("candle", "CS", "蜡烛图策略", "K线形态识别")
+    FUSION_STRATEGY = ("fusion", "FS", "融合策略", "多策略综合信号")
 
     def __new__(cls, value, code, text, desc):
         obj = object.__new__(cls)
@@ -35,7 +36,7 @@ class StrategyType(Enum):
 
     @classmethod
     def all_strategies(cls):
-        """返回所有可用的策略类型"""
+        """返回所有可用的策略类型（不包括融合策略）"""
         return [
             cls.MACD_STRATEGY,
             cls.SMA_STRATEGY,

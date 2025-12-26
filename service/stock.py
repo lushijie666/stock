@@ -318,7 +318,7 @@ def show_follow_page(category: Category):
                             followed_time = stock.followed_at.strftime('%Y-%m-%d %H:%M:%S') if stock.followed_at else '-'
                             ipo_time = stock.ipo_at.strftime('%Y-%m-%d') if stock.ipo_at else '-'
                             card_html = f"""
-                            <div class="stock-card">
+                            <div class="stock-card" style="border-left: 4px solid #9c27b0;">
                                 <div class="stock-card-header">
                                     <div class="stock-card-title">
                                         <span class="stock-name">{stock.name}</span>

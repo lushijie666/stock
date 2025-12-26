@@ -62,7 +62,8 @@ def show_page(stock, t: StockHistoryType):
             StrategyType.RSI_STRATEGY: StrategyType.RSI_STRATEGY.fullText,
             StrategyType.BOLL_STRATEGY: StrategyType.BOLL_STRATEGY.fullText,
             StrategyType.KDJ_STRATEGY: StrategyType.KDJ_STRATEGY.fullText,
-            StrategyType.CANDLESTICK_STRATEGY: StrategyType.CANDLESTICK_STRATEGY.fullText
+            StrategyType.CANDLESTICK_STRATEGY: StrategyType.CANDLESTICK_STRATEGY.fullText,
+            StrategyType.FUSION_STRATEGY: StrategyType.FUSION_STRATEGY.fullText
         }
         selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
         if selected_strategy_key not in st.session_state:
@@ -75,7 +76,7 @@ def show_page(stock, t: StockHistoryType):
                 currently_selected = strategy in selected_strategies
                 # 定义回调函数来切换选择状态
                 def toggle_strategy(sel_strategy=strategy):
-                    current = st.session_state[selected_strategy_key]
+                    current = st.session_state.get(selected_strategy_key, [])
                     if sel_strategy in current:
                         st.session_state[selected_strategy_key] = [s for s in current if s != sel_strategy]
                     else:
@@ -88,10 +89,42 @@ def show_page(stock, t: StockHistoryType):
                     label_visibility="visible"
 
                 )
-                if is_selected:
+                if is_selected and strategy not in selected_strategies:
                     selected_strategies.append(strategy)
         # 更新session state
         st.session_state[selected_strategy_key] = selected_strategies
+
+        # 如果选择了融合策略，显示配置选项
+        if StrategyType.FUSION_STRATEGY in selected_strategies:
+            with st.expander("⚙️ 融合策略配置", expanded=False):
+                fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
+                fusion_consensus_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_consensus"
+
+                # 默认值
+                if fusion_mode_key not in st.session_state:
+                    st.session_state[fusion_mode_key] = "voting"
+                if fusion_consensus_key not in st.session_state:
+                    st.session_state[fusion_consensus_key] = 3
+
+                # 融合模式选择
+                fusion_mode = st.selectbox(
+                    "融合模式",
+                    options=["voting", "weighted", "adaptive"],
+                    format_func=lambda x: {"voting": "🗳️ 投票模式（稳健）", "weighted": "⚖️ 加权模式（灵活）", "adaptive": "🤖 自适应模式（智能）"}[x],
+                    key=fusion_mode_key,
+                    help="投票模式：多数策略一致才触发\n加权模式：根据策略权重计算综合得分\n自适应模式：根据市场环境动态调整"
+                )
+
+                if fusion_mode == "voting":
+                    min_consensus = st.slider(
+                        "最小一致策略数",
+                        min_value=2,
+                        max_value=8,
+                        value=st.session_state[fusion_consensus_key],
+                        key=fusion_consensus_key,
+                        help="至少几个策略发出相同信号才触发"
+                    )
+
     chart_handlers = {
         "K线图": lambda: show_kline_chart(stock, t, selected_strategies),
         "K线图处理": lambda: show_kline_process_chart(stock, t),
@@ -667,7 +700,7 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                         '策略': ', '.join([StrategyType.lookup(code.strip()).fullText for code in s.get('strategy_code', '').split(',')])
                             if s.get('strategy_code') and ',' in s.get('strategy_code', '')
                             else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知'),
-                        '模式': s.get('pattern_name', '-')  # 添加K线形态列
+                        '模式': s.get('pattern_name', '-')
                     }
                     for s in all_signals
                 ]).sort_values('日期（时间）')

@@ -1490,3 +1490,397 @@ def _detect_triple_candle_pattern(
         }
     
     return None
+
+
+# ================== 融合策略 ==================
+
+class FusionStrategy(BaseStrategy):
+    """
+    融合策略 - 综合多个策略的信号
+
+    支持三种融合模式：
+    1. 投票模式（voting）：多数策略达成一致才触发
+    2. 加权模式（weighted）：根据策略权重计算综合得分
+    3. 自适应模式（adaptive）：根据市场环境动态选择策略组合
+    """
+
+    def __init__(
+        self,
+        mode: str = 'voting',
+        min_consensus: int = 3,
+        weights: Dict[str, float] = None,
+        threshold: float = 3.0,
+        enable_market_detection: bool = False
+    ):
+        super().__init__("融合策略")
+        self.mode = mode  # 'voting', 'weighted', 'adaptive'
+        self.min_consensus = min_consensus  # 投票模式：最小一致策略数
+        self.weights = weights or self._get_default_weights()  # 加权模式：策略权重
+        self.threshold = threshold  # 加权模式：触发阈值
+        self.enable_market_detection = enable_market_detection  # 是否启用市场检测
+
+    def _get_default_weights(self) -> Dict[str, float]:
+        """获取默认权重配置（平衡型）"""
+        return {
+            'macd': 1.0,
+            'sma': 1.0,
+            'turtle': 1.0,
+            'cbr': 1.0,
+            'rsi': 1.0,
+            'boll': 1.0,
+            'kdj': 1.0,
+            'candle': 1.0
+        }
+
+    def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
+        """
+        生成融合信号
+
+        Args:
+            df: 股票历史数据
+
+        Returns:
+            融合后的信号结果
+        """
+        # 获取所有基础策略的信号
+        all_strategy_signals = self._collect_all_strategy_signals(df)
+
+        # 根据模式选择融合方法
+        if self.mode == 'voting':
+            fusion_signals = self._voting_fusion(all_strategy_signals)
+        elif self.mode == 'weighted':
+            fusion_signals = self._weighted_fusion(all_strategy_signals)
+        elif self.mode == 'adaptive':
+            fusion_signals = self._adaptive_fusion(df, all_strategy_signals)
+        else:
+            raise ValueError(f"未知的融合模式: {self.mode}")
+
+        return StrategyResult(
+            strategy_type=StrategyType.FUSION_STRATEGY,
+            signals=fusion_signals,
+            metadata={
+                "description": f"融合策略 - {self.mode}模式",
+                "mode": self.mode,
+                "min_consensus": self.min_consensus if self.mode == 'voting' else None,
+                "weights": self.weights if self.mode in ['weighted', 'adaptive'] else None,
+                "threshold": self.threshold if self.mode == 'weighted' else None
+            }
+        )
+
+    def _collect_all_strategy_signals(self, df: pd.DataFrame) -> Dict[str, List[Dict]]:
+        """收集所有策略的信号"""
+        strategies = {
+            'macd': MACDStrategy(),
+            'sma': SMAStrategy(),
+            'turtle': TurtleStrategy(),
+            'cbr': CBRStrategy(),
+            'rsi': RSIStrategy(),
+            'boll': BollingerStrategy(),
+            'kdj': KDJStrategy(),
+            'candle': CandlestickStrategy()
+        }
+
+        all_signals = {}
+        for code, strategy in strategies.items():
+            try:
+                result = strategy.generate_signals(df)
+                all_signals[code] = result.signals
+            except Exception as e:
+                # 如果某个策略失败，记录但继续
+                all_signals[code] = []
+
+        return all_signals
+
+    def _voting_fusion(self, all_strategy_signals: Dict[str, List[Dict]]) -> List[Dict]:
+        """
+        投票融合：多个策略达成一致才发出信号
+
+        Args:
+            all_strategy_signals: 所有策略的信号字典 {strategy_code: signals}
+
+        Returns:
+            融合后的信号列表
+        """
+        # 按日期分组统计
+        date_signals = {}
+
+        for strategy_code, signals in all_strategy_signals.items():
+            for signal in signals:
+                date = signal['date']
+                if date not in date_signals:
+                    date_signals[date] = {'BUY': [], 'SELL': []}
+
+                signal_type = 'BUY' if signal['type'] == SignalType.BUY else 'SELL'
+                date_signals[date][signal_type].append({
+                    'strategy': strategy_code,
+                    'strength': signal['strength'],
+                    'pattern': signal.get('pattern_name', ''),
+                    'price': signal.get('price', 0)
+                })
+
+        # 生成融合信号
+        fusion_signals = []
+
+        for date, signals in date_signals.items():
+            # 买入信号投票
+            if len(signals['BUY']) >= self.min_consensus:
+                strength = self._calculate_consensus_strength(signals['BUY'])
+                avg_price = sum(s['price'] for s in signals['BUY']) / len(signals['BUY'])
+
+                fusion_signals.append({
+                    'date': date,
+                    'price': avg_price,
+                    'type': SignalType.BUY,
+                    'strength': strength,
+                    'consensus_count': len(signals['BUY']),
+                    'strategies': ', '.join([s['strategy'] for s in signals['BUY']]),
+                    'details': '、'.join([
+                        f"{StrategyType.lookup(s['strategy']).text}({s['strength'].text})"
+                        for s in signals['BUY']
+                    ])
+                })
+
+            # 卖出信号投票
+            if len(signals['SELL']) >= self.min_consensus:
+                strength = self._calculate_consensus_strength(signals['SELL'])
+                avg_price = sum(s['price'] for s in signals['SELL']) / len(signals['SELL'])
+
+                fusion_signals.append({
+                    'date': date,
+                    'price': avg_price,
+                    'type': SignalType.SELL,
+                    'strength': strength,
+                    'consensus_count': len(signals['SELL']),
+                    'strategies': ', '.join([s['strategy'] for s in signals['SELL']]),
+                    'details': '、'.join([
+                        f"{StrategyType.lookup(s['strategy']).text}({s['strength'].text})"
+                        for s in signals['SELL']
+                    ])
+                })
+
+        return fusion_signals
+
+    def _weighted_fusion(self, all_strategy_signals: Dict[str, List[Dict]]) -> List[Dict]:
+        """
+        加权融合：根据策略权重计算综合得分
+
+        Args:
+            all_strategy_signals: 所有策略的信号字典
+
+        Returns:
+            融合后的信号列表
+        """
+        date_scores = {}
+
+        for strategy_code, signals in all_strategy_signals.items():
+            weight = self.weights.get(strategy_code, 1.0)
+
+            for signal in signals:
+                date = signal['date']
+                if date not in date_scores:
+                    date_scores[date] = {
+                        'BUY': {'score': 0, 'details': [], 'prices': []},
+                        'SELL': {'score': 0, 'details': [], 'prices': []}
+                    }
+
+                # 信号强度转换为数值
+                strength_value = 2.0 if signal['strength'] == SignalStrength.STRONG else 1.0
+
+                # 计算加权得分
+                score = strength_value * weight
+
+                signal_type = 'BUY' if signal['type'] == SignalType.BUY else 'SELL'
+                date_scores[date][signal_type]['score'] += score
+                date_scores[date][signal_type]['details'].append({
+                    'strategy': strategy_code,
+                    'strength': signal['strength'],
+                    'weight': weight,
+                    'score': score
+                })
+                date_scores[date][signal_type]['prices'].append(signal.get('price', 0))
+
+        # 生成融合信号
+        fusion_signals = []
+
+        for date, scores in date_scores.items():
+            # 买入信号
+            if scores['BUY']['score'] >= self.threshold:
+                strength = SignalStrength.STRONG if scores['BUY']['score'] >= 5.0 else SignalStrength.WEAK
+                avg_price = sum(scores['BUY']['prices']) / len(scores['BUY']['prices']) if scores['BUY']['prices'] else 0
+
+                fusion_signals.append({
+                    'date': date,
+                    'price': avg_price,
+                    'type': SignalType.BUY,
+                    'strength': strength,
+                    'score': scores['BUY']['score'],
+                    'strategies': ', '.join([d['strategy'] for d in scores['BUY']['details']]),
+                    'details': '、'.join([
+                        f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].text}={d['score']:.1f})"
+                        for d in scores['BUY']['details']
+                    ])
+                })
+
+            # 卖出信号
+            if scores['SELL']['score'] >= self.threshold:
+                strength = SignalStrength.STRONG if scores['SELL']['score'] >= 5.0 else SignalStrength.WEAK
+                avg_price = sum(scores['SELL']['prices']) / len(scores['SELL']['prices']) if scores['SELL']['prices'] else 0
+
+                fusion_signals.append({
+                    'date': date,
+                    'price': avg_price,
+                    'type': SignalType.SELL,
+                    'strength': strength,
+                    'score': scores['SELL']['score'],
+                    'strategies': ', '.join([d['strategy'] for d in scores['SELL']['details']]),
+                    'details': '、'.join([
+                        f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].text}={d['score']:.1f})"
+                        for d in scores['SELL']['details']
+                    ])
+                })
+
+        return fusion_signals
+
+    def _adaptive_fusion(self, df: pd.DataFrame, all_strategy_signals: Dict[str, List[Dict]]) -> List[Dict]:
+        """
+        自适应融合：根据市场环境动态调整策略权重
+
+        Args:
+            df: 股票数据
+            all_strategy_signals: 所有策略的信号字典
+
+        Returns:
+            融合后的信号列表
+        """
+        # 检测市场状态
+        market_state = detect_market_state(df)
+
+        # 根据市场状态调整权重
+        if market_state == 'trending':
+            # 趋势市场：侧重趋势跟随策略
+            adaptive_weights = {
+                'macd': 2.0,
+                'sma': 2.0,
+                'turtle': 1.5,
+                'cbr': 1.0,
+                'rsi': 0.5,
+                'boll': 0.5,
+                'kdj': 0.5,
+                'candle': 1.0
+            }
+        else:
+            # 震荡市场：侧重反转策略
+            adaptive_weights = {
+                'macd': 0.5,
+                'sma': 0.5,
+                'turtle': 0.5,
+                'cbr': 0.5,
+                'rsi': 2.0,
+                'boll': 2.0,
+                'kdj': 2.0,
+                'candle': 1.5
+            }
+
+        # 使用自适应权重进行加权融合
+        original_weights = self.weights
+        self.weights = adaptive_weights
+        result = self._weighted_fusion(all_strategy_signals)
+        self.weights = original_weights  # 恢复原始权重
+
+        # 在信号详情中添加市场状态信息
+        for signal in result:
+            signal['market_state'] = '趋势市场' if market_state == 'trending' else '震荡市场'
+
+        return result
+
+    def _calculate_consensus_strength(self, signals: List[Dict]) -> SignalStrength:
+        """
+        计算一致信号的强度
+
+        Args:
+            signals: 同一日期的信号列表
+
+        Returns:
+            综合强度
+        """
+        strong_count = sum(1 for s in signals if s['strength'] == SignalStrength.STRONG)
+        total_count = len(signals)
+
+        # 如果超过一半是强信号，则判定为强
+        if strong_count / total_count >= 0.5:
+            return SignalStrength.STRONG
+        else:
+            return SignalStrength.WEAK
+
+
+def detect_market_state(df: pd.DataFrame, window: int = 20) -> str:
+    """
+    检测市场状态：趋势 or 震荡
+
+    使用ADX（平均趋向指数）判断：
+    - ADX > 25：趋势市场
+    - ADX <= 25：震荡市场
+
+    Args:
+        df: 股票数据
+        window: 检测窗口期
+
+    Returns:
+        'trending' 或 'ranging'
+    """
+    if len(df) < window + 1:
+        return 'ranging'  # 数据不足，默认震荡
+
+    try:
+        high = df['highest']
+        low = df['lowest']
+        close = df['closing']
+
+        # 计算+DM和-DM
+        plus_dm = high.diff()
+        minus_dm = -low.diff()
+
+        plus_dm[plus_dm < 0] = 0
+        minus_dm[minus_dm < 0] = 0
+
+        # 计算TR（真实波幅）
+        tr_list = []
+        for i in range(len(df)):
+            if i == 0:
+                tr_list.append(high.iloc[i] - low.iloc[i])
+            else:
+                tr = max(
+                    high.iloc[i] - low.iloc[i],
+                    abs(high.iloc[i] - close.iloc[i-1]),
+                    abs(low.iloc[i] - close.iloc[i-1])
+                )
+                tr_list.append(tr)
+
+        tr = pd.Series(tr_list, index=df.index)
+
+        # 计算ATR
+        atr = tr.rolling(window).mean()
+
+        # 计算+DI和-DI
+        plus_di = 100 * (plus_dm.rolling(window).mean() / atr)
+        minus_di = 100 * (minus_dm.rolling(window).mean() / atr)
+
+        # 计算DX和ADX
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 0.0001)  # 避免除零
+        adx = dx.rolling(window).mean()
+
+        # 获取最新的ADX值
+        latest_adx = adx.iloc[-1]
+
+        if pd.isna(latest_adx):
+            return 'ranging'
+
+        # ADX > 25 为趋势市场
+        if latest_adx > 25:
+            return 'trending'
+        else:
+            return 'ranging'
+
+    except Exception as e:
+        # 如果计算失败，默认返回震荡市场
+        return 'ranging'

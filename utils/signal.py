@@ -8,7 +8,7 @@ from enums.signal import SignalStrength
 from enums.strategy import StrategyType
 
 from utils.strategy import StrategyResult, MACDStrategy, SMAStrategy, TurtleStrategy, CBRStrategy, RSIStrategy, \
-    BollingerStrategy, KDJStrategy, CandlestickStrategy
+    BollingerStrategy, KDJStrategy, CandlestickStrategy, FusionStrategy
 
 
 def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = None, merge_and_filter: bool = True) -> List[Dict]:
@@ -89,6 +89,7 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
         StrategyType.BOLL_STRATEGY: BollingerStrategy(),
         StrategyType.KDJ_STRATEGY: KDJStrategy(),
         StrategyType.CANDLESTICK_STRATEGY: CandlestickStrategy(),
+        StrategyType.FUSION_STRATEGY: FusionStrategy(mode='voting', min_consensus=3),  # 默认使用投票模式
     }
 
     results = {}
