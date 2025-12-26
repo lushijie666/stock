@@ -1131,6 +1131,32 @@ def _show_fusion_strategy_config(stock, t: StockHistoryType):
 
         # 根据选择的模式显示不同的配置选项
         if fusion_mode_code == FusionStrategyModel.VOTING_MODEL.code:
+            st.caption("""
+**🗳 投票模式说明**
+
+当多个策略达成一致时才发出信号，适合追求稳健的用户。
+
+**📊 工作原理**
+
+在同一日期，当至少N个策略发出相同类型的信号（买入或卖出）时，才触发该信号。
+
+**💡 使用示例**
+
+假设最小一致策略数设为3，某日期出现：
+• ✅ MACD发出买入信号
+• ✅ SMA发出买入信号
+• ✅ RSI发出买入信号
+• ❌ 布林带发出卖出信号
+• ❌ KDJ无信号
+
+结果：3个策略一致发出买入信号 ≥ 3（阈值）→ **触发买入**
+
+**⚙️ 信号强度判定**
+
+• 超过一半是强信号 → 最终判定为**强信号**
+• 否则 → 最终判定为**弱信号**
+            """)
+
             min_consensus = st.slider(
                 "最小一致策略数 (至少几个策略发出相同信号才触发)",
                 min_value=2,
@@ -1138,6 +1164,32 @@ def _show_fusion_strategy_config(stock, t: StockHistoryType):
                 key=fusion_consensus_key,
             )
         elif fusion_mode_code == FusionStrategyModel.WEIGHTED_MODEL.code:
+            st.caption("""
+**⚖️ 加权模式说明**
+
+根据您设置的权重计算综合得分，适合有明确策略偏好的用户。
+
+**📊 计算公式**
+```
+综合得分 = Σ(策略权重 × 信号强度值)
+```
+
+**💡 信号强度值**
+• 强信号 = 2.0
+• 弱信号 = 1.0
+
+**🎯 使用示例**
+
+假设某日期出现以下信号：
+• MACD发出强买信号（权重1.5）→ 得分 = 1.5 × 2.0 = 3.0
+• SMA发出弱买信号（权重1.0）→ 得分 = 1.0 × 1.0 = 1.0
+• RSI发出强买信号（权重0.5）→ 得分 = 0.5 × 2.0 = 1.0
+
+综合得分 = 3.0 + 1.0 + 1.0 = 5.0
+
+如果触发阈值设为3.0，则5.0 > 3.0，触发买入信号。
+            """)
+
             # 为每个策略创建权重滑块
             weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_weights"
             threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_threshold"
@@ -1179,9 +1231,44 @@ def _show_fusion_strategy_config(stock, t: StockHistoryType):
             st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
 
         elif fusion_mode_code == FusionStrategyModel.ADAPTIVE_MODEL.code:
-            st.caption("根据市场环境动态调整策略权重\n\n" +
-                       "• 趋势市场：侧重MACD、SMA等趋势「跟随策略」\n\n" +
-                       "• 震荡市场：侧重RSI、布林带、KDJ等「反转策略」")
+            st.caption("""
+**🤖 自适应模式说明**
+
+根据市场环境自动调整策略权重，再叠加您的自定义权重进行微调。
+
+**📊 计算公式**
+```
+最终权重 = 自适应基础权重 × 您的调整系数
+最终得分 = Σ(策略权重 × 信号强度值)
+```
+
+**🎯 自适应基础权重**
+
+趋势市场（ADX > 25）- 侧重趋势跟随：
+• MACD策略: 2.0 | SMA策略: 2.0 | 海龟策略: 1.5
+• CBR策略: 1.0 | 蜡烛图: 1.0
+• RSI策略: 0.5 | 布林带: 0.5 | KDJ策略: 0.5
+
+震荡市场（ADX ≤ 25）- 侧重反转策略：
+• RSI策略: 2.0 | 布林带: 2.0 | KDJ策略: 2.0
+• 蜡烛图: 1.5 | CBR策略: 0.5
+• MACD策略: 0.5 | SMA策略: 0.5 | 海龟策略: 0.5
+
+**💡 使用示例**
+
+假设当前是趋势市场，您设置 MACD调整系数=2.0：
+• MACD最终权重 = 2.0(基础) × 2.0(您的系数) = 4.0
+
+假设该日期MACD发出强买信号（强度值=2.0）：
+• MACD得分 = 4.0(最终权重) × 2.0(强度) = 8.0
+
+**⚙️ 您的权重调整系数**
+
+设置为 1.0 = 使用默认自适应权重
+设置为 2.0 = 加倍该策略的影响力
+设置为 0.5 = 减半该策略的影响力
+设置为 0.0 = 完全禁用该策略
+            """)
 
             weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_weights"
             threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_threshold"
@@ -1204,7 +1291,7 @@ def _show_fusion_strategy_config(stock, t: StockHistoryType):
                 # 交替分配到两列
                 with (col1 if idx % 2 == 0 else col2):
                     weight = st.slider(
-                        f"{strategy_type.fullText}",
+                        f"{strategy_type.fullText} (调整系数)",
                         min_value=0.0,
                         max_value=3.0,
                         step=0.5,
