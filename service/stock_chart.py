@@ -1087,39 +1087,99 @@ def _format_strategy_text(signal):
 
 
 def _format_pattern_text(signal):
-    """格式化形态文本，对于融合策略显示参与的策略，对于蜡烛图显示形态名称"""
+    """
+    格式化形态文本，按照不同策略分别展示详细信息
+
+    展示规则：
+    - 融合策略：显示参与的各个策略及其强度，如 [CBR策略(强)、KDJ策略(弱)]
+    - 蜡烛图策略：显示识别的形态名称，如 [看涨吞没、晨星]
+    - 其他策略：显示 [-]
+    - 多个策略：用空格分隔每个策略的信息
+    """
     from enums.signal import SignalType
 
     strategy_code = signal.get('strategy_code', '')
 
-    # 如果是融合策略，显示详细的策略信息
-    if strategy_code == 'FS':
-        details = signal.get('details', {})
-        if details:
-            # details 是一个字典: {SignalType.BUY: [...], SignalType.SELL: [...]}
-            # 需要根据当前信号类型获取对应的策略列表
-            signal_type = signal.get('type')
-            if signal_type in details:
-                strategy_list = details[signal_type]
-                if strategy_list:
-                    # 格式化每个参与的策略信息
-                    formatted_strategies = []
-                    for s in strategy_list:
-                        strategy_type = s.get('strategy')
-                        strength = s.get('strength')
-                        if strategy_type and strength:
-                            formatted_strategies.append(
-                                f"{strategy_type.text}({strength.display_name})"
-                            )
-                    return '、'.join(formatted_strategies) if formatted_strategies else '-'
+    if not strategy_code:
         return '-'
 
-    # 如果是蜡烛图策略，显示形态名称
-    pattern_name = signal.get('pattern_name', '')
-    if pattern_name:
-        return pattern_name
+    # 检查是否有多个策略（合并后的信号）
+    strategies = signal.get('strategies', [])
 
-    return '-'
+    if strategies:
+        # 有多个策略的情况
+        pattern_parts = []
+
+        for strategy in strategies:
+            if strategy == StrategyType.FUSION_STRATEGY:
+                # 融合策略：显示参与的各个策略明细
+                details = signal.get('details', {})
+                if details:
+                    signal_type = signal.get('type')
+                    if signal_type in details:
+                        strategy_list = details[signal_type]
+                        if strategy_list:
+                            formatted_strategies = []
+                            for s in strategy_list:
+                                strategy_type = s.get('strategy')
+                                strength = s.get('strength')
+                                if strategy_type and strength:
+                                    formatted_strategies.append(
+                                        f"{strategy_type.text}({strength.display_name})"
+                                    )
+                            if formatted_strategies:
+                                pattern_parts.append(f"[{('、'.join(formatted_strategies))}]")
+                            else:
+                                pattern_parts.append('[-]')
+                        else:
+                            pattern_parts.append('[-]')
+                    else:
+                        pattern_parts.append('[-]')
+                else:
+                    pattern_parts.append('[-]')
+
+            elif strategy == StrategyType.CANDLESTICK_STRATEGY:
+                # 蜡烛图策略：显示形态名称
+                pattern_name = signal.get('pattern_name', '')
+                if pattern_name:
+                    pattern_parts.append(f"[{pattern_name}]")
+                else:
+                    pattern_parts.append('[-]')
+            else:
+                # 其他策略：显示 [-]
+                pattern_parts.append('[-]')
+
+        return ' '.join(pattern_parts) if pattern_parts else '-'
+
+    else:
+        # 单个策略的情况
+        if strategy_code == 'FS':
+            # 融合策略：显示参与的各个策略明细
+            details = signal.get('details', {})
+            if details:
+                signal_type = signal.get('type')
+                if signal_type in details:
+                    strategy_list = details[signal_type]
+                    if strategy_list:
+                        formatted_strategies = []
+                        for s in strategy_list:
+                            strategy_type = s.get('strategy')
+                            strength = s.get('strength')
+                            if strategy_type and strength:
+                                formatted_strategies.append(
+                                    f"{strategy_type.text}({strength.display_name})"
+                                )
+                        return f"[{('、'.join(formatted_strategies))}]" if formatted_strategies else '-'
+            return '-'
+
+        elif strategy_code == 'CS':
+            # 蜡烛图策略：显示形态名称
+            pattern_name = signal.get('pattern_name', '')
+            return f"[{pattern_name}]" if pattern_name else '-'
+
+        else:
+            # 其他策略
+            return '[-]'
 
 
 def _get_fusion_config(stock, t: StockHistoryType):
