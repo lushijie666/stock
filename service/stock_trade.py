@@ -18,6 +18,7 @@ from models.stock_history import get_history_model
 from models.stock_trade import StockTradeW, StockTrade30M, StockTradeM, StockTradeD, get_trade_model
 from service.stock import reload, get_followed_codes, get_codes
 from service.stock_chart import show_detail_dialog
+from utils.convert import format_pattern_text
 from utils.db import get_db_session
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
@@ -332,6 +333,9 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
     stock_trades = []
     for signal in signals:
         signal_date = signal['date']
+        # 格式化模式文本
+        formatted_pattern = format_pattern_text(signal)
+
         model_instance = None
         if t == StockHistoryType.W:
             model_instance = StockTradeW(
@@ -341,7 +345,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
-                pattern_name=signal.get('pattern_name', ''),
+                pattern_name=formatted_pattern,
                 removed=False
             )
         elif t == StockHistoryType.M:
@@ -352,7 +356,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
-                pattern_name=signal.get('pattern_name', ''),
+                pattern_name=formatted_pattern,
                 removed=False
             )
         elif t == StockHistoryType.THIRTY_M:
@@ -363,7 +367,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
-                pattern_name=signal.get('pattern_name', ''),
+                pattern_name=formatted_pattern,
                 removed=False
             )
         else:
@@ -374,7 +378,7 @@ def fetch(code: str, t: StockHistoryType, start_date: Any = None, end_date: Any 
                 signal_type=signal['type'].value,
                 signal_strength=signal['strength'].value,
                 strategy_type=signal['strategy_code'],
-                pattern_name=signal.get('pattern_name', ''),
+                pattern_name=formatted_pattern,
                 removed=False
             )
         stock_trades.append(model_instance)
