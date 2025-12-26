@@ -24,6 +24,56 @@ from utils.uuid import generate_key
 KEY_PREFIX = "stock_chart"
 
 
+def _format_strategy_text(signal):
+    """格式化策略文本，处理融合策略和普通策略"""
+    strategy_code = signal.get('strategy_code', '')
+
+    if not strategy_code:
+        return '未知'
+
+    # 如果是融合策略 (code可能是'FS'或'fusion')
+    if strategy_code in ['FS', 'fusion']:
+        return '融合策略'
+
+    # 普通策略
+    if ',' in strategy_code:
+        # 多个策略
+        codes = [code.strip() for code in strategy_code.split(',')]
+        strategies = []
+        for code in codes:
+            st_type = StrategyType.lookup(code)
+            if st_type:
+                strategies.append(st_type.fullText)
+        return ', '.join(strategies) if strategies else '未知'
+    else:
+        # 单个策略
+        st_type = StrategyType.lookup(strategy_code)
+        return st_type.fullText if st_type else '未知'
+
+
+def _format_pattern_text(signal):
+    """格式化形态文本，对于融合策略显示参与的策略，对于蜡烛图显示形态名称"""
+    strategy_code = signal.get('strategy_code', '')
+
+    # 如果是融合策略，显示详细的策略信息
+    if strategy_code in ['FS', 'fusion']:
+        details = signal.get('details', '')
+        if details:
+            return details
+        # 如果没有details，尝试从strategies字段获取
+        strategies = signal.get('strategies', '')
+        if strategies:
+            return strategies
+        return '-'
+
+    # 如果是蜡烛图策略，显示形态名称
+    pattern_name = signal.get('pattern_name', '')
+    if pattern_name:
+        return pattern_name
+
+    return '-'
+
+
 @st.dialog("股票图表", width="large")
 def show_detail_dialog(stock):
     show_detail(stock)
@@ -312,10 +362,8 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                         '信号类型': f"{s['type'].fullText}",
                         '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
-                        '策略': ', '.join([StrategyType.lookup(code.strip()).fullText for code in s.get('strategy_code', '').split(',')])
-                            if s.get('strategy_code') and ',' in s.get('strategy_code', '')
-                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知'),
-                        '模式': s.get('pattern_name', '-')  # 添加K线形态列
+                        '策略': _format_strategy_text(s),
+                        '模式': _format_pattern_text(s)  # 蜡烛图显示形态，融合策略显示参与策略
                     }
                     for s in all_signals
                 ]).sort_values('日期（时间）')
@@ -697,10 +745,8 @@ def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
                         '信号类型': f"{s['type'].fullText}",
                         '信号强度': f"{s['strength'].fullText}",
                         '价格': round(s['price'], 2),
-                        '策略': ', '.join([StrategyType.lookup(code.strip()).fullText for code in s.get('strategy_code', '').split(',')])
-                            if s.get('strategy_code') and ',' in s.get('strategy_code', '')
-                            else (StrategyType.lookup(s.get('strategy_code')).fullText if s.get('strategy_code') else '未知'),
-                        '模式': s.get('pattern_name', '-')
+                        '策略': _format_strategy_text(s),
+                        '模式': _format_pattern_text(s)  # 蜡烛图显示形态，融合策略显示参与策略
                     }
                     for s in all_signals
                 ]).sort_values('日期（时间）')
