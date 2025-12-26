@@ -7,7 +7,6 @@ import pandas as pd
 from enums.signal import SignalType, SignalStrength
 from models.stock_history import get_history_model
 from utils.db import get_db_session
-from utils.signal import calculate_all_signals_by_strategy
 
 
 class StrategyResult:
@@ -1554,6 +1553,9 @@ class FusionStrategy(BaseStrategy):
         }
 
     def generate_signals(self, df: pd.DataFrame) -> StrategyResult:
+        # 延迟导入避免循环依赖
+        from utils.signal import calculate_all_signals_by_strategy
+
         all_strategies = StrategyType.all_base_strategies()
         all_strategy_signals = calculate_all_signals_by_strategy(df, all_strategies, False)
 

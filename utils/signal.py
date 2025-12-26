@@ -11,7 +11,12 @@ from utils.strategy import StrategyResult, MACDStrategy, SMAStrategy, TurtleStra
     BollingerStrategy, KDJStrategy, CandlestickStrategy, FusionStrategy
 
 
-def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = None, merge_and_filter: bool = True) -> List[Dict]:
+def calculate_all_signals(
+    df: pd.DataFrame,
+    strategies: List[StrategyType] = None,
+    merge_and_filter: bool = True,
+    fusion_config: Dict = None
+) -> List[Dict]:
     """
     计算所有策略的信号并合并为一个信号列表
 
@@ -19,12 +24,13 @@ def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = Non
         df: 股票数据DataFrame
         strategies: 要计算的策略列表，如果为None则计算所有策略
         merge_and_filter: 是否对信号进行合并和过滤处理
+        fusion_config: 融合策略配置字典，包含mode、min_consensus、weights、threshold等
 
     Returns:
         List[Dict]: 合并后的信号列表
     """
     # 获取各策略的信号结果
-    strategy_results = calculate_all_signals_by_strategy(df, strategies, False)
+    strategy_results = calculate_all_signals_by_strategy(df, strategies, False, fusion_config)
     # 收集所有信号
     all_signals = []
     for strategy_type, result in strategy_results.items():
@@ -62,7 +68,12 @@ def calculate_all_signals(df: pd.DataFrame, strategies: List[StrategyType] = Non
     return all_signals
 
 
-def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[StrategyType] = None,merge_and_filter: bool = True) -> Dict[StrategyType, StrategyResult]:
+def calculate_all_signals_by_strategy(
+    df: pd.DataFrame,
+    strategies: List[StrategyType] = None,
+    merge_and_filter: bool = True,
+    fusion_config: Dict = None
+) -> Dict[StrategyType, StrategyResult]:
     """
     根据指定策略计算信号
 
@@ -70,6 +81,7 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
         df: 股票数据DataFrame
         strategies: 要计算的策略列表，如果为None则计算所有策略
         merge_and_filter: 是否对信号进行合并和过滤处理
+        fusion_config: 融合策略配置字典
 
     Returns:
         Dict[StrategyType, StrategyResult]: 各策略的计算结果
@@ -80,6 +92,21 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
     if strategies is None:
         strategies = StrategyType.all_strategies()
 
+    # 根据 fusion_config 创建融合策略实例
+    if fusion_config:
+        mode = fusion_config.get('mode', FusionStrategyModel.VOTING_MODEL)
+        min_consensus = fusion_config.get('min_consensus')
+        weights = fusion_config.get('weights')
+        threshold = fusion_config.get('threshold')
+        fusion_strategy = FusionStrategy(
+            mode=mode,
+            min_consensus=min_consensus,
+            weights=weights,
+            threshold=threshold
+        )
+    else:
+        fusion_strategy = FusionStrategy(mode=FusionStrategyModel.VOTING_MODEL, min_consensus=2)
+
     strategy_map = {
         StrategyType.MACD_STRATEGY: MACDStrategy(),
         StrategyType.SMA_STRATEGY: SMAStrategy(),
@@ -89,7 +116,7 @@ def calculate_all_signals_by_strategy(df: pd.DataFrame, strategies: List[Strateg
         StrategyType.BOLL_STRATEGY: BollingerStrategy(),
         StrategyType.KDJ_STRATEGY: KDJStrategy(),
         StrategyType.CANDLESTICK_STRATEGY: CandlestickStrategy(),
-        StrategyType.FUSION_STRATEGY: FusionStrategy(mode=FusionStrategyModel.VOTING_MODEL, min_consensus=2),
+        StrategyType.FUSION_STRATEGY: fusion_strategy,
     }
 
     results = {}

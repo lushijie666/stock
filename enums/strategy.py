@@ -112,12 +112,18 @@ class StrategyType(Enum):
 
 class FusionStrategyModel(Enum):
     """策略类型枚举"""
-    VOTING_MODEL = ("voting", "投票模式")
-    WEIGHTED_MODEL = ("weighted", "加权模式")
-    ADAPTIVE_MODEL = ("adaptive", "自适应模式")
+    VOTING_MODEL = ("voting", "投票模式", "🗳", "稳健")
+    WEIGHTED_MODEL = ("weighted", "加权模式",  "⚖️", "灵活")
+    ADAPTIVE_MODEL = ("adaptive", "自适应模式", "🤖", "智能")
 
-    def __new__(cls, code, text):
+    def __new__(cls, code, text, icon, desc):
         obj = object.__new__(cls)
         obj.code = code
         obj.text = text
+        obj.icon = icon
+        obj.desc = desc
         return obj
+
+    @property
+    def fullText(self) -> str:
+        return f"{self.icon} {self.text} ({self.desc})"
