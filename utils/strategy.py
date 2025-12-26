@@ -1492,6 +1492,37 @@ def _detect_triple_candle_pattern(
     return None
 
 
+def _safe_strategy_lookup(strategy_code: str):
+    """
+    安全地查找策略类型
+
+    支持通过 code (M, S, T等) 或 value (macd, sma, turtle等) 查找
+    """
+    # 首先尝试通过code查找
+    result = StrategyType.lookup(strategy_code)
+    if result:
+        return result
+
+    # 如果找不到，尝试通过value查找
+    code_map = {
+        'macd': 'M',
+        'sma': 'S',
+        'turtle': 'T',
+        'cbr': 'C',
+        'rsi': 'R',
+        'boll': 'B',
+        'kdj': 'K',
+        'candle': 'CS',
+        'fusion': 'FS'
+    }
+
+    code = code_map.get(strategy_code)
+    if code:
+        return StrategyType.lookup(code)
+
+    return None
+
+
 # ================== 融合策略 ==================
 
 class FusionStrategy(BaseStrategy):
@@ -1635,8 +1666,9 @@ class FusionStrategy(BaseStrategy):
                     'consensus_count': len(signals['BUY']),
                     'strategies': ', '.join([s['strategy'] for s in signals['BUY']]),
                     'details': '、'.join([
-                        f"{StrategyType.lookup(s['strategy']).text}({s['strength'].text})"
+                        f"{_safe_strategy_lookup(s['strategy']).text}({s['strength'].text})"
                         for s in signals['BUY']
+                        if _safe_strategy_lookup(s['strategy'])
                     ])
                 })
 
@@ -1653,8 +1685,9 @@ class FusionStrategy(BaseStrategy):
                     'consensus_count': len(signals['SELL']),
                     'strategies': ', '.join([s['strategy'] for s in signals['SELL']]),
                     'details': '、'.join([
-                        f"{StrategyType.lookup(s['strategy']).text}({s['strength'].text})"
+                        f"{_safe_strategy_lookup(s['strategy']).text}({s['strength'].text})"
                         for s in signals['SELL']
+                        if _safe_strategy_lookup(s['strategy'])
                     ])
                 })
 
@@ -1716,8 +1749,9 @@ class FusionStrategy(BaseStrategy):
                     'score': scores['BUY']['score'],
                     'strategies': ', '.join([d['strategy'] for d in scores['BUY']['details']]),
                     'details': '、'.join([
-                        f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].text}={d['score']:.1f})"
+                        f"{_safe_strategy_lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].text}={d['score']:.1f})"
                         for d in scores['BUY']['details']
+                        if _safe_strategy_lookup(d['strategy'])
                     ])
                 })
 
@@ -1734,8 +1768,9 @@ class FusionStrategy(BaseStrategy):
                     'score': scores['SELL']['score'],
                     'strategies': ', '.join([d['strategy'] for d in scores['SELL']['details']]),
                     'details': '、'.join([
-                        f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].text}={d['score']:.1f})"
+                        f"{_safe_strategy_lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].text}={d['score']:.1f})"
                         for d in scores['SELL']['details']
+                        if _safe_strategy_lookup(d['strategy'])
                     ])
                 })
 
