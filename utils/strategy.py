@@ -1633,7 +1633,6 @@ class FusionStrategy(BaseStrategy):
                     'type': SignalType.BUY,
                     'strength': strength,
                     'consensus_count': len(signals['BUY']),
-                    'strategies': ', '.join([s['strategy'] for s in signals['BUY']]),
                     'details': '、'.join([
                         f"{StrategyType.lookup(s['strategy']).text}({s['strength'].display_name})"
                         for s in signals['BUY']
@@ -1652,7 +1651,6 @@ class FusionStrategy(BaseStrategy):
                     'type': SignalType.SELL,
                     'strength': strength,
                     'consensus_count': len(signals['SELL']),
-                    'strategies': ', '.join([s['strategy'] for s in signals['SELL']]),
                     'details': '、'.join([
                         f"{StrategyType.lookup(s['strategy']).text}({s['strength'].display_name})"
                         for s in signals['SELL']
@@ -1716,7 +1714,6 @@ class FusionStrategy(BaseStrategy):
                     'type': SignalType.BUY,
                     'strength': strength,
                     'score': scores['BUY']['score'],
-                    'strategies': ', '.join([d['strategy'] for d in scores['BUY']['details']]),
                     'details': '、'.join([
                         f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].display_name}={d['score']:.1f})"
                         for d in scores['BUY']['details']
@@ -1735,7 +1732,6 @@ class FusionStrategy(BaseStrategy):
                     'type': SignalType.SELL,
                     'strength': strength,
                     'score': scores['SELL']['score'],
-                    'strategies': ', '.join([d['strategy'] for d in scores['SELL']['details']]),
                     'details': '、'.join([
                         f"{StrategyType.lookup(d['strategy']).text}(权重{d['weight']:.1f}×{d['strength'].display_name}={d['score']:.1f})"
                         for d in scores['SELL']['details']
