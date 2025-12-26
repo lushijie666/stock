@@ -31,8 +31,8 @@ def _format_strategy_text(signal):
     if not strategy_code:
         return '未知'
 
-    # 如果是融合策略 (code可能是'FS'或'fusion')
-    if strategy_code in ['FS', 'fusion']:
+    # 如果是融合策略
+    if strategy_code == 'FS':
         return '融合策略'
 
     # 普通策略
@@ -56,7 +56,7 @@ def _format_pattern_text(signal):
     strategy_code = signal.get('strategy_code', '')
 
     # 如果是融合策略，显示详细的策略信息
-    if strategy_code in ['FS', 'fusion']:
+    if strategy_code == 'FS':
         details = signal.get('details', '')
         if details:
             return details
