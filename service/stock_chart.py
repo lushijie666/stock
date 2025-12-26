@@ -24,96 +24,6 @@ from utils.uuid import generate_key
 KEY_PREFIX = "stock_chart"
 
 
-def _format_strategy_text(signal):
-    """格式化策略文本，处理融合策略和普通策略"""
-    strategy_code = signal.get('strategy_code', '')
-
-    if not strategy_code:
-        return '未知'
-
-    # 如果是融合策略
-    if strategy_code == 'FS':
-        return '融合策略'
-
-    # 普通策略
-    if ',' in strategy_code:
-        # 多个策略
-        codes = [code.strip() for code in strategy_code.split(',')]
-        strategies = []
-        for code in codes:
-            st_type = StrategyType.lookup(code)
-            if st_type:
-                strategies.append(st_type.fullText)
-        return ', '.join(strategies) if strategies else '未知'
-    else:
-        # 单个策略
-        st_type = StrategyType.lookup(strategy_code)
-        return st_type.fullText if st_type else '未知'
-
-
-def _format_pattern_text(signal):
-    """格式化形态文本，对于融合策略显示参与的策略，对于蜡烛图显示形态名称"""
-    from enums.signal import SignalType
-
-    strategy_code = signal.get('strategy_code', '')
-
-    # 如果是融合策略，显示详细的策略信息
-    if strategy_code == 'FS':
-        details = signal.get('details', {})
-        if details:
-            # details 是一个字典: {SignalType.BUY: [...], SignalType.SELL: [...]}
-            # 需要根据当前信号类型获取对应的策略列表
-            signal_type = signal.get('type')
-            if signal_type in details:
-                strategy_list = details[signal_type]
-                if strategy_list:
-                    # 格式化每个参与的策略信息
-                    formatted_strategies = []
-                    for s in strategy_list:
-                        strategy_type = s.get('strategy')
-                        strength = s.get('strength')
-                        if strategy_type and strength:
-                            formatted_strategies.append(
-                                f"{strategy_type.text}({strength.display_name})"
-                            )
-                    return '、'.join(formatted_strategies) if formatted_strategies else '-'
-        return '-'
-
-    # 如果是蜡烛图策略，显示形态名称
-    pattern_name = signal.get('pattern_name', '')
-    if pattern_name:
-        return pattern_name
-
-    return '-'
-
-
-def _get_fusion_config(stock, t: StockHistoryType):
-    """获取融合策略配置"""
-    fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
-    fusion_consensus_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_consensus"
-    fusion_weights_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"
-    fusion_threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"
-
-    # 获取模式
-    mode_code = st.session_state.get(fusion_mode_key, FusionStrategyModel.VOTING_MODEL.code)
-
-    # 根据 code 找到对应的枚举
-    mode = next((m for m in FusionStrategyModel if m.code == mode_code), FusionStrategyModel.VOTING_MODEL)
-
-    config = {
-        'mode': mode,
-    }
-
-    # 根据不同模式获取参数
-    if mode == FusionStrategyModel.VOTING_MODEL:
-        config['min_consensus'] = st.session_state.get(fusion_consensus_key, 2)
-    elif mode in [FusionStrategyModel.WEIGHTED_MODEL, FusionStrategyModel.ADAPTIVE_MODEL]:
-        config['weights'] = st.session_state.get(fusion_weights_key)
-        config['threshold'] = st.session_state.get(fusion_threshold_key)
-
-    return config
-
-
 @st.dialog("股票图表", width="large")
 def show_detail_dialog(stock):
     show_detail(stock)
@@ -184,142 +94,9 @@ def show_page(stock, t: StockHistoryType):
         # 更新session state
         st.session_state[selected_strategy_key] = selected_strategies
 
-        # 如果选择了融合策略，显示配置选项
-        if StrategyType.FUSION_STRATEGY in selected_strategies:
-            with st.expander("⚙️ 融合策略配置", expanded=False):
-                fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
-                fusion_consensus_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_consensus"
-
-                # 默认值
-                if fusion_mode_key not in st.session_state:
-                    st.session_state[fusion_mode_key] = FusionStrategyModel.VOTING_MODEL.code
-                if fusion_consensus_key not in st.session_state:
-                    st.session_state[fusion_consensus_key] = 2
-
-                # 融合模式选择
-                fusion_mode_code = st.selectbox(
-                    "融合模式",
-                    options=[m.code for m in FusionStrategyModel],
-                    format_func=lambda x: next(m.fullText for m in FusionStrategyModel if m.code == x),
-                    key=fusion_mode_key,
-                )
-
-                # 根据选择的模式显示不同的配置选项
-                if fusion_mode_code == FusionStrategyModel.VOTING_MODEL.code:
-                    min_consensus = st.slider(
-                        "最小一致策略数",
-                        min_value=2,
-                        max_value=8,
-                        value=st.session_state[fusion_consensus_key],
-                        key=fusion_consensus_key,
-                        help="至少几个策略发出相同信号才触发"
-                    )
-                elif fusion_mode_code == FusionStrategyModel.WEIGHTED_MODEL.code:
-                    st.info("⚖️ 加权模式：根据策略权重计算综合得分")
-
-                    # 权重配置
-                    st.markdown("##### 策略权重配置")
-
-                    # 为每个策略创建权重滑块
-                    weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_weights"
-                    threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_threshold"
-
-                    # 初始化默认值
-                    if threshold_key not in st.session_state:
-                        st.session_state[threshold_key] = 3.0
-
-                    # 使用两列布局
-                    col1, col2 = st.columns(2)
-
-                    base_strategies = StrategyType.all_base_strategies()
-                    weights = {}
-
-                    for idx, strategy_type in enumerate(base_strategies):
-                        weight_key = f"{weights_key_prefix}_{strategy_type.code}"
-                        if weight_key not in st.session_state:
-                            st.session_state[weight_key] = 1.0
-
-                        # 交替分配到两列
-                        with (col1 if idx % 2 == 0 else col2):
-                            weight = st.slider(
-                                f"{strategy_type.text}",
-                                min_value=0.0,
-                                max_value=3.0,
-                                value=st.session_state[weight_key],
-                                step=0.5,
-                                key=weight_key,
-                                help=f"{strategy_type.desc}"
-                            )
-                            weights[strategy_type] = weight
-
-                    # 触发阈值设置
-                    threshold = st.slider(
-                        "触发阈值",
-                        min_value=1.0,
-                        max_value=10.0,
-                        value=st.session_state[threshold_key],
-                        step=0.5,
-                        key=threshold_key,
-                        help="综合得分超过此阈值才发出信号"
-                    )
-
-                    # 保存配置到 session_state
-                    st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
-                    st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
-
-                elif fusion_mode_code == FusionStrategyModel.ADAPTIVE_MODEL.code:
-                    st.info("🤖 自适应模式：根据市场环境动态调整策略权重\n\n" +
-                           "• 趋势市场：侧重MACD、SMA等趋势跟随策略\n" +
-                           "• 震荡市场：侧重RSI、布林带、KDJ等反转策略")
-
-                    # 权重配置（作为基础权重，会根据市场状态调整）
-                    st.markdown("##### 基础权重配置（会根据市场状态自动调整）")
-
-                    weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_weights"
-                    threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_threshold"
-
-                    # 初始化默认值
-                    if threshold_key not in st.session_state:
-                        st.session_state[threshold_key] = 3.0
-
-                    # 使用两列布局
-                    col1, col2 = st.columns(2)
-
-                    base_strategies = StrategyType.all_base_strategies()
-                    weights = {}
-
-                    for idx, strategy_type in enumerate(base_strategies):
-                        weight_key = f"{weights_key_prefix}_{strategy_type.code}"
-                        if weight_key not in st.session_state:
-                            st.session_state[weight_key] = 1.0
-
-                        # 交替分配到两列
-                        with (col1 if idx % 2 == 0 else col2):
-                            weight = st.slider(
-                                f"{strategy_type.text}",
-                                min_value=0.0,
-                                max_value=3.0,
-                                value=st.session_state[weight_key],
-                                step=0.5,
-                                key=weight_key,
-                                help=f"{strategy_type.desc}"
-                            )
-                            weights[strategy_type] = weight
-
-                    # 触发阈值设置
-                    threshold = st.slider(
-                        "触发阈值",
-                        min_value=1.0,
-                        max_value=10.0,
-                        value=st.session_state[threshold_key],
-                        step=0.5,
-                        key=threshold_key,
-                        help="综合得分超过此阈值才发出信号"
-                    )
-
-                    # 保存配置到 session_state
-                    st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
-                    st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
+    # 如果选择了融合策略，显示配置选项
+    if StrategyType.FUSION_STRATEGY in selected_strategies:
+        _show_fusion_strategy_config(stock, t)
 
     chart_handlers = {
         "K线图": lambda: show_kline_chart(stock, t, selected_strategies),
@@ -1279,3 +1056,206 @@ def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
                 st.info("没有交易记录")
     except Exception as e:
         st.error(f"回测分析失败：{str(e)}")
+
+
+
+def _format_strategy_text(signal):
+    """格式化策略文本，处理融合策略和普通策略"""
+    strategy_code = signal.get('strategy_code', '')
+
+    if not strategy_code:
+        return '未知'
+
+    # 如果是融合策略
+    if strategy_code == 'FS':
+        return '融合策略'
+
+    # 普通策略
+    if ',' in strategy_code:
+        # 多个策略
+        codes = [code.strip() for code in strategy_code.split(',')]
+        strategies = []
+        for code in codes:
+            st_type = StrategyType.lookup(code)
+            if st_type:
+                strategies.append(st_type.fullText)
+        return ', '.join(strategies) if strategies else '未知'
+    else:
+        # 单个策略
+        st_type = StrategyType.lookup(strategy_code)
+        return st_type.fullText if st_type else '未知'
+
+
+def _format_pattern_text(signal):
+    """格式化形态文本，对于融合策略显示参与的策略，对于蜡烛图显示形态名称"""
+    from enums.signal import SignalType
+
+    strategy_code = signal.get('strategy_code', '')
+
+    # 如果是融合策略，显示详细的策略信息
+    if strategy_code == 'FS':
+        details = signal.get('details', {})
+        if details:
+            # details 是一个字典: {SignalType.BUY: [...], SignalType.SELL: [...]}
+            # 需要根据当前信号类型获取对应的策略列表
+            signal_type = signal.get('type')
+            if signal_type in details:
+                strategy_list = details[signal_type]
+                if strategy_list:
+                    # 格式化每个参与的策略信息
+                    formatted_strategies = []
+                    for s in strategy_list:
+                        strategy_type = s.get('strategy')
+                        strength = s.get('strength')
+                        if strategy_type and strength:
+                            formatted_strategies.append(
+                                f"{strategy_type.text}({strength.display_name})"
+                            )
+                    return '、'.join(formatted_strategies) if formatted_strategies else '-'
+        return '-'
+
+    # 如果是蜡烛图策略，显示形态名称
+    pattern_name = signal.get('pattern_name', '')
+    if pattern_name:
+        return pattern_name
+
+    return '-'
+
+
+def _get_fusion_config(stock, t: StockHistoryType):
+    """获取融合策略配置"""
+    fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
+    fusion_consensus_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_consensus"
+    fusion_weights_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"
+    fusion_threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"
+
+    # 获取模式
+    mode_code = st.session_state.get(fusion_mode_key, FusionStrategyModel.VOTING_MODEL.code)
+
+    # 根据 code 找到对应的枚举
+    mode = next((m for m in FusionStrategyModel if m.code == mode_code), FusionStrategyModel.VOTING_MODEL)
+
+    config = {
+        'mode': mode,
+    }
+
+    # 根据不同模式获取参数
+    if mode == FusionStrategyModel.VOTING_MODEL:
+        config['min_consensus'] = st.session_state.get(fusion_consensus_key, 2)
+    elif mode in [FusionStrategyModel.WEIGHTED_MODEL, FusionStrategyModel.ADAPTIVE_MODEL]:
+        config['weights'] = st.session_state.get(fusion_weights_key)
+        config['threshold'] = st.session_state.get(fusion_threshold_key)
+
+    return config
+
+def _show_fusion_strategy_config(stock, t: StockHistoryType):
+    with st.expander("⚙️ 融合策略配置", expanded=False):
+        fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
+        fusion_consensus_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_consensus"
+        # 默认值
+        if fusion_mode_key not in st.session_state:
+            st.session_state[fusion_mode_key] = FusionStrategyModel.VOTING_MODEL.code
+        if fusion_consensus_key not in st.session_state:
+            st.session_state[fusion_consensus_key] = 2
+        # 融合模式选择
+        fusion_mode_code = st.selectbox(
+            "模式",
+            options=[m.code for m in FusionStrategyModel],
+            format_func=lambda x: next(m.fullText for m in FusionStrategyModel if m.code == x),
+            key=fusion_mode_key,
+        )
+
+        # 根据选择的模式显示不同的配置选项
+        if fusion_mode_code == FusionStrategyModel.VOTING_MODEL.code:
+            min_consensus = st.slider(
+                "最小一致策略数 (至少几个策略发出相同信号才触发)",
+                min_value=2,
+                max_value=8,
+                key=fusion_consensus_key,
+            )
+        elif fusion_mode_code == FusionStrategyModel.WEIGHTED_MODEL.code:
+            # 为每个策略创建权重滑块
+            weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_weights"
+            threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_threshold"
+
+            # 初始化默认值
+            if threshold_key not in st.session_state:
+                st.session_state[threshold_key] = 3.0
+            # 使用两列布局
+            col1, col2 = st.columns(2)
+            base_strategies = StrategyType.all_base_strategies()
+            weights = {}
+            for idx, strategy_type in enumerate(base_strategies):
+                weight_key = f"{weights_key_prefix}_{strategy_type.code}"
+                if weight_key not in st.session_state:
+                    st.session_state[weight_key] = 1.0
+
+                # 交替分配到两列
+                with (col1 if idx % 2 == 0 else col2):
+                    weight = st.slider(
+                        f"{strategy_type.fullText}",
+                        min_value=0.0,
+                        max_value=3.0,
+                        step=0.5,
+                        key=weight_key,
+                    )
+                    weights[strategy_type] = weight
+
+            # 触发阈值设置
+            threshold = st.slider(
+                "触发阈值 (综合得分超过此阈值才发出信号)",
+                min_value=1.0,
+                max_value=10.0,
+                step=0.5,
+                key=threshold_key
+            )
+
+            # 保存配置到 session_state
+            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
+            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
+
+        elif fusion_mode_code == FusionStrategyModel.ADAPTIVE_MODEL.code:
+            st.caption("根据市场环境动态调整策略权重\n\n" +
+                       "• 趋势市场：侧重MACD、SMA等趋势「跟随策略」\n\n" +
+                       "• 震荡市场：侧重RSI、布林带、KDJ等「反转策略」")
+
+            weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_weights"
+            threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_threshold"
+
+            # 初始化默认值
+            if threshold_key not in st.session_state:
+                st.session_state[threshold_key] = 3.0
+
+            # 使用两列布局
+            col1, col2 = st.columns(2)
+
+            base_strategies = StrategyType.all_base_strategies()
+            weights = {}
+
+            for idx, strategy_type in enumerate(base_strategies):
+                weight_key = f"{weights_key_prefix}_{strategy_type.code}"
+                if weight_key not in st.session_state:
+                    st.session_state[weight_key] = 1.0
+
+                # 交替分配到两列
+                with (col1 if idx % 2 == 0 else col2):
+                    weight = st.slider(
+                        f"{strategy_type.fullText}",
+                        min_value=0.0,
+                        max_value=3.0,
+                        step=0.5,
+                        key=weight_key,
+                    )
+                    weights[strategy_type] = weight
+
+            # 触发阈值设置
+            threshold = st.slider(
+                "触发阈值 (综合得分超过此阈值才发出信号)",
+                min_value=1.0,
+                max_value=10.0,
+                step=0.5,
+                key=threshold_key,
+            )
+            # 保存配置到 session_state
+            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
+            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold

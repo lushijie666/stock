@@ -1643,10 +1643,10 @@ class FusionStrategy(BaseStrategy):
         """
         date_scores = {}
 
-        for strategy_type, signals in all_strategy_signals.items():
+        for strategy_type, result in all_strategy_signals.items():
             weight = self.weights.get(strategy_type, 1.0)
 
-            for signal in signals:
+            for signal in result.signals:
                 date = signal['date']
                 if date not in date_scores:
                     date_scores[date] = {
