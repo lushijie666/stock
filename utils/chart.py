@@ -594,20 +594,8 @@ class ChartBuilder:
             for line in resistance_lines:
                 marklines.append(
                     opts.MarkLineItem(
-                        name=line.get('name', f"阻力位 {line['value']:.2f}"),
-                        y=line['value'],
-                        linestyle_opts=opts.LineStyleOpts(
-                            color=line.get('color', '#ff4d4f'),
-                            type_=line.get('line_type', 'dashed'),
-                            width=line.get('width', 2)
-                        ),
-                        label_opts=opts.LabelOpts(
-                            position="end",
-                            formatter=line.get('label', f"{line.get('name', '阻力位')}: {line['value']:.2f}"),
-                            color=line.get('color', '#ff4d4f'),
-                            font_size=11,
-                            font_weight="bold"
-                        )
+                        name=line.get('label', f"{line.get('name', '阻力位')}: {line['value']:.2f}"),
+                        y=line['value']
                     )
                 )
 
@@ -616,30 +604,37 @@ class ChartBuilder:
             for line in support_lines:
                 marklines.append(
                     opts.MarkLineItem(
-                        name=line.get('name', f"支撑位 {line['value']:.2f}"),
-                        y=line['value'],
-                        linestyle_opts=opts.LineStyleOpts(
-                            color=line.get('color', '#52c41a'),
-                            type_=line.get('line_type', 'dashed'),
-                            width=line.get('width', 2)
-                        ),
-                        label_opts=opts.LabelOpts(
-                            position="end",
-                            formatter=line.get('label', f"{line.get('name', '支撑位')}: {line['value']:.2f}"),
-                            color=line.get('color', '#52c41a'),
-                            font_size=11,
-                            font_weight="bold"
-                        )
+                        name=line.get('label', f"{line.get('name', '支撑位')}: {line['value']:.2f}"),
+                        y=line['value']
                     )
                 )
 
         if marklines:
-            kline.set_series_opts(
-                markline_opts=opts.MarkLineOpts(
-                    data=marklines,
-                    symbol=["none", "none"]
-                )
+            # 设置markline的整体样式
+            markline_opts = opts.MarkLineOpts(
+                data=marklines,
+                symbol=["none", "none"]
             )
+
+            # 如果有阻力线或支撑线，设置线条样式
+            if resistance_lines or support_lines:
+                # 使用linestyle_opts设置线条样式
+                line_style = opts.LineStyleOpts(
+                    type_="dashed",
+                    width=2
+                )
+                markline_opts = opts.MarkLineOpts(
+                    data=marklines,
+                    symbol=["none", "none"],
+                    linestyle_opts=line_style,
+                    label_opts=opts.LabelOpts(
+                        position="end",
+                        font_size=11,
+                        font_weight="bold"
+                    )
+                )
+
+            kline.set_series_opts(markline_opts=markline_opts)
 
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
