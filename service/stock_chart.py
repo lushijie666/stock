@@ -52,6 +52,8 @@ def show_page(stock, t: StockHistoryType):
         key=f"{KEY_PREFIX}_{stock.code}_{t}_radio2",
         label_visibility="collapsed"
     )
+    selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
+    selected_strategies = st.session_state.get(selected_strategy_key, [])
     strategy_required = chart_type in ["K线图", "买卖点分析", "回测分析"]
     if strategy_required:
         strategy_options = {
@@ -302,7 +304,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
 
-def show_kline_process_chart(stock, t: StockHistoryType):
+def show_kline_process_chart(stock, t: StockHistoryType, strategies=None):
     st.markdown(
         f"""
             <div class="table-header">

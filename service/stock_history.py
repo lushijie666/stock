@@ -230,7 +230,7 @@ def _fetch_a_stock_data(code: str, start_date: str, end_date: str, t: StockHisto
             rs = bs.query_history_k_data_plus(category.get_full_code(code, "."),
                                               fields,
                                               start_date=start_date, end_date=end_date, frequency=t.bs_frequency,
-                                              adjustflag="1")
+                                              adjustflag="2")
             logging.info(
                 f"获取[{KEY_PREFIX}][{t.text}]数据结果为..., 分类: {category.fullText}, 股票: {code}, 开始日期: {start_date}, 结束日期: {end_date}, code: {rs.error_code}, msg: {rs.error_msg}")
             if rs.error_code != '0':
@@ -462,7 +462,7 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                     period=period,
                     start_date=start_date_fmt,
                     end_date=end_date_fmt,
-                    adjust="hfq"
+                    adjust="qfq"
                 )
             if df is None or df.empty:
                 logging.warning(f"获取美股[{KEY_PREFIX}][{t.text}]数据为空, 股票: {code}, symbol: {symbol}")

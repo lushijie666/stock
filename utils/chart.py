@@ -152,7 +152,7 @@ class ChartBuilder:
                     color0="#14b143",
                     border_color="#ef232a",
                     border_color0="#14b143",
-                ),
+                )
             )
         )
         # 添加均线
@@ -594,7 +594,7 @@ class ChartBuilder:
                 pos_top="30%",
                 pos_left="right",
                 orient="vertical",  # 改为垂直排列
-                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                textstyle_opts=opts.TextStyleOpts(color="#000000")
             ),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
