@@ -614,6 +614,10 @@ class ChartBuilder:
             ),
             yaxis_opts=opts.AxisOpts(
                 is_scale=True,
+                name="价格(元)",
+                name_location="end",
+                name_gap=15,
+                name_textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=12),
                 splitline_opts=opts.SplitLineOpts(
                     is_show=True,
                     linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
@@ -638,7 +642,33 @@ class ChartBuilder:
                 background_color="rgba(245, 245, 245, 0.8)",
                 border_width=1,
                 border_color="#ccc",
-                textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                formatter=JsCode("""
+                    function(params) {
+                        if (!params || params.length === 0) return '';
+                        let result = params[0].axisValue + '<br/>';
+
+                        params.forEach(item => {
+                            if (item.seriesName === 'K线' && item.data) {
+                                const klineData = item.data;
+                                if (Array.isArray(klineData) && klineData.length >= 4) {
+                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
+                                    result += item.seriesName + '<br/>';
+                                    result += '开盘: ' + klineData[0] + '<br/>';
+                                    result += '收盘: ' + klineData[1] + '<br/>';
+                                    result += '最低: ' + klineData[2] + '<br/>';
+                                    result += '最高: ' + klineData[3] + '<br/>';
+                                }
+                            } else if (item.seriesType !== 'scatter' && item.seriesName !== 'K线') {
+                                const value = (item.value !== undefined && item.value !== null) ? item.value.toFixed(2) : '-';
+                                const color = item.color || '#666';
+                                result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + color + '"></span>';
+                                result += item.seriesName + ': ' + value + '<br/>';
+                            }
+                        });
+                        return result;
+                    }
+                """)
             ),
         )
         return kline
@@ -694,6 +724,10 @@ class ChartBuilder:
                     is_scale=True,
                     split_number=2,
                     position="left",  # 改为左侧
+                    name="成交量(股)",
+                    name_location="end",
+                    name_gap=15,
+                    name_textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=12),
                     axisline_opts=opts.AxisLineOpts(
                         linestyle_opts=opts.LineStyleOpts(color="#666666")
                     ),
@@ -707,6 +741,27 @@ class ChartBuilder:
                         margin=4,
                         color="#000000"
                     ),
+                ),
+                tooltip_opts=opts.TooltipOpts(
+                    trigger="axis",
+                    axis_pointer_type="shadow",
+                    background_color="rgba(245, 245, 245, 0.8)",
+                    border_width=1,
+                    border_color="#ccc",
+                    textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                    formatter=JsCode("""
+                        function(params) {
+                            if (!params || params.length === 0) return '';
+                            let result = params[0].axisValue + '<br/>';
+                            params.forEach(item => {
+                                if (item.seriesName === '成交量') {
+                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
+                                    result += '成交量(股): ' + item.value + '<br/>';
+                                }
+                            });
+                            return result;
+                        }
+                    """)
                 ),
                 datazoom_opts=[
                     opts.DataZoomOpts(
