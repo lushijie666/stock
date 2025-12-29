@@ -140,7 +140,7 @@ class ChartBuilder:
         return bar
 
     @staticmethod
-    def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None, resistance_lines=None, support_lines=None):
+    def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None, extra_lines=None):
         df_json = df.to_json(orient='records')
         kline = (
             Kline(init_opts=opts.InitOpts())
@@ -168,6 +168,41 @@ class ChartBuilder:
                     is_smooth=True,
                     label_opts=opts.LabelOpts(is_show=False),  # 不显示标签
                 )
+            kline = kline.overlap(lines)
+        # 添加额外的线（如支撑线、阻力线等）
+        if extra_lines:
+            lines = Line()
+            lines.add_xaxis(dates)
+            for name, line_data in extra_lines.items():
+                values = line_data.get('values', [])
+                color = line_data.get('color', None)
+                # 确保值的数量与日期数量一致
+                if len(values) != len(dates):
+                    # 如果长度不一致，用最后一个值填充
+                    if len(values) < len(dates):
+                        values = values + [values[-1]] * (len(dates) - len(values))
+                    else:
+                        values = values[:len(dates)]
+                line_opts = opts.LineStyleOpts(type_="dashed", width=3)  # 使用虚线
+                if color:
+                    line_opts.color = color
+                lines.add_yaxis(
+                    name,
+                    values,
+                    is_smooth=False,
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        position="end",
+                        formatter="{c}",
+                        font_size=15,
+                        font_weight="bold",
+                        color=color if color else "#000"
+                    ),
+                    linestyle_opts=line_opts,
+                    itemstyle_opts=opts.ItemStyleOpts(color=color) if color else None,
+                    symbol = "none"
+                )
+
             kline = kline.overlap(lines)
 
         # 添加分型标记
@@ -575,66 +610,15 @@ class ChartBuilder:
                     )
                 ])
 
-            # 应用标记区域和标记线
+            # 应用标记区域
             if markarea_data:
                 kline.set_series_opts(
                     markarea_opts=opts.MarkAreaOpts(data=markarea_data)
                 )
-
             if markline_data:
                 kline.set_series_opts(
                     markline_opts=opts.MarkLineOpts(data=markline_data)
                 )
-
-        # 添加阻力线和支撑线
-        marklines = []
-
-        # 添加阻力线（通常是最高价）
-        if resistance_lines:
-            for line in resistance_lines:
-                marklines.append(
-                    opts.MarkLineItem(
-                        name=line.get('label', f"{line.get('name', '阻力位')}: {line['value']:.2f}"),
-                        y=line['value']
-                    )
-                )
-
-        # 添加支撑线（通常是最低价）
-        if support_lines:
-            for line in support_lines:
-                marklines.append(
-                    opts.MarkLineItem(
-                        name=line.get('label', f"{line.get('name', '支撑位')}: {line['value']:.2f}"),
-                        y=line['value']
-                    )
-                )
-
-        if marklines:
-            # 设置markline的整体样式
-            markline_opts = opts.MarkLineOpts(
-                data=marklines,
-                symbol=["none", "none"]
-            )
-
-            # 如果有阻力线或支撑线，设置线条样式
-            if resistance_lines or support_lines:
-                # 使用linestyle_opts设置线条样式
-                line_style = opts.LineStyleOpts(
-                    type_="dashed",
-                    width=2
-                )
-                markline_opts = opts.MarkLineOpts(
-                    data=marklines,
-                    symbol=["none", "none"],
-                    linestyle_opts=line_style,
-                    label_opts=opts.LabelOpts(
-                        position="end",
-                        font_size=11,
-                        font_weight="bold"
-                    )
-                )
-
-            kline.set_series_opts(markline_opts=markline_opts)
 
         kline.set_global_opts(
             title_opts=opts.TitleOpts(

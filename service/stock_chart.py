@@ -61,7 +61,7 @@ def show_page(stock, t: StockHistoryType):
         _show_strategy_config(stock, t)
     chart_handlers = {
         "K线图": lambda: show_kline_chart(stock, t),
-        "K线图形态": lambda: show_kline_chart(stock, t),
+        "K线图形态": lambda: show_kline_pattern_chart(stock, t),
         "K线图策略": lambda: show_kline_strategy_chart(stock, t, selected_strategies),
         "K线图处理": lambda: show_kline_process_chart(stock, t),
         "买卖点分析": lambda: show_trade_points_chart(stock, t, selected_strategies),
@@ -78,72 +78,16 @@ def show_kline_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-    df = _get_stock_history_data(stock, t)
-    dates = format_dates(df, t)
-    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-    volumes = df['turnover_count'].tolist()
-
-    # 通过 SQL 计算最近半年（180天）的最高价和最低价
-    model = get_history_model(t)
-    with get_db_session() as session:
-        # 获取最新日期
-        latest_date = session.query(func.max(model.date)).filter(
-            model.code == stock.code,
-            model.removed == False
-        ).scalar()
-
-        if latest_date:
-            # 计算半年前的日期
-            half_year_ago = latest_date - timedelta(days=180)
-
-            # 查询最近半年的最高价和最低价
-            result = session.query(
-                func.max(model.highest).label('max_high'),
-                func.min(model.lowest).label('min_low')
-            ).filter(
-                model.code == stock.code,
-                model.date >= half_year_ago,
-                model.date <= latest_date,
-                model.removed == False
-            ).first()
-
-            resistance_lines = None
-            support_lines = None
-
-            if result and result.max_high and result.min_low:
-                resistance_lines = [
-                    {
-                        'value': float(result.max_high),
-                        'name': '半年最高',
-                        'label': f'半年最高: {float(result.max_high):.2f}',
-                        'color': '#ff4d4f',
-                        'line_type': 'dashed',
-                        'width': 2
-                    }
-                ]
-                support_lines = [
-                    {
-                        'value': float(result.min_low),
-                        'name': '半年最低',
-                        'label': f'半年最低: {float(result.min_low):.2f}',
-                        'color': '#52c41a',
-                        'line_type': 'dashed',
-                        'width': 2
-                    }
-                ]
-
-    # 创建 K 线图
+    df, kline_chart, volume_bar = _build_stock_kline_chart(stock, t)
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
               <span class="chart-title">K线图</span>
           </div>
       """, unsafe_allow_html=True)
-    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df, resistance_lines=resistance_lines, support_lines=support_lines)
-    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
     # 显示K线图
-    streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline")
+    streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart")
     # 显示成交量
     st.markdown(f"""
                      <div class="chart-header">
@@ -151,8 +95,34 @@ def show_kline_chart(stock, t: StockHistoryType):
                          <span class="chart-title">成交量</span>
                      </div>
                  """, unsafe_allow_html=True)
-    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
+    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar")
 
+def show_kline_pattern_chart(stock, t: StockHistoryType):
+    st.markdown(
+        f"""
+               <div class="table-header">
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图形态</div>
+               </div>
+               """,
+        unsafe_allow_html=True
+    )
+    df, kline_chart, volume_bar = _build_stock_kline_chart(stock, t)
+    st.markdown("""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">K线图</span>
+          </div>
+      """, unsafe_allow_html=True)
+    # 显示K线图
+    streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_pattern")
+    # 显示成交量
+    st.markdown(f"""
+                     <div class="chart-header">
+                         <span class="chart-icon">🔍</span>
+                         <span class="chart-title">成交量</span>
+                     </div>
+                 """, unsafe_allow_html=True)
+    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar_pattern")
 
 def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
     st.markdown(
@@ -192,7 +162,7 @@ def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
     # 显示K线图
-    streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_kline")
+    streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_strategy")
 
     # 计算 MACD
     macd_df = calculate_macd(df)
@@ -220,7 +190,7 @@ def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
         slow_period=slow_period,
         signal_period=signal_period,
     )
-    streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_macd")
+    streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_macd_chart_strategy")
 
     # 显示成交量
     st.markdown(f"""
@@ -229,7 +199,7 @@ def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
               <span class="chart-title">成交量</span>
           </div>
       """, unsafe_allow_html=True)
-    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_volume")
+    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar_strategy")
 
     # 显示MACD数据表格
     if not macd_df.empty:
@@ -1265,6 +1235,36 @@ def _show_fusion_strategy_config(stock, t: StockHistoryType):
             st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
             st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
 
+
+
+def _build_stock_kline_chart(stock, t: StockHistoryType):
+    df = _get_stock_history_data(stock, t)
+    dates = format_dates(df, t)
+    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+    volumes = df['turnover_count'].tolist()
+    max_highest, min_lowest = _get_stock_history_lately_max_min(stock, t, 180)
+    extra_lines = {}
+    if max_highest is not None:
+        extra_lines['阻力线(半年)'] = {
+            'values': [max_highest] * len(dates),  # 阻力线
+            'color': '#ef232a'  # 红色
+        }
+    if min_lowest is not None:
+        extra_lines['支撑线(半年)'] = {
+            'values': [min_lowest] * len(dates),  # 支撑线
+            'color': '#14b143'  # 绿色
+        }
+
+    st.markdown("""
+             <div class="chart-header">
+                 <span class="chart-icon">🔍</span>
+                 <span class="chart-title">K线图</span>
+             </div>
+         """, unsafe_allow_html=True)
+    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
+    return df, kline_chart, volume_bar
+
 def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
     model = get_history_model(t)
     try:
@@ -1332,3 +1332,27 @@ def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
     return pd.DataFrame()
+
+def _get_stock_history_lately_max_min(stock, t: StockHistoryType, days: int):
+    model = get_history_model(t)
+    with get_db_session() as session:
+        latest_date = session.query(func.max(model.date)).filter(
+            model.code == stock.code,
+            model.removed == False
+        ).scalar()
+        if latest_date:
+            days_ago = latest_date - timedelta(days=days)
+            result = session.query(
+                func.max(model.highest).label('max_high'),
+                func.min(model.lowest).label('min_low')
+            ).filter(
+                model.code == stock.code,
+                model.date >= days_ago,
+                model.date <= latest_date,
+                model.removed == False
+            ).first()
+            if result:
+                return result.max_high, result.min_low
+            else:
+                return None, None
+    return None, None
