@@ -654,7 +654,6 @@ class ChartBuilder:
         colors = ['#ef232a' if close > open else '#14b143'
                   for open, close in zip(df['opening'], df['closing'])]
         df_json = df.to_json(orient='records')
-
         bar = (
             Bar()
             .add_xaxis(dates)
@@ -754,7 +753,7 @@ class ChartBuilder:
                                 }}
                             }}
                             let dfData = {df_json};
-                            let result = params[0].axisValue + '<br/>';
+                            let result = '<div style="padding:5px;"><strong>' + params[0].axisValue + '</strong><br/><br/>';
                             params.forEach(item => {{
                                 if (item.seriesName === '成交量') {{
                                     let index = item.dataIndex;
@@ -763,16 +762,27 @@ class ChartBuilder:
                                     let shouValue = (value / 100).toFixed(0);
                                     let formattedValue = formatValue(value);
                                     let formattedShou = formatValue(Number(shouValue));
-                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
-                                    result += '开盘价 <span style="float:right;text-align:right;min-width:100px;">' + currentData.opening + '</span><br/>';
-                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
-                                    result += '成交量(股) <span style="float:right;text-align:right;min-width:100px;">' + value + '</span><br/>';
-                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
-                                    result += '成交量(格式化) <span style="float:right;text-align:right;min-width:100px;">' + formattedValue + '</span><br/>';
-                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
-                                    result += '成交量(手) <span style="float:right;text-align:right;min-width:100px;">' + formattedShou + '</span><br/>';
+
+                                    // 价格数据组 - 使用蓝色系
+                                    result += '<div style="margin-bottom:8px;"><strong style="color:#1890ff;">━━ 价格信息</strong></div>';
+                                    result += '💰 <span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + currentData.opening + '</span><br/>';
+                                    result += '💵 <span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + currentData.closing + '</span><br/>';
+                                    result += '📉 <span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + currentData.lowest + '</span><br/>';
+                                    result += '📈 <span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + currentData.highest + '</span><br/>';
+
+                                    // 成交量数据组 - 使用紫色系
+                                    result += '<div style="margin:8px 0;"><strong style="color:#722ed1;">━━ 成交信息</strong></div>';
+                                    result += '📊 <span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
+                                    result += '🤝 <span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
+                                    result += '💸 <span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + currentData.turnover_amount + '</span><br/>';
+
+                                    // 指标数据组 - 使用橙色系
+                                    result += '<div style="margin:8px 0;"><strong style="color:#fa8c16;">━━ 指标信息</strong></div>';
+                                    result += '📶 <span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + currentData.change + '</span><br/>';
+                                    result += '🔄 <span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + currentData.turnover_ratio + '</span><br/>';
                                 }}
                             }});
+                            result += '</div>';
                             return result;
                         }}
                     """)

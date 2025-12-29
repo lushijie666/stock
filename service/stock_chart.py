@@ -101,7 +101,7 @@ def show_kline_chart(stock, t: StockHistoryType):
                          <span class="chart-title">成交量</span>
                      </div>
                  """, unsafe_allow_html=True)
-    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
+    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="500px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
 
 
 def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
@@ -1404,7 +1404,10 @@ def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
                 model.highest,
                 model.lowest,
                 model.closing,
-                model.turnover_count
+                model.turnover_count,
+                model.turnover_amount,
+                model.change,
+                model.turnover_ratio
             ).filter(
                 model.code == stock.code,
                 model.removed == False,
