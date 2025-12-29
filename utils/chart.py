@@ -658,7 +658,7 @@ class ChartBuilder:
                                 const value = (item.value !== undefined && item.value !== null) ? item.value : '-';
                                 const color = item.color || '#666';
                                 result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + color + '"></span>';
-                                result += item.seriesName + ': ' + value + '<br/>';
+                                result += item.seriesName + ': ' + (typeof value === 'number' ? value.toFixed(4) : value) + '<br/>';
                             }
                         });
                         return result;
