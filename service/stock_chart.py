@@ -82,6 +82,12 @@ def show_kline_chart(stock, t: StockHistoryType):
     dates = format_dates(df, t)
     k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
     volumes = df['turnover_count'].tolist()
+
+    # 计算最近半年（180天）的最高价和最低价
+    recent_180_days = df.tail(180) if len(df) > 180 else df
+    half_year_high = float(recent_180_days['highest'].max())
+    half_year_low = float(recent_180_days['lowest'].min())
+
     # 创建 K 线图
     st.markdown("""
           <div class="chart-header">
@@ -89,7 +95,7 @@ def show_kline_chart(stock, t: StockHistoryType):
               <span class="chart-title">K线图</span>
           </div>
       """, unsafe_allow_html=True)
-    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df)
+    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df, half_year_high=half_year_high, half_year_low=half_year_low)
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
     # 显示K线图

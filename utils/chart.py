@@ -140,7 +140,7 @@ class ChartBuilder:
         return bar
 
     @staticmethod
-    def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None):
+    def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None, half_year_high=None, half_year_low=None):
         df_json = df.to_json(orient='records')
         kline = (
             Kline(init_opts=opts.InitOpts())
@@ -585,6 +585,58 @@ class ChartBuilder:
                 kline.set_series_opts(
                     markline_opts=opts.MarkLineOpts(data=markline_data)
                 )
+
+        # 添加半年最高价和最低价的水平线
+        if half_year_high is not None and half_year_low is not None:
+            resistance_support_lines = []
+
+            # 半年最高价 - 阻力线（红色虚线）
+            resistance_support_lines.append(
+                opts.MarkLineItem(
+                    name=f"半年最高 {half_year_high:.2f}",
+                    y=half_year_high,
+                    linestyle_opts=opts.LineStyleOpts(
+                        color="#ff4d4f",
+                        type_="dashed",
+                        width=2
+                    ),
+                    label_opts=opts.LabelOpts(
+                        position="end",
+                        formatter=f"半年最高: {half_year_high:.2f}",
+                        color="#ff4d4f",
+                        font_size=11,
+                        font_weight="bold"
+                    )
+                )
+            )
+
+            # 半年最低价 - 支撑线（绿色虚线）
+            resistance_support_lines.append(
+                opts.MarkLineItem(
+                    name=f"半年最低 {half_year_low:.2f}",
+                    y=half_year_low,
+                    linestyle_opts=opts.LineStyleOpts(
+                        color="#52c41a",
+                        type_="dashed",
+                        width=2
+                    ),
+                    label_opts=opts.LabelOpts(
+                        position="end",
+                        formatter=f"半年最低: {half_year_low:.2f}",
+                        color="#52c41a",
+                        font_size=11,
+                        font_weight="bold"
+                    )
+                )
+            )
+
+            kline.set_series_opts(
+                markline_opts=opts.MarkLineOpts(
+                    data=resistance_support_lines,
+                    symbol=["none", "none"]
+                )
+            )
+
         kline.set_global_opts(
             title_opts=opts.TitleOpts(
                 title="",
