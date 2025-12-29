@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -83,10 +83,54 @@ def show_kline_chart(stock, t: StockHistoryType):
     k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
     volumes = df['turnover_count'].tolist()
 
-    # 计算最近半年（180天）的最高价和最低价
-    recent_180_days = df.tail(180) if len(df) > 180 else df
-    half_year_high = float(recent_180_days['highest'].max())
-    half_year_low = float(recent_180_days['lowest'].min())
+    # 通过 SQL 计算最近半年（180天）的最高价和最低价
+    model = get_history_model(t)
+    with get_db_session() as session:
+        # 获取最新日期
+        latest_date = session.query(func.max(model.date)).filter(
+            model.code == stock.code,
+            model.removed == False
+        ).scalar()
+
+        if latest_date:
+            # 计算半年前的日期
+            half_year_ago = latest_date - timedelta(days=180)
+
+            # 查询最近半年的最高价和最低价
+            result = session.query(
+                func.max(model.highest).label('max_high'),
+                func.min(model.lowest).label('min_low')
+            ).filter(
+                model.code == stock.code,
+                model.date >= half_year_ago,
+                model.date <= latest_date,
+                model.removed == False
+            ).first()
+
+            resistance_lines = None
+            support_lines = None
+
+            if result and result.max_high and result.min_low:
+                resistance_lines = [
+                    {
+                        'value': float(result.max_high),
+                        'name': '半年最高',
+                        'label': f'半年最高: {float(result.max_high):.2f}',
+                        'color': '#ff4d4f',
+                        'line_type': 'dashed',
+                        'width': 2
+                    }
+                ]
+                support_lines = [
+                    {
+                        'value': float(result.min_low),
+                        'name': '半年最低',
+                        'label': f'半年最低: {float(result.min_low):.2f}',
+                        'color': '#52c41a',
+                        'line_type': 'dashed',
+                        'width': 2
+                    }
+                ]
 
     # 创建 K 线图
     st.markdown("""
@@ -95,7 +139,7 @@ def show_kline_chart(stock, t: StockHistoryType):
               <span class="chart-title">K线图</span>
           </div>
       """, unsafe_allow_html=True)
-    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df, half_year_high=half_year_high, half_year_low=half_year_low)
+    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df, resistance_lines=resistance_lines, support_lines=support_lines)
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
     # 显示K线图
