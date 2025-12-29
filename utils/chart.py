@@ -639,6 +639,31 @@ class ChartBuilder:
                 border_width=1,
                 border_color="#ccc",
                 textstyle_opts=opts.TextStyleOpts(color="#000000"),  # 提示框文字改为黑色
+                formatter=JsCode("""
+                    function(params) {
+                        if (!params || params.length === 0) return '';
+                        let result = params[0].axisValue + '<br/>';
+                        params.forEach(item => {
+                            if (item.seriesName === 'K线' && item.data) {
+                                const klineData = item.data;
+                                if (Array.isArray(klineData) && klineData.length >= 4) {
+                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
+                                    result += item.seriesName + '<br/>';
+                                    result += '开盘: ' + klineData[0] + '<br/>';
+                                    result += '收盘: ' + klineData[1] + '<br/>';
+                                    result += '最低: ' + klineData[2] + '<br/>';
+                                    result += '最高: ' + klineData[3] + '<br/>';
+                                }
+                            } else if (item.seriesType !== 'scatter' && item.seriesName !== 'K线') {
+                                const value = (item.value !== undefined && item.value !== null) ? item.value : '-';
+                                const color = item.color || '#666';
+                                result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + color + '"></span>';
+                                result += item.seriesName + ': ' + value + '<br/>';
+                            }
+                        });
+                        return result;
+                    }
+                """)
             ),
         )
         return kline
