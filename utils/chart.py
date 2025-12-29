@@ -614,9 +614,11 @@ class ChartBuilder:
             ),
             yaxis_opts=opts.AxisOpts(
                 is_scale=True,
-                name="价格(元)",
-                name_location="end",
-                name_gap=15,
+                position="left",  # 改为左侧
+                name="价格(元/美元)",
+                name_location="middle",
+                name_gap=60,
+                name_rotate=-90,
                 name_textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=12),
                 splitline_opts=opts.SplitLineOpts(
                     is_show=True,
@@ -642,39 +644,17 @@ class ChartBuilder:
                 background_color="rgba(245, 245, 245, 0.8)",
                 border_width=1,
                 border_color="#ccc",
-                textstyle_opts=opts.TextStyleOpts(color="#000000"),
-                formatter=JsCode("""
-                    function(params) {
-                        if (!params || params.length === 0) return '';
-                        let result = params[0].axisValue + '<br/>';
-
-                        params.forEach(item => {
-                            if (item.seriesName === 'K线' && item.data) {
-                                const klineData = item.data;
-                                if (Array.isArray(klineData) && klineData.length >= 4) {
-                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
-                                    result += item.seriesName + '<br/>';
-                                    result += '开盘: ' + klineData[0] + '<br/>';
-                                    result += '收盘: ' + klineData[1] + '<br/>';
-                                    result += '最低: ' + klineData[2] + '<br/>';
-                                    result += '最高: ' + klineData[3] + '<br/>';
-                                }
-                            } else if (item.seriesType !== 'scatter' && item.seriesName !== 'K线') {
-                                const value = (item.value !== undefined && item.value !== null) ? item.value.toFixed(2) : '-';
-                                const color = item.color || '#666';
-                                result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + color + '"></span>';
-                                result += item.seriesName + ': ' + value + '<br/>';
-                            }
-                        });
-                        return result;
-                    }
-                """)
+                textstyle_opts=opts.TextStyleOpts(color="#000000")
             ),
         )
         return kline
 
     @staticmethod
-    def create_volume_bar(dates, volumes, colors):
+    def create_volume_bar(dates, volumes, df):
+        colors = ['#ef232a' if close > open else '#14b143'
+                  for open, close in zip(df['opening'], df['closing'])]
+        df_json = df.to_json(orient='records')
+
         bar = (
             Bar()
             .add_xaxis(dates)
@@ -725,8 +705,9 @@ class ChartBuilder:
                     split_number=2,
                     position="left",  # 改为左侧
                     name="成交量(股)",
-                    name_location="end",
-                    name_gap=15,
+                    name_location="middle",
+                    name_gap=60,
+                    name_rotate=-90,
                     name_textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=12),
                     axisline_opts=opts.AxisLineOpts(
                         linestyle_opts=opts.LineStyleOpts(color="#666666")
@@ -739,7 +720,18 @@ class ChartBuilder:
                     axislabel_opts=opts.LabelOpts(
                         is_show=True,
                         margin=4,
-                        color="#000000"
+                        color="#000000",
+                        formatter=JsCode("""
+                                function(value) {
+                                    if (value >= 100000000) {
+                                        return (value / 100000000).toFixed(1) + '亿';
+                                    } else if (value >= 10000) {
+                                        return (value / 10000).toFixed(1) + '万';
+                                    } else {
+                                        return value;
+                                    }
+                                }
+                            """)
                     ),
                 ),
                 tooltip_opts=opts.TooltipOpts(
@@ -749,18 +741,40 @@ class ChartBuilder:
                     border_width=1,
                     border_color="#ccc",
                     textstyle_opts=opts.TextStyleOpts(color="#000000"),
-                    formatter=JsCode("""
-                        function(params) {
+                    formatter=JsCode(f"""
+                        function(params) {{
                             if (!params || params.length === 0) return '';
+                            function formatValue(value) {{
+                                if (value >= 100000000) {{
+                                    return (value / 100000000).toFixed(2) + '亿';
+                                }} else if (value >= 10000) {{
+                                    return (value / 10000).toFixed(2) + '万';
+                                }} else {{
+                                    return value.toLocaleString();
+                                }}
+                            }}
+                            let dfData = {df_json};
                             let result = params[0].axisValue + '<br/>';
-                            params.forEach(item => {
-                                if (item.seriesName === '成交量') {
+                            params.forEach(item => {{
+                                if (item.seriesName === '成交量') {{
+                                    let index = item.dataIndex;
+                                    let currentData = dfData[index];
+                                    let value = item.value;
+                                    let shouValue = (value / 100).toFixed(0);
+                                    let formattedValue = formatValue(value);
+                                    let formattedShou = formatValue(Number(shouValue));
                                     result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
-                                    result += '成交量(股): ' + item.value + '<br/>';
-                                }
-                            });
+                                    result += '开盘价 <span style="float:right;text-align:right;min-width:100px;">' + currentData.opening + '</span><br/>';
+                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
+                                    result += '成交量(股) <span style="float:right;text-align:right;min-width:100px;">' + value + '</span><br/>';
+                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
+                                    result += '成交量(格式化) <span style="float:right;text-align:right;min-width:100px;">' + formattedValue + '</span><br/>';
+                                    result += '<span style="display:inline-block;margin-right:5px;width:10px;height:10px;background-color:' + item.color + '"></span>';
+                                    result += '成交量(手) <span style="float:right;text-align:right;min-width:100px;">' + formattedShou + '</span><br/>';
+                                }}
+                            }});
                             return result;
-                        }
+                        }}
                     """)
                 ),
                 datazoom_opts=[

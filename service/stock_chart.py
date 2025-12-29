@@ -82,8 +82,6 @@ def show_kline_chart(stock, t: StockHistoryType):
     dates = format_dates(df, t)
     k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
     volumes = df['turnover_count'].tolist()
-    colors = ['#ef232a' if close > open else '#14b143'
-              for open, close in zip(df['opening'], df['closing'])]
     # 创建 K 线图
     st.markdown("""
           <div class="chart-header">
@@ -92,7 +90,7 @@ def show_kline_chart(stock, t: StockHistoryType):
           </div>
       """, unsafe_allow_html=True)
     kline = ChartBuilder.create_kline_chart(dates, k_line_data)
-    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
     # 显示K线图
     streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline")
@@ -189,8 +187,6 @@ def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
                 ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
             k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
             volumes = df['turnover_count'].tolist()
-            colors = ['#ef232a' if close > open else '#14b143'
-                      for open, close in zip(df['opening'], df['closing'])]
 
             all_signals = []
             if strategies:
@@ -208,7 +204,7 @@ def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
                   </div>
               """, unsafe_allow_html=True)
             kline = ChartBuilder.create_kline_chart(dates, k_line_data, ma_lines=ma_lines, signals=all_signals)
-            volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
+            volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
             #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
             # 显示K线图
