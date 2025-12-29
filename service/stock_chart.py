@@ -1,7 +1,7 @@
 from datetime import datetime, time
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 from sqlalchemy import func
 import streamlit_echarts
 
@@ -47,72 +47,70 @@ def show_detail(stock):
 def show_page(stock, t: StockHistoryType):
     chart_type = st.radio(
         "选择功能",
-        ["K线图", "K线图处理", "买卖点分析", "回测分析"],
+        ["K线图", "K线图形态", "K线图策略", "K线图处理", "买卖点分析", "回测分析"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_{t}_radio2",
         label_visibility="collapsed"
     )
     selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
+    if selected_strategy_key not in st.session_state:
+        st.session_state[selected_strategy_key] = StrategyType.get_default_strategies_by_type(t)
     selected_strategies = st.session_state.get(selected_strategy_key, [])
-    strategy_required = chart_type in ["K线图", "买卖点分析", "回测分析"]
+    strategy_required = chart_type in ["K线图策略", "买卖点分析", "回测分析"]
     if strategy_required:
-        strategy_options = {
-            StrategyType.MACD_STRATEGY: StrategyType.MACD_STRATEGY.fullText,
-            StrategyType.SMA_STRATEGY: StrategyType.SMA_STRATEGY.fullText,
-            StrategyType.TURTLE_STRATEGY: StrategyType.TURTLE_STRATEGY.fullText,
-            StrategyType.CBR_STRATEGY: StrategyType.CBR_STRATEGY.fullText,
-            StrategyType.RSI_STRATEGY: StrategyType.RSI_STRATEGY.fullText,
-            StrategyType.BOLL_STRATEGY: StrategyType.BOLL_STRATEGY.fullText,
-            StrategyType.KDJ_STRATEGY: StrategyType.KDJ_STRATEGY.fullText,
-            StrategyType.CANDLESTICK_STRATEGY: StrategyType.CANDLESTICK_STRATEGY.fullText,
-            StrategyType.FUSION_STRATEGY: StrategyType.FUSION_STRATEGY.fullText
-        }
-        selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
-        if selected_strategy_key not in st.session_state:
-            st.session_state[selected_strategy_key] = StrategyType.get_default_strategies_by_type(t)
-
-        selected_strategies = st.session_state.get(selected_strategy_key, [])
-        cols = st.columns(len(strategy_options))
-        for i, (strategy, strategy_text) in enumerate(strategy_options.items()):
-            with cols[i]:
-                currently_selected = strategy in selected_strategies
-                # 定义回调函数来切换选择状态
-                def toggle_strategy(sel_strategy=strategy):
-                    current = st.session_state.get(selected_strategy_key, [])
-                    if sel_strategy in current:
-                        st.session_state[selected_strategy_key] = [s for s in current if s != sel_strategy]
-                    else:
-                        st.session_state[selected_strategy_key] = current + [sel_strategy]
-                is_selected = st.checkbox(
-                    strategy_text,
-                    value=currently_selected,
-                    key=f"{selected_strategy_key}_{strategy.value}",
-                    on_change=toggle_strategy,
-                    label_visibility="visible"
-
-                )
-                if is_selected and strategy not in selected_strategies:
-                    selected_strategies.append(strategy)
-        # 更新session state
-        st.session_state[selected_strategy_key] = selected_strategies
-
-    # 如果选择了融合策略，显示配置选项
-    if StrategyType.FUSION_STRATEGY in selected_strategies:
-        _show_fusion_strategy_config(stock, t)
-
+        _show_strategy_config(stock, t)
     chart_handlers = {
-        "K线图": lambda: show_kline_chart(stock, t, selected_strategies),
+        "K线图": lambda: show_kline_chart(stock, t),
+        "K线图形态": lambda: show_kline_chart(stock, t),
+        "K线图策略": lambda: show_kline_strategy_chart(stock, t, selected_strategies),
         "K线图处理": lambda: show_kline_process_chart(stock, t),
         "买卖点分析": lambda: show_trade_points_chart(stock, t, selected_strategies),
         "回测分析": lambda: show_backtest_analysis(stock, t, selected_strategies)
     }
     chart_handlers.get(chart_type, lambda: None)()
 
-def show_kline_chart(stock, t: StockHistoryType, strategies=None):
+def show_kline_chart(stock, t: StockHistoryType):
     st.markdown(
         f"""
                <div class="table-header">
                    <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图</div>
+               </div>
+               """,
+        unsafe_allow_html=True
+    )
+    df = _get_stock_history_data(stock, t)
+    dates = format_dates(df, t)
+    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+    volumes = df['turnover_count'].tolist()
+    colors = ['#ef232a' if close > open else '#14b143'
+              for open, close in zip(df['opening'], df['closing'])]
+    # 创建 K 线图
+    st.markdown("""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">K线图</span>
+          </div>
+      """, unsafe_allow_html=True)
+    kline = ChartBuilder.create_kline_chart(dates, k_line_data)
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, colors)
+    #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
+    # 显示K线图
+    streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline")
+    # 显示成交量
+    st.markdown(f"""
+                     <div class="chart-header">
+                         <span class="chart-icon">🔍</span>
+                         <span class="chart-title">成交量</span>
+                     </div>
+                 """, unsafe_allow_html=True)
+    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
+
+
+def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
+    st.markdown(
+        f"""
+               <div class="table-header">
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图策略</div>
                </div>
                """,
         unsafe_allow_html=True
@@ -133,7 +131,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                 return
             min_date, max_date = date_range
             default_start_date = t.get_default_start_date(max_date, min_date)
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_history_chart',category=stock.category)
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_strategy',category=stock.category)
             start_date_key = f"{key_prefix}_start_date"
             end_date_key = f"{key_prefix}_end_date"
 
@@ -214,7 +212,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
             #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
             # 显示K线图
-            streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline")
+            streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_kline")
 
             # 计算 MACD
             macd_df = calculate_macd(df)
@@ -242,7 +240,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                 slow_period=slow_period,
                 signal_period=signal_period,
             )
-            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_macd")
+            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_macd")
 
             # 显示成交量
             st.markdown(f"""
@@ -251,7 +249,7 @@ def show_kline_chart(stock, t: StockHistoryType, strategies=None):
                       <span class="chart-title">成交量</span>
                   </div>
               """, unsafe_allow_html=True)
-            streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
+            streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_volume")
 
             # 显示MACD数据表格
             if not macd_df.empty:
@@ -330,7 +328,7 @@ def show_kline_process_chart(stock, t: StockHistoryType, strategies=None):
             min_date, max_date = date_range
             default_start_date = t.get_default_start_date(max_date, min_date)
 
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_process_history_chart', category=stock.category)
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_process', category=stock.category)
             # 初始化 session state 中的日期值
             start_date_key = f"{key_prefix}_start_date"
             end_date_key = f"{key_prefix}_end_date"
@@ -1114,6 +1112,51 @@ def _get_fusion_config(stock, t: StockHistoryType):
 
     return config
 
+
+def _show_strategy_config(stock, t: StockHistoryType):
+    strategy_options = {
+        StrategyType.MACD_STRATEGY: StrategyType.MACD_STRATEGY.fullText,
+        StrategyType.SMA_STRATEGY: StrategyType.SMA_STRATEGY.fullText,
+        StrategyType.TURTLE_STRATEGY: StrategyType.TURTLE_STRATEGY.fullText,
+        StrategyType.CBR_STRATEGY: StrategyType.CBR_STRATEGY.fullText,
+        StrategyType.RSI_STRATEGY: StrategyType.RSI_STRATEGY.fullText,
+        StrategyType.BOLL_STRATEGY: StrategyType.BOLL_STRATEGY.fullText,
+        StrategyType.KDJ_STRATEGY: StrategyType.KDJ_STRATEGY.fullText,
+        StrategyType.CANDLESTICK_STRATEGY: StrategyType.CANDLESTICK_STRATEGY.fullText,
+        StrategyType.FUSION_STRATEGY: StrategyType.FUSION_STRATEGY.fullText
+    }
+    selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
+    if selected_strategy_key not in st.session_state:
+        st.session_state[selected_strategy_key] = StrategyType.get_default_strategies_by_type(t)
+    selected_strategies = st.session_state.get(selected_strategy_key, [])
+    cols = st.columns(len(strategy_options))
+    for i, (strategy, strategy_text) in enumerate(strategy_options.items()):
+        with cols[i]:
+            currently_selected = strategy in selected_strategies
+            # 定义回调函数来切换选择状态
+            def toggle_strategy(sel_strategy=strategy):
+                current = st.session_state.get(selected_strategy_key, [])
+                if sel_strategy in current:
+                    st.session_state[selected_strategy_key] = [s for s in current if s != sel_strategy]
+                else:
+                    st.session_state[selected_strategy_key] = current + [sel_strategy]
+            is_selected = st.checkbox(
+                strategy_text,
+                value=currently_selected,
+                key=f"{selected_strategy_key}_{strategy.value}",
+                on_change=toggle_strategy,
+                label_visibility="visible"
+
+            )
+            if is_selected and strategy not in selected_strategies:
+                selected_strategies.append(strategy)
+    # 更新session state
+    st.session_state[selected_strategy_key] = selected_strategies
+
+    # 如果选择了融合策略，显示配置选项
+    if StrategyType.FUSION_STRATEGY in selected_strategies:
+        _show_fusion_strategy_config(stock, t)
+
 def _show_fusion_strategy_config(stock, t: StockHistoryType):
     with st.expander("⚙️ 融合策略配置", expanded=False):
         fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
@@ -1312,3 +1355,68 @@ def _show_fusion_strategy_config(stock, t: StockHistoryType):
             # 保存配置到 session_state
             st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
             st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
+
+def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
+    model = get_history_model(t)
+    try:
+        with get_db_session() as session:
+            # 获取该股票的最早和最晚日期
+            date_range = session.query(
+                func.min(model.date),
+                func.max(model.date)
+            ).filter(
+                model.code == stock.code,
+                model.removed == False
+            ).first()
+            if not date_range or None in date_range:
+                st.warning("没有找到数据")
+                return pd.DataFrame()
+            min_date, max_date = date_range
+            default_start_date = t.get_default_start_date(max_date, min_date)
+            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}',category=stock.category)
+            start_date_key = f"{key_prefix}_start_date"
+            end_date_key = f"{key_prefix}_end_date"
+
+            if start_date_key not in st.session_state:
+                st.session_state[start_date_key] = default_start_date
+            if end_date_key not in st.session_state:
+                st.session_state[end_date_key] = max_date
+            # 添加日期选择器
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input(
+                    "开始日期",
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=start_date_key
+                )
+                if start_date != st.session_state[start_date_key]:
+                    st.session_state[start_date_key] = start_date
+            with col2:
+                end_date = st.date_input(
+                    "结束日期",
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=end_date_key
+                )
+                if end_date != st.session_state[end_date_key]:
+                    st.session_state[end_date_key] = end_date
+            # 从数据库获取数据
+            query = session.query(
+                model.date,
+                model.opening,
+                model.highest,
+                model.lowest,
+                model.closing,
+                model.turnover_count
+            ).filter(
+                model.code == stock.code,
+                model.removed == False,
+                model.date >= start_date,
+                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
+            ).order_by(model.date)
+            # 读取数据到DataFrame
+            return pd.read_sql(query.statement, session.bind)
+    except Exception as e:
+        st.error(f"加载数据失败：{str(e)}")
+    return pd.DataFrame()

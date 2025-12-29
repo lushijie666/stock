@@ -31,14 +31,18 @@ def format_amount(value: float) -> str:
 
 
 def format_volume(value: float) -> str:
-    """格式化成交量"""
+    """格式化成交量，输入单位为股，输出格式化为股"""
     if value is None:
         return ""
-    if value >= 100000000:  # 大于1亿手
-        return f"{value / 100000000:.2f}亿手"
-    elif value >= 10000:  # 大于1万手
-        return f"{value / 10000:.2f}万手"
-    return f"{value:.0f}手"
+    if value >= 10000000000:  # 大于100亿股
+        return f"{value / 10000000000:.2f}亿股"
+    elif value >= 100000000:  # 大于1亿股
+        return f"{value / 100000000:.2f}亿股"
+    elif value >= 1000000:  # 大于100万股
+        return f"{value / 1000000:.2f}万股"
+    elif value >= 1000:  # 大于1千股
+        return f"{value / 1000:.2f}千股"
+    return f"{value:.0f}股"
 
 
 def format_pinyin_short(value):

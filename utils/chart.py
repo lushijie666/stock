@@ -748,7 +748,7 @@ class ChartBuilder:
                 grid_opts=opts.GridOpts(
                     pos_left="10%",
                     pos_right="10%",
-                    pos_top="71%",
+                    pos_top="70%",
                     height="20%"
                 ),
             )
