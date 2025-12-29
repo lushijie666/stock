@@ -89,7 +89,7 @@ def show_kline_chart(stock, t: StockHistoryType):
               <span class="chart-title">K线图</span>
           </div>
       """, unsafe_allow_html=True)
-    kline = ChartBuilder.create_kline_chart(dates, k_line_data)
+    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df)
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
     # 显示K线图
@@ -101,7 +101,7 @@ def show_kline_chart(stock, t: StockHistoryType):
                          <span class="chart-title">成交量</span>
                      </div>
                  """, unsafe_allow_html=True)
-    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="500px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
+    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume")
 
 
 def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
@@ -113,190 +113,122 @@ def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
                """,
         unsafe_allow_html=True
     )
-    model = get_history_model(t)
-    try:
-        with get_db_session() as session:
-            # 获取该股票的最早和最晚日期
-            date_range = session.query(
-                func.min(model.date),
-                func.max(model.date)
-            ).filter(
-                model.code == stock.code,
-                model.removed == False
-            ).first()
-            if not date_range or None in date_range:
-                st.warning("没有找到数据")
-                return
-            min_date, max_date = date_range
-            default_start_date = t.get_default_start_date(max_date, min_date)
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_strategy',category=stock.category)
-            start_date_key = f"{key_prefix}_start_date"
-            end_date_key = f"{key_prefix}_end_date"
+    df = _get_stock_history_data(stock, t)
+    dates = format_dates(df, t)
+    ma_periods = t.ma_periods  # 5日移动平均线，10日移动平均线，30日移动平均线，250日移动平均线
+    ma_lines = {}
+    for period in ma_periods:
+        ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
+    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+    volumes = df['turnover_count'].tolist()
 
-            if start_date_key not in st.session_state:
-                st.session_state[start_date_key] = default_start_date
-            if end_date_key not in st.session_state:
-                st.session_state[end_date_key] = max_date
+    all_signals = []
+    if strategies:
+        # 获取融合策略配置
+        fusion_config = None
+        if StrategyType.FUSION_STRATEGY in strategies:
+            fusion_config = _get_fusion_config(stock, t)
+        all_signals = calculate_all_signals(df, strategies, merge_and_filter=True, fusion_config=fusion_config)
+        all_signals = format_dates_signals(all_signals, t)
+    # 创建 K 线图
+    st.markdown("""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">K线图</span>
+          </div>
+      """, unsafe_allow_html=True)
+    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, signals=all_signals)
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
+    #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
 
-            # 添加日期选择器
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "开始日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=start_date_key
-                )
-                if start_date != st.session_state[start_date_key]:
-                    st.session_state[start_date_key] = start_date
-            with col2:
-                end_date = st.date_input(
-                    "结束日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=end_date_key
-                )
-                if end_date != st.session_state[end_date_key]:
-                    st.session_state[end_date_key] = end_date
-            # 从数据库获取数据
-            query = session.query(
-                model.date,
-                model.opening,
-                model.highest,
-                model.lowest,
-                model.closing,
-                model.turnover_count
-            ).filter(
-                model.code == stock.code,
-                model.removed == False,
-                model.date >= start_date,
-                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
-            ).order_by(model.date)
+    # 显示K线图
+    streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_kline")
 
-            # 读取数据到DataFrame
-            df = pd.read_sql(query.statement, session.bind)
+    # 计算 MACD
+    macd_df = calculate_macd(df)
 
-            if df.empty:
-                st.warning("所选日期范围内没有数据")
-                return
+    diff_values = macd_df['DIFF'].tolist()
+    dea_values = macd_df['DEA'].tolist()
+    macd_hist = macd_df['MACD_hist'].tolist()
+    # 显示 MACD 图
+    fast_period = 12
+    slow_period = 26
+    signal_period = 9
+    macd_full_title = f"MACD ({fast_period},{slow_period},{signal_period})"
+    st.markdown(f"""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">{macd_full_title}</span>
+          </div>
+      """, unsafe_allow_html=True)
+    macd_chart = ChartBuilder.create_macd_chart(
+        dates=dates,
+        diff=diff_values,
+        dea=dea_values,
+        hist=macd_hist,
+        fast_period=fast_period,
+        slow_period=slow_period,
+        signal_period=signal_period,
+    )
+    streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_macd")
 
-            dates = format_dates(df, t)
-            ma_periods = t.ma_periods  # 5日移动平均线，10日移动平均线，30日移动平均线，250日移动平均线
-            ma_lines = {}
-            for period in ma_periods:
-                ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
-            k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-            volumes = df['turnover_count'].tolist()
+    # 显示成交量
+    st.markdown(f"""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">成交量</span>
+          </div>
+      """, unsafe_allow_html=True)
+    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_volume")
 
-            all_signals = []
-            if strategies:
-                # 获取融合策略配置
-                fusion_config = None
-                if StrategyType.FUSION_STRATEGY in strategies:
-                    fusion_config = _get_fusion_config(stock, t)
-                all_signals = calculate_all_signals(df, strategies, merge_and_filter=True, fusion_config=fusion_config)
-                all_signals = format_dates_signals(all_signals, t)
-            # 创建 K 线图
-            st.markdown("""
-                  <div class="chart-header">
-                      <span class="chart-icon">🔍</span>
-                      <span class="chart-title">K线图</span>
-                  </div>
-              """, unsafe_allow_html=True)
-            kline = ChartBuilder.create_kline_chart(dates, k_line_data, ma_lines=ma_lines, signals=all_signals)
-            volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
-            #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
+    # 显示MACD数据表格
+    if not macd_df.empty:
+        st.markdown("""
+           <div class="chart-header">
+               <span class="chart-icon">🔍</span>
+               <span class="chart-title">MACD指标信息</span>
+           </div>
+           """, unsafe_allow_html=True)
 
-            # 显示K线图
-            streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_kline")
+        # 创建MACD数据DataFrame
+        macd_display_df = pd.DataFrame({
+            '日期（时间）': format_dates_series(df['date'], t),
+            'DIFF': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DIFF']],
+            'DEA': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DEA']],
+            'MACD': [round(x, 4) if not pd.isna(x) else None for x in macd_df['MACD_hist']]
+        })
 
-            # 计算 MACD
-            macd_df = calculate_macd(df)
+        st.dataframe(
+            macd_display_df,
+            height=min(len(macd_display_df) * 35 + 38, 300),
+            use_container_width=True
+        )
 
-            diff_values = macd_df['DIFF'].tolist()
-            dea_values = macd_df['DEA'].tolist()
-            macd_hist = macd_df['MACD_hist'].tolist()
-            # 显示 MACD 图
-            fast_period = 12
-            slow_period = 26
-            signal_period = 9
-            macd_full_title = f"MACD ({fast_period},{slow_period},{signal_period})"
-            st.markdown(f"""
-                  <div class="chart-header">
-                      <span class="chart-icon">🔍</span>
-                      <span class="chart-title">{macd_full_title}</span>
-                  </div>
-              """, unsafe_allow_html=True)
-            macd_chart = ChartBuilder.create_macd_chart(
-                dates=dates,
-                diff=diff_values,
-                dea=dea_values,
-                hist=macd_hist,
-                fast_period=fast_period,
-                slow_period=slow_period,
-                signal_period=signal_period,
-            )
-            streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_macd")
-
-            # 显示成交量
-            st.markdown(f"""
-                  <div class="chart-header">
-                      <span class="chart-icon">🔍</span>
-                      <span class="chart-title">成交量</span>
-                  </div>
-              """, unsafe_allow_html=True)
-            streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_strategy_volume")
-
-            # 显示MACD数据表格
-            if not macd_df.empty:
-                st.markdown("""
-                   <div class="chart-header">
-                       <span class="chart-icon">🔍</span>
-                       <span class="chart-title">MACD指标信息</span>
-                   </div>
-                   """, unsafe_allow_html=True)
-
-                # 创建MACD数据DataFrame
-                macd_display_df = pd.DataFrame({
-                    '日期（时间）': format_dates_series(df['date'], t),
-                    'DIFF': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DIFF']],
-                    'DEA': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DEA']],
-                    'MACD': [round(x, 4) if not pd.isna(x) else None for x in macd_df['MACD_hist']]
-                })
-
-                st.dataframe(
-                    macd_display_df,
-                    height=min(len(macd_display_df) * 35 + 38, 300),
-                    use_container_width=True
-                )
-
-            # 显示信号数据表格
-            if all_signals:
-                st.markdown("""
-                            <div class="chart-header">
-                                <span class="chart-icon">🔍</span>
-                                <span class="chart-title">买卖点信息</span>
-                            </div>
-                            """, unsafe_allow_html=True)
-                # 创建信号DataFrame
-                signal_df = pd.DataFrame([
-                    {
-                        '日期（时间）': format_date_by_type(s['date'], t),
-                        '信号类型': f"{s['type'].fullText}",
-                        '信号强度': f"{s['strength'].fullText}",
-                        '价格': round(s['price'], 2),
-                        '策略': _format_strategy_text(s),
-                        '模式': format_pattern_text(s)  # 蜡烛图显示形态，融合策略显示参与策略
-                    }
-                    for s in all_signals
-                ]).sort_values('日期（时间）')
-                st.dataframe(
-                    signal_df,
-                    height=min(len(signal_df) * 35 + 38, 600),
-                    use_container_width=True
-                )
-    except Exception as e:
-        st.error(f"加载数据失败：{str(e)}")
+    # 显示信号数据表格
+    if all_signals:
+        st.markdown("""
+                    <div class="chart-header">
+                        <span class="chart-icon">🔍</span>
+                        <span class="chart-title">买卖点信息</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+        # 创建信号DataFrame
+        signal_df = pd.DataFrame([
+            {
+                '日期（时间）': format_date_by_type(s['date'], t),
+                '信号类型': f"{s['type'].fullText}",
+                '信号强度': f"{s['strength'].fullText}",
+                '价格': round(s['price'], 2),
+                '策略': _format_strategy_text(s),
+                '模式': format_pattern_text(s)  # 蜡烛图显示形态，融合策略显示参与策略
+            }
+            for s in all_signals
+        ]).sort_values('日期（时间）')
+        st.dataframe(
+            signal_df,
+            height=min(len(signal_df) * 35 + 38, 600),
+            use_container_width=True
+        )
 
 def show_kline_process_chart(stock, t: StockHistoryType, strategies=None):
     st.markdown(
@@ -307,247 +239,178 @@ def show_kline_process_chart(stock, t: StockHistoryType, strategies=None):
         """,
         unsafe_allow_html=True
     )
-    model = get_history_model(t)
+    df = _get_stock_history_data(stock, t)
+    # 创建处理器实例
+    processor = KLineProcessor()
     try:
-        with get_db_session() as session:
-            # 获取该股票的最早和最晚日期
-            date_range = session.query(
-                func.min(model.date),
-                func.max(model.date)
-            ).filter(
-                model.code == stock.code,
-                model.removed == False
-            ).first()
-            if not date_range or None in date_range:
-                st.warning("没有找到数据")
-                return
-            min_date, max_date = date_range
-            default_start_date = t.get_default_start_date(max_date, min_date)
+        processor.validate_data(df)
+        processed_df, contains_marks, processing_records, patterns = processor.process_klines(
+            df,
+        )
+        # 识别笔
+        strokes = KLineProcessor.identify_strokes(patterns, processed_df)
+        # 识别线段
+        segments = KLineProcessor.identify_segments(strokes)
+        # 识别中枢
+        centers = KLineProcessor.identify_centers(strokes)
 
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_process', category=stock.category)
-            # 初始化 session state 中的日期值
-            start_date_key = f"{key_prefix}_start_date"
-            end_date_key = f"{key_prefix}_end_date"
+        processed_dates = format_dates(processed_df, t)
+        processed_k_line_data = processed_df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+        processed_kline = ChartBuilder.create_kline_chart(
+            processed_dates,
+            processed_k_line_data,
+            df,
+            ma_lines=None,
+            patterns=patterns,
+            strokes=strokes,
+            segments=segments,
+            centers=centers
 
-            if start_date_key not in st.session_state:
-                st.session_state[start_date_key] = default_start_date
-            if end_date_key not in st.session_state:
-                st.session_state[end_date_key] = max_date
+        )
+        # 显示图表
+        st.markdown("""
+              <div class="chart-header">
+                  <span class="chart-icon">🔍</span>
+                  <span class="chart-title">K线图</span>
+              </div>
+        """, unsafe_allow_html=True)
+        streamlit_echarts.st_pyecharts(processed_kline,theme="white",height="500px",key=generate_key())
 
-            # 添加日期选择器
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "开始日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=start_date_key
-                )
-                if start_date != st.session_state[start_date_key]:
-                    st.session_state[start_date_key] = start_date
-            with col2:
-                end_date = st.date_input(
-                    "结束日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=end_date_key
-                )
-                if end_date != st.session_state[end_date_key]:
-                    st.session_state[end_date_key] = end_date
+        # 显示处理信息表格
+        if processing_records:
+            st.markdown("""
+               <div class="chart-header">
+                   <span class="chart-icon">🔍</span>
+                   <span class="chart-title">包含关系信息</span>
+               </div>
+            """, unsafe_allow_html=True)
+            st.markdown("""
+               <div class='info-description'>
+               -  当两根K线互相包含时，根据前一根K线的趋势决定处理方向<br>
+               -  向上处理：取两根K线中较高的最高价和较高的最低价<br>
+               -  向下处理：取两根K线中较低的最高价和较低的最低价
+               
+               </div>
+               """, unsafe_allow_html=True)
+            # 创建更直观的包含关系DataFrame
+            contains_df = pd.DataFrame([
+                {
+                    '上一K线日期': format_date_by_type(record['original_k1']['date'], t),
+                    '上一K线最高/低': f"{record['original_k1']['highest']}/{record['original_k1']['lowest']}",
+                    '上一K线开/收盘': f"{record['original_k1']['opening']}/{record['original_k1']['closing']}",
+                    '当前K线日期': format_date_by_type(record['date'], t),
+                    '当前K线最高/低': f"{record['original_k2']['highest']}/{record['original_k2']['lowest']}",
+                    '当前K线开/收盘': f"{record['original_k2']['opening']}/{record['original_k2']['closing']}",
+                    '下一K线日期': format_date_by_type(record['original_k3']['date'], t),
+                    '下一K线最高/低': f"{record['original_k3']['highest']}/{record['original_k3']['lowest']}",
+                    '下一K线开/收盘': f"{record['original_k3']['opening']}/{record['original_k3']['closing']}",
+                    '处理方向': record['trend'],
+                    '合并后最高/低': f"{record['new_values']['high']}/{record['new_values']['low']}"
+                }
+                for record in processing_records
+            ])
 
-            # 从数据库获取数据
-            query = session.query(
-                model.date,
-                model.opening,
-                model.highest,
-                model.lowest,
-                model.closing,
-                model.turnover_count
-            ).filter(
-                model.code == stock.code,
-                model.removed == False,
-                model.date >= start_date,
-                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
-            ).order_by(model.date)
+            # 显示包含关系表格
+            st.dataframe(
+                contains_df,
+                height=min(len(contains_df) * 35 + 38, 600),
+                use_container_width=True
+            )
+        # 原有的分型信息表格
+        if patterns:
+            st.markdown("""
+              <div class="chart-header">
+                  <span class="chart-icon">🔍</span>
+                  <span class="chart-title">分型标记信息</span>
+              </div>
+           """, unsafe_allow_html=True)
+            pattern_df = pd.DataFrame({
+                '日期': [format_date_by_type(p['date'], t) for p in patterns],
+                '类型': ["🚀 顶分型" if p['type'] == Patterns.TOP else "💣 底分型" for p in patterns],
+                '价格': [p['value'] for p in patterns]
+            })
 
-            # 读取数据到DataFrame
-            df = pd.read_sql(query.statement, session.bind)
-
-            if df.empty:
-                st.warning("所选日期范围内没有数据")
-                return
-            # 创建处理器实例
-            processor = KLineProcessor()
-            try:
-                processor.validate_data(df)
-                processed_df, contains_marks, processing_records, patterns = processor.process_klines(
-                    df,
-                )
-                # 识别笔
-                strokes = KLineProcessor.identify_strokes(patterns, processed_df)
-                # 识别线段
-                segments = KLineProcessor.identify_segments(strokes)
-                # 识别中枢
-                centers = KLineProcessor.identify_centers(strokes)
-
-                processed_dates = format_dates(processed_df, t)
-                processed_k_line_data = processed_df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-                processed_kline = ChartBuilder.create_kline_chart(
-                    processed_dates,
-                    processed_k_line_data,
-                    ma_lines=None,
-                    patterns=patterns,
-                    strokes=strokes,
-                    segments=segments,
-                    centers=centers
-
-                )
-                # 显示图表
-                st.markdown("""
-                      <div class="chart-header">
-                          <span class="chart-icon">🔍</span>
-                          <span class="chart-title">K线图</span>
-                      </div>
-                """, unsafe_allow_html=True)
-                streamlit_echarts.st_pyecharts(processed_kline,theme="white",height="500px",key=generate_key())
-
-                # 显示处理信息表格
-                if processing_records:
-                    st.markdown("""
-                       <div class="chart-header">
-                           <span class="chart-icon">🔍</span>
-                           <span class="chart-title">包含关系信息</span>
-                       </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                       <div class='info-description'>
-                       -  当两根K线互相包含时，根据前一根K线的趋势决定处理方向<br>
-                       -  向上处理：取两根K线中较高的最高价和较高的最低价<br>
-                       -  向下处理：取两根K线中较低的最高价和较低的最低价
-                       
-                       </div>
-                       """, unsafe_allow_html=True)
-                    # 创建更直观的包含关系DataFrame
-                    contains_df = pd.DataFrame([
-                        {
-                            '上一K线日期': format_date_by_type(record['original_k1']['date'], t),
-                            '上一K线最高/低': f"{record['original_k1']['highest']}/{record['original_k1']['lowest']}",
-                            '上一K线开/收盘': f"{record['original_k1']['opening']}/{record['original_k1']['closing']}",
-                            '当前K线日期': format_date_by_type(record['date'], t),
-                            '当前K线最高/低': f"{record['original_k2']['highest']}/{record['original_k2']['lowest']}",
-                            '当前K线开/收盘': f"{record['original_k2']['opening']}/{record['original_k2']['closing']}",
-                            '下一K线日期': format_date_by_type(record['original_k3']['date'], t),
-                            '下一K线最高/低': f"{record['original_k3']['highest']}/{record['original_k3']['lowest']}",
-                            '下一K线开/收盘': f"{record['original_k3']['opening']}/{record['original_k3']['closing']}",
-                            '处理方向': record['trend'],
-                            '合并后最高/低': f"{record['new_values']['high']}/{record['new_values']['low']}"
-                        }
-                        for record in processing_records
-                    ])
-
-                    # 显示包含关系表格
-                    st.dataframe(
-                        contains_df,
-                        height=min(len(contains_df) * 35 + 38, 600),
-                        use_container_width=True
-                    )
-                # 原有的分型信息表格
-                if patterns:
-                    st.markdown("""
-                      <div class="chart-header">
-                          <span class="chart-icon">🔍</span>
-                          <span class="chart-title">分型标记信息</span>
-                      </div>
-                   """, unsafe_allow_html=True)
-                    pattern_df = pd.DataFrame({
-                        '日期': [format_date_by_type(p['date'], t) for p in patterns],
-                        '类型': ["🚀 顶分型" if p['type'] == Patterns.TOP else "💣 底分型" for p in patterns],
-                        '价格': [p['value'] for p in patterns]
-                    })
-
-                    st.dataframe(
-                        pattern_df,
-                        height=min(len(pattern_df) * 35 + 38, 600),
-                        use_container_width=True
-                    )
-                # 显示笔信息表格
-                if strokes:
-                    st.markdown("""
-                      <div class="chart-header">
-                          <span class="chart-icon">🔍</span>
-                          <span class="chart-title">笔信息</span>
-                      </div>
-                   """, unsafe_allow_html=True)
-                    stroke_df = pd.DataFrame([
-                        {
-                            '起始日期': format_date_by_type(s['start_date'], t),
-                            '结束日期': format_date_by_type(s['end_date'], t),
-                            '起始价格': s['start_value'],
-                            '结束价格': s['end_value'],
-                            '类型': "向上(S)" if s['type'] == 'up' else "向下(X)",
-                            'K线数量': abs(s['end_index'] - s['start_index']) + 1
-                        }
-                        for s in strokes
-                    ])
-                    st.dataframe(
-                        stroke_df,
-                        height=min(len(stroke_df) * 35 + 38, 600),
-                        use_container_width=True
-                    )
-                # 显示线段信息表格
-                if segments:
-                    st.markdown("""
-                          <div class="chart-header">
-                              <span class="chart-icon">🔍</span>
-                              <span class="chart-title">线段信息</span>
-                          </div>
-                       """, unsafe_allow_html=True)
-                    segment_df = pd.DataFrame([
-                        {
-                            '起始日期': format_date_by_type(s['start_date'], t),
-                            '结束日期': format_date_by_type(s['end_date'], t),
-                            '起始价格': s['start_value'],
-                            '结束价格': s['end_value'],
-                            '类型': "向上" if s['type'] == 'up' else "向下",
-                            '包含笔数': len(s['strokes'])
-                        }
-                        for s in segments
-                    ])
-                    st.dataframe(
-                        segment_df,
-                        height=min(len(segment_df) * 35 + 38, 600),
-                        use_container_width=True
-                    )
-                # 显示中枢信息表格
-                if centers:
-                    st.markdown("""
-                         <div class="chart-header">
-                             <span class="chart-icon">🔍</span>
-                             <span class="chart-title">中枢信息</span>
-                         </div>
-                      """, unsafe_allow_html=True)
-                    center_df = pd.DataFrame([
-                        {
-                            '起始日期': format_date_by_type(c['start_date'], t),
-                            '结束日期': format_date_by_type(c['end_date'], t),
-                            '中枢类型': "上涨中枢" if c['type'] == 'up_center' else "下跌中枢",
-                            '中枢高点(ZG)': round(c['ZG'], 2),
-                            '中枢低点(ZD)': round(c['ZD'], 2),
-                            '中枢波动最高点(GG)': round(c['GG'], 2),
-                            '中枢波动最低点(DD)': round(c['DD'], 2),
-                            '包含笔数': len(c['strokes'])
-                        }
-                        for c in centers
-                    ])
-                    st.dataframe(
-                        center_df,
-                        height=min(len(center_df) * 35 + 38, 600),
-                        use_container_width=True
-                    )
-            except ValueError as e:
-                st.error(f"数据处理失败：{str(e)}")
-    except Exception as e:
-        st.error(f"加载数据失败：{str(e)}")
+            st.dataframe(
+                pattern_df,
+                height=min(len(pattern_df) * 35 + 38, 600),
+                use_container_width=True
+            )
+        # 显示笔信息表格
+        if strokes:
+            st.markdown("""
+              <div class="chart-header">
+                  <span class="chart-icon">🔍</span>
+                  <span class="chart-title">笔信息</span>
+              </div>
+           """, unsafe_allow_html=True)
+            stroke_df = pd.DataFrame([
+                {
+                    '起始日期': format_date_by_type(s['start_date'], t),
+                    '结束日期': format_date_by_type(s['end_date'], t),
+                    '起始价格': s['start_value'],
+                    '结束价格': s['end_value'],
+                    '类型': "向上(S)" if s['type'] == 'up' else "向下(X)",
+                    'K线数量': abs(s['end_index'] - s['start_index']) + 1
+                }
+                for s in strokes
+            ])
+            st.dataframe(
+                stroke_df,
+                height=min(len(stroke_df) * 35 + 38, 600),
+                use_container_width=True
+            )
+        # 显示线段信息表格
+        if segments:
+            st.markdown("""
+                  <div class="chart-header">
+                      <span class="chart-icon">🔍</span>
+                      <span class="chart-title">线段信息</span>
+                  </div>
+               """, unsafe_allow_html=True)
+            segment_df = pd.DataFrame([
+                {
+                    '起始日期': format_date_by_type(s['start_date'], t),
+                    '结束日期': format_date_by_type(s['end_date'], t),
+                    '起始价格': s['start_value'],
+                    '结束价格': s['end_value'],
+                    '类型': "向上" if s['type'] == 'up' else "向下",
+                    '包含笔数': len(s['strokes'])
+                }
+                for s in segments
+            ])
+            st.dataframe(
+                segment_df,
+                height=min(len(segment_df) * 35 + 38, 600),
+                use_container_width=True
+            )
+        # 显示中枢信息表格
+        if centers:
+            st.markdown("""
+                 <div class="chart-header">
+                     <span class="chart-icon">🔍</span>
+                     <span class="chart-title">中枢信息</span>
+                 </div>
+              """, unsafe_allow_html=True)
+            center_df = pd.DataFrame([
+                {
+                    '起始日期': format_date_by_type(c['start_date'], t),
+                    '结束日期': format_date_by_type(c['end_date'], t),
+                    '中枢类型': "上涨中枢" if c['type'] == 'up_center' else "下跌中枢",
+                    '中枢高点(ZG)': round(c['ZG'], 2),
+                    '中枢低点(ZD)': round(c['ZD'], 2),
+                    '中枢波动最高点(GG)': round(c['GG'], 2),
+                    '中枢波动最低点(DD)': round(c['DD'], 2),
+                    '包含笔数': len(c['strokes'])
+                }
+                for c in centers
+            ])
+            st.dataframe(
+                center_df,
+                height=min(len(center_df) * 35 + 38, 600),
+                use_container_width=True
+            )
+    except ValueError as e:
+        st.error(f"数据处理失败：{str(e)}")
 
 
 def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):

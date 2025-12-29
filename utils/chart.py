@@ -140,7 +140,8 @@ class ChartBuilder:
         return bar
 
     @staticmethod
-    def create_kline_chart(dates, k_line_data, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None):
+    def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None):
+        df_json = df.to_json(orient='records')
         kline = (
             Kline(init_opts=opts.InitOpts())
             .add_xaxis(dates)
@@ -644,7 +645,57 @@ class ChartBuilder:
                 background_color="rgba(245, 245, 245, 0.8)",
                 border_width=1,
                 border_color="#ccc",
-                textstyle_opts=opts.TextStyleOpts(color="#000000")
+                textstyle_opts=opts.TextStyleOpts(color="#000000"),
+                formatter=JsCode(f"""
+                    function(params) {{
+                        if (!params || params.length === 0) return '';
+
+                        function formatValue(value) {{
+                            if (value >= 100000000) {{
+                                return (value / 100000000).toFixed(2) + '亿';
+                            }} else if (value >= 10000) {{
+                                return (value / 10000).toFixed(2) + '万';
+                            }} else {{
+                                return value.toLocaleString();
+                            }}
+                        }}
+
+                        var dfData = {df_json};
+                        var result = '<div style="padding:2px; width:200px;"><strong>' + params[0].axisValue + '</strong><br/>';
+                        params.forEach(function(item) {{
+                            if (item.seriesName === 'K线') {{
+                                var index = item.dataIndex;
+                                var currentData = dfData[index];
+                                var turnoverCount = currentData.turnover_count;
+                                var turnoverShouCount = (turnoverCount / 100).toFixed(0);
+                                var formattedTurnoverCount = formatValue(turnoverCount);
+                                var formattedTurnoverShouCount = formatValue(Number(turnoverShouCount));
+                                var formattedTurnover = formatValue(currentData.turnover_amount);
+                                var opening = parseFloat(currentData.opening).toFixed(2);
+                                var closing = parseFloat(currentData.closing).toFixed(2);
+                                var lowest = parseFloat(currentData.lowest).toFixed(2);
+                                var highest = parseFloat(currentData.highest).toFixed(2);
+                                var change = parseFloat(currentData.change).toFixed(2) + '%';
+                                var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
+
+                                result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
+                                result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
+                                result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
+                                result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
+
+                                result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedTurnoverCount + '</span><br/>';
+                                result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedTurnoverShouCount + '</span><br/>';
+                                result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
+
+                                result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                                result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
+                            }} 
+                        }});
+
+                        result += '</div>';
+                        return result;
+                    }}
+                """)
             ),
         )
         return kline
@@ -735,7 +786,7 @@ class ChartBuilder:
                 ),
                 tooltip_opts=opts.TooltipOpts(
                     trigger="axis",
-                    axis_pointer_type="shadow",
+                    axis_pointer_type="cross",
                     background_color="rgba(245, 245, 245, 0.8)",
                     border_width=1,
                     border_color="#ccc",
@@ -743,6 +794,7 @@ class ChartBuilder:
                     formatter=JsCode(f"""
                         function(params) {{
                             if (!params || params.length === 0) return '';
+
                             function formatValue(value) {{
                                 if (value >= 100000000) {{
                                     return (value / 100000000).toFixed(2) + '亿';
@@ -752,36 +804,39 @@ class ChartBuilder:
                                     return value.toLocaleString();
                                 }}
                             }}
-                            let dfData = {df_json};
-                            let result = '<div style="padding:5px;"><strong>' + params[0].axisValue + '</strong><br/><br/>';
-                            params.forEach(item => {{
+
+                            var dfData = {df_json};
+                            var result = '<div style="padding:2px; width:200px;"><strong>' + params[0].axisValue + '</strong><br/>';
+                            params.forEach(function(item) {{
                                 if (item.seriesName === '成交量') {{
-                                    let index = item.dataIndex;
-                                    let currentData = dfData[index];
-                                    let value = item.value;
-                                    let shouValue = (value / 100).toFixed(0);
-                                    let formattedValue = formatValue(value);
-                                    let formattedShou = formatValue(Number(shouValue));
+                                    var index = item.dataIndex;
+                                    var currentData = dfData[index];
+                                    var value = item.value;
+                                    var shouValue = (value / 100).toFixed(0);
+                                    var formattedValue = formatValue(value);
+                                    var formattedShou = formatValue(Number(shouValue));
+                                    var formattedTurnover = formatValue(currentData.turnover_amount);
+                                    var opening = parseFloat(currentData.opening).toFixed(2);
+                                    var closing = parseFloat(currentData.closing).toFixed(2);
+                                    var lowest = parseFloat(currentData.lowest).toFixed(2);
+                                    var highest = parseFloat(currentData.highest).toFixed(2);
+                                    var change = parseFloat(currentData.change).toFixed(2) + '%';
+                                    var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
 
-                                    // 价格数据组 - 使用蓝色系
-                                    result += '<div style="margin-bottom:8px;"><strong style="color:#1890ff;">━━ 价格信息</strong></div>';
-                                    result += '💰 <span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + currentData.opening + '</span><br/>';
-                                    result += '💵 <span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + currentData.closing + '</span><br/>';
-                                    result += '📉 <span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + currentData.lowest + '</span><br/>';
-                                    result += '📈 <span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + currentData.highest + '</span><br/>';
-
-                                    // 成交量数据组 - 使用紫色系
-                                    result += '<div style="margin:8px 0;"><strong style="color:#722ed1;">━━ 成交信息</strong></div>';
-                                    result += '📊 <span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
-                                    result += '🤝 <span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
-                                    result += '💸 <span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + currentData.turnover_amount + '</span><br/>';
-
-                                    // 指标数据组 - 使用橙色系
-                                    result += '<div style="margin:8px 0;"><strong style="color:#fa8c16;">━━ 指标信息</strong></div>';
-                                    result += '📶 <span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + currentData.change + '</span><br/>';
-                                    result += '🔄 <span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + currentData.turnover_ratio + '</span><br/>';
+                                    result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
+                                    result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
+                                    result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
+                                    result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
+                            
+                                    result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
+                                    result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
+                                    result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
+                            
+                                    result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                                    result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
                                 }}
                             }});
+
                             result += '</div>';
                             return result;
                         }}
