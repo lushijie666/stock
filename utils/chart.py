@@ -397,7 +397,7 @@ class ChartBuilder:
                 scatter_hammer = Scatter()
                 scatter_hammer.add_xaxis([p[0] for p in hammer_points])
                 scatter_hammer.add_yaxis(
-                    series_name="🔨 锤子线",
+                    series_name="锤子线",
                     y_axis=[p[1] - 0.1 for p in hammer_points],  # 向下偏移一点
                     symbol='pin',
                     symbol_size=12,
@@ -417,7 +417,7 @@ class ChartBuilder:
                 scatter_inverted = Scatter()
                 scatter_inverted.add_xaxis([p[0] for p in inverted_hammer_points])
                 scatter_inverted.add_yaxis(
-                    series_name="🔨 倒锤子线",
+                    series_name="倒锤子线",
                     y_axis=[p[1] + 0.1 for p in inverted_hammer_points],  # 向上偏移一点
                     symbol='pin',
                     symbol_size=12,
