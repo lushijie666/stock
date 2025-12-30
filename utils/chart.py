@@ -143,7 +143,10 @@ class ChartBuilder:
 
     @staticmethod
     def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None, extra_lines=None, candlestick_patterns=None):
+        import json
         df_json = df.to_json(orient='records')
+        # 将 candlestick_patterns 转换为 JSON 字符串
+        candlestick_patterns_json = json.dumps(candlestick_patterns or [])
         kline = (
             Kline(init_opts=opts.InitOpts())
             .add_xaxis(dates)
@@ -747,13 +750,10 @@ class ChartBuilder:
                                 return value.toLocaleString();
                             }}
                         }}
-
                         var dfData = {df_json};
-                        var candlestickPatterns = {[p for p in (candlestick_patterns or [])]};
+                        var candlestickPatterns = {candlestick_patterns_json};
                         var currentDate = params[0].axisValue;
-
                         var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
-
                         params.forEach(function(item) {{
                             if (item.seriesName === 'K线') {{
                                 var index = item.dataIndex;
