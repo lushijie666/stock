@@ -143,10 +143,7 @@ class ChartBuilder:
 
     @staticmethod
     def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None, extra_lines=None, candlestick_patterns=None):
-        import json
         df_json = df.to_json(orient='records')
-        # 将 candlestick_patterns 转换为 JSON 字符串
-        candlestick_patterns_json = json.dumps(candlestick_patterns or [])
         kline = (
             Kline(init_opts=opts.InitOpts())
             .add_xaxis(dates)
@@ -386,9 +383,9 @@ class ChartBuilder:
             hammer_points = []
             inverted_hammer_points = []
             for pattern in candlestick_patterns:
-                if pattern.get('type') == CandlestickPattern.HAMMER.code:
+                if pattern.get('type') == CandlestickPattern.HAMMER:
                     hammer_points.append([pattern['date'], pattern['value']])
-                elif pattern.get('type') == CandlestickPattern.INVERTED_HAMMER.code:
+                elif pattern.get('type') == CandlestickPattern.INVERTED_HAMMER:
                     inverted_hammer_points.append([pattern['date'], pattern['value']])
 
             # 添加锤子线标记
@@ -751,7 +748,6 @@ class ChartBuilder:
                             }}
                         }}
                         var dfData = {df_json};
-                        var candlestickPatterns = {candlestick_patterns_json};
                         var currentDate = params[0].axisValue;
                         var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
                         params.forEach(function(item) {{
@@ -767,14 +763,16 @@ class ChartBuilder:
                                 var closing = parseFloat(currentData.closing).toFixed(2);
                                 var lowest = parseFloat(currentData.lowest).toFixed(2);
                                 var highest = parseFloat(currentData.highest).toFixed(2);
+                                var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
                                 var change = parseFloat(currentData.change).toFixed(2) + '%';
                                 var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
 
+                                result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
                                 result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
                                 result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
                                 result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
                                 result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
-
+                               
                                 result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedTurnoverCount + '</span><br/>';
                                 result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedTurnoverShouCount + '</span><br/>';
                                 result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
@@ -912,14 +910,17 @@ class ChartBuilder:
                                     var closing = parseFloat(currentData.closing).toFixed(2);
                                     var lowest = parseFloat(currentData.lowest).toFixed(2);
                                     var highest = parseFloat(currentData.highest).toFixed(2);
+                                    var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
                                     var change = parseFloat(currentData.change).toFixed(2) + '%';
                                     var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
 
+                                    
+                                    result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
                                     result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
                                     result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
                                     result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
                                     result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
-                            
+                                    
                                     result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
                                     result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
                                     result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';

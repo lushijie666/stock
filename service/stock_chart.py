@@ -118,9 +118,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
         pattern_markers.append({
             'date': format_date_by_type(pattern['date'], t),
             'value': pattern['price'],
-            'type': pattern['pattern_type'].code,
-            'name': pattern['pattern_type'].text,
-            'icon': pattern['pattern_type'].icon,
+            'type': pattern['pattern_type'],
             'description': pattern['description']
         })
 
@@ -162,6 +160,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             '收盘价': f"{pattern['row']['closing']:.2f}",
             '最低价': f"{pattern['row']['lowest']:.2f}",
             '最高价': f"{pattern['row']['highest']:.2f}",
+            '涨跌额': f"{pattern['row']['change_amount']:.2f}",
             '说明': pattern['description']
         })
         # 显示表格
@@ -1361,6 +1360,7 @@ def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
                 model.turnover_count,
                 model.turnover_amount,
                 model.change,
+                model.change_amount,
                 model.turnover_ratio
             ).filter(
                 model.code == stock.code,

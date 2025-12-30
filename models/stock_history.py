@@ -68,6 +68,7 @@ class StockHistoryD(BaseStockHistory):
     lowest = Column(Numeric(100, 4))  # 最低
     turnover_count = Column(Numeric(100, 0))  # 成交量
     turnover_amount = Column(Numeric(100, 4))  # 成交额
+    change_amount = Column(Numeric(100, 4))  # 涨跌额
     change = Column(Numeric(100, 6))  # 涨跌幅
     turnover_ratio = Column(Numeric(100, 6))  # 换手率
 
@@ -101,6 +102,7 @@ class StockHistoryW(BaseStockHistory):
     lowest = Column(Numeric(100, 4))  # 最低
     turnover_count = Column(Numeric(100, 0))  # 成交量
     turnover_amount = Column(Numeric(100, 4))  # 成交额
+    change_amount = Column(Numeric(100, 4))  # 涨跌额
     change = Column(Numeric(100, 6))  # 涨跌幅
     turnover_ratio = Column(Numeric(100, 6))  # 换手率
 
@@ -133,6 +135,7 @@ class StockHistoryM(BaseStockHistory):
     lowest = Column(Numeric(100, 4))  # 最低
     turnover_count = Column(Numeric(100, 0))  # 成交量
     turnover_amount = Column(Numeric(100, 4))  # 成交额
+    change_amount = Column(Numeric(100, 4))  # 涨跌额
     change = Column(Numeric(100, 6))  # 涨跌幅
     turnover_ratio = Column(Numeric(100, 6))  # 换手率
 
@@ -166,6 +169,7 @@ class StockHistory30M(BaseStockHistory):
     lowest = Column(Numeric(100, 4))  # 最低
     turnover_count = Column(Numeric(100, 0))  # 成交量
     turnover_amount = Column(Numeric(100, 4))  # 成交额
+    change_amount = Column(Numeric(100, 4))  # 涨跌额
     change = Column(Numeric(100, 6))  # 涨跌幅
     turnover_ratio = Column(Numeric(100, 6))  # 换手率
 

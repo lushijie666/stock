@@ -64,6 +64,7 @@ def show_page(stock, t: StockHistoryType):
                     'lowest': st.column_config.NumberColumn('最低价', help="当日最低价", format="%.2f"),
                     'turnover_count': st.column_config.TextColumn('成交量(股)', help="成交股数"),
                     'turnover_amount': st.column_config.TextColumn('成交额(元)', help="成交金额"),
+                    'change_amount': st.column_config.NumberColumn('涨跌额', help="涨跌额", format="%.2f"),
                     'change': st.column_config.NumberColumn('涨跌幅', help="涨跌幅", format="%.2f%%"),
                     'turnover_ratio': st.column_config.NumberColumn('换手率', help="成交股数与流通股数之比", format="%.2f%%"),
                     'updated_at': st.column_config.DatetimeColumn('最后更新时间', help="更新时间"),
@@ -255,7 +256,8 @@ def _fetch_a_stock_data(code: str, start_date: str, end_date: str, t: StockHisto
                         turnover_count=clean_numeric_value(row_data[6]),
                         turnover_amount=clean_numeric_value(row_data[7]),
                         turnover_ratio=clean_numeric_value(row_data[9]),
-                        change=clean_numeric_value(row_data[10])
+                        change=clean_numeric_value(row_data[10]),
+                        change_amount=clean_numeric_value(row_data[5]) - clean_numeric_value(row_data[2])
                     )
                 elif t == StockHistoryType.M:
                     model_instance = StockHistoryM(
@@ -269,7 +271,8 @@ def _fetch_a_stock_data(code: str, start_date: str, end_date: str, t: StockHisto
                         turnover_count=clean_numeric_value(row_data[6]),
                         turnover_amount=clean_numeric_value(row_data[7]),
                         turnover_ratio=clean_numeric_value(row_data[9]),
-                        change=clean_numeric_value(row_data[10])
+                        change=clean_numeric_value(row_data[10]),
+                        change_amount=clean_numeric_value(row_data[5]) - clean_numeric_value(row_data[2])
                     )
                 elif t == StockHistoryType.THIRTY_M:
                     model_instance = StockHistory30M(
@@ -284,6 +287,7 @@ def _fetch_a_stock_data(code: str, start_date: str, end_date: str, t: StockHisto
                         turnover_amount=clean_numeric_value(row_data[8]),
                         # turnover_ratio=row_data[9],
                         # change=row_data[9]
+                        change_amount=clean_numeric_value(row_data[6]) - clean_numeric_value(row_data[3])
                     )
                 else:
                     model_instance = StockHistoryD(
@@ -297,7 +301,8 @@ def _fetch_a_stock_data(code: str, start_date: str, end_date: str, t: StockHisto
                         turnover_count=clean_numeric_value(row_data[6]),
                         turnover_amount=clean_numeric_value(row_data[7]),
                         turnover_ratio=clean_numeric_value(row_data[9]),
-                        change=clean_numeric_value(row_data[10])
+                        change=clean_numeric_value(row_data[10]),
+                        change_amount=clean_numeric_value(row_data[5]) - clean_numeric_value(row_data[2])
                     )
                 data_list.append(model_instance)
             logging.info(
@@ -486,61 +491,71 @@ def _fetch_us_stock_data(code: str, start_date: str, end_date: str, t: StockHist
                         date_str = str(row['时间'])
                     else:
                         date_str = str(index)
+                    opening_val = clean_numeric_value(row['开盘'])
+                    closing_val = clean_numeric_value(row['收盘'])
+                    change_amount_val = closing_val - opening_val
                     model_instance = StockHistory30M(
                         category=Category.US_XX,
                         code=code,
                         date=date_str,
-                        opening=clean_numeric_value(row['开盘']),
+                        opening=opening_val,
                         highest=clean_numeric_value(row['最高']),
                         lowest=clean_numeric_value(row['最低']),
-                        closing=clean_numeric_value(row['收盘']),
+                        closing=closing_val,
                         turnover_count=clean_numeric_value(row['成交量']),
                         turnover_amount=clean_numeric_value(row.get('成交额')),
+                        change_amount=change_amount_val
                     )
                 else:
                     # 日线、周线、月线数据字段：日期、开盘、收盘、最高、最低、成交量、成交额、振幅、涨跌幅、涨跌额、换手率
                     date_str = str(row['日期'])
+                    opening_val = clean_numeric_value(row['开盘'])
+                    closing_val = clean_numeric_value(row['收盘'])
+                    change_amount_val = closing_val - opening_val
                     if t == StockHistoryType.W:
                         model_instance = StockHistoryW(
                             category=Category.US_XX,
                             code=code,
                             date=date_str,
-                            opening=clean_numeric_value(row['开盘']),
+                            opening=opening_val,
                             highest=clean_numeric_value(row['最高']),
                             lowest=clean_numeric_value(row['最低']),
-                            closing=clean_numeric_value(row['收盘']),
+                            closing=closing_val,
                             turnover_count=clean_numeric_value(row['成交量']),
                             turnover_amount=clean_numeric_value(row['成交额']),
                             turnover_ratio=clean_numeric_value(row['换手率']),
-                            change=clean_numeric_value(row['涨跌幅'])
+                            change=clean_numeric_value(row['涨跌幅']),
+                            change_amount=change_amount_val
                         )
                     elif t == StockHistoryType.M:
                         model_instance = StockHistoryM(
                             category=Category.US_XX,
                             code=code,
                             date=date_str,
-                            opening=clean_numeric_value(row['开盘']),
+                            opening=opening_val,
                             highest=clean_numeric_value(row['最高']),
                             lowest=clean_numeric_value(row['最低']),
-                            closing=clean_numeric_value(row['收盘']),
+                            closing=closing_val,
                             turnover_count=clean_numeric_value(row['成交量']),
                             turnover_amount=clean_numeric_value(row['成交额']),
                             turnover_ratio=clean_numeric_value(row['换手率']),
-                            change=clean_numeric_value(row['涨跌幅'])
+                            change=clean_numeric_value(row['涨跌幅']),
+                            change_amount=change_amount_val
                         )
                     else:  # 日线数据
                         model_instance = StockHistoryD(
                             category=Category.US_XX,
                             code=code,
                             date=date_str,
-                            opening=clean_numeric_value(row['开盘']),
+                            opening=opening_val,
                             highest=clean_numeric_value(row['最高']),
                             lowest=clean_numeric_value(row['最低']),
-                            closing=clean_numeric_value(row['收盘']),
+                            closing=closing_val,
                             turnover_count=clean_numeric_value(row['成交量']),
                             turnover_amount=clean_numeric_value(row['成交额']),
                             turnover_ratio=clean_numeric_value(row['换手率']),
-                            change=clean_numeric_value(row['涨跌幅'])
+                            change=clean_numeric_value(row['涨跌幅']),
+                            change_amount=change_amount_val
                         )
                 logging.info(
                     f"获取美股[{KEY_PREFIX}][{t.text}]数据为..., 分类: {model_instance.category.fullText}, 股票:{symbol}, 日期: {model_instance.date}, 信息为: {model_instance}")
