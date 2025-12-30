@@ -386,10 +386,9 @@ class ChartBuilder:
             hammer_points = []
             inverted_hammer_points = []
             for pattern in candlestick_patterns:
-                # 现在 pattern_type 是字符串，直接比较字符串
-                if pattern.get('pattern_type') == 'hammer':
+                if pattern.get('type') == CandlestickPattern.HAMMER.code:
                     hammer_points.append([pattern['date'], pattern['value']])
-                elif pattern.get('pattern_type') == 'inverted_hammer':
+                elif pattern.get('type') == CandlestickPattern.INVERTED_HAMMER.code:
                     inverted_hammer_points.append([pattern['date'], pattern['value']])
 
             # 添加锤子线标记
@@ -785,18 +784,29 @@ class ChartBuilder:
 
                                 // 查找当前日期的蜡烛图形态
                                 var foundPattern = null;
-                                for (var i = 0; i < candlestickPatterns.length; i++) {{
-                                    if (candlestickPatterns[i].date === currentDate) {{
-                                        foundPattern = candlestickPatterns[i];
-                                        break;
+                                if (candlestickPatterns && candlestickPatterns.length > 0) {{
+                                    for (var i = 0; i < candlestickPatterns.length; i++) {{
+                                        if (candlestickPatterns[i] && candlestickPatterns[i].date === currentDate) {{
+                                            foundPattern = candlestickPatterns[i];
+                                            break;
+                                        }}
                                     }}
                                 }}
 
                                 // 如果找到形态，显示形态信息
                                 if (foundPattern) {{
                                     result += '<br/><div style="background-color:#fff3cd;padding:4px;border-radius:4px;margin-top:4px;">';
-                                    result += '<strong style="color:#856404;">' + foundPattern.icon + ' ' + foundPattern.name + '</strong><br/>';
-                                    result += '<span style="color:#856404;font-size:11px;">' + foundPattern.description + '</span>';
+                                    result += '<strong style="color:#856404;">';
+                                    if (foundPattern.icon) {{
+                                        result += foundPattern.icon + ' ';
+                                    }}
+                                    if (foundPattern.name) {{
+                                        result += foundPattern.name;
+                                    }}
+                                    result += '</strong><br/>';
+                                    if (foundPattern.description) {{
+                                        result += '<span style="color:#856404;font-size:11px;">' + foundPattern.description + '</span>';
+                                    }}
                                     result += '</div>';
                                 }}
                             }}

@@ -118,9 +118,9 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
         pattern_markers.append({
             'date': format_date_by_type(pattern['date'], t),
             'value': pattern['price'],
-            'pattern_type': pattern['pattern_type'].code,  # 使用枚举的 code 属性
-            'name': pattern['pattern_type'].text,  # 使用枚举的 text 属性
-            'icon': pattern['pattern_type'].icon,  # 使用枚举的 icon 属性
+            'type': pattern['pattern_type'].code,
+            'name': pattern['pattern_type'].text,
+            'icon': pattern['pattern_type'].icon,
             'description': pattern['description']
         })
 
