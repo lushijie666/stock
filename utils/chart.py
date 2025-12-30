@@ -386,9 +386,10 @@ class ChartBuilder:
             hammer_points = []
             inverted_hammer_points = []
             for pattern in candlestick_patterns:
-                if pattern['pattern_type'] == CandlestickPattern.HAMMER:
+                # 现在 pattern_type 是字符串，直接比较字符串
+                if pattern.get('pattern_type') == 'hammer':
                     hammer_points.append([pattern['date'], pattern['value']])
-                elif pattern['pattern_type'] == CandlestickPattern.INVERTED_HAMMER:
+                elif pattern.get('pattern_type') == 'inverted_hammer':
                     inverted_hammer_points.append([pattern['date'], pattern['value']])
 
             # 添加锤子线标记
