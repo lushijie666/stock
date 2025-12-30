@@ -140,7 +140,7 @@ class ChartBuilder:
         return bar
 
     @staticmethod
-    def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None, extra_lines=None):
+    def create_kline_chart(dates, k_line_data, df, ma_lines=None, patterns=None, signals=None, strokes=None, segments=None, centers=None, extra_lines=None, candlestick_patterns=None):
         df_json = df.to_json(orient='records')
         kline = (
             Kline(init_opts=opts.InitOpts())
@@ -375,6 +375,60 @@ class ChartBuilder:
                     )
                 )
                 kline = kline.overlap(scatter_sell_weak)
+
+        # 添加蜡烛图形态标记
+        if candlestick_patterns:
+            hammer_points = []
+            inverted_hammer_points = []
+
+            for pattern in candlestick_patterns:
+                from enums.candlestick_pattern import CandlestickPattern
+
+                if pattern['type'] == CandlestickPattern.HAMMER:
+                    hammer_points.append([pattern['date'], pattern['value']])
+                elif pattern['type'] == CandlestickPattern.INVERTED_HAMMER:
+                    inverted_hammer_points.append([pattern['date'], pattern['value']])
+
+            # 添加锤子线标记
+            if hammer_points:
+                scatter_hammer = Scatter()
+                scatter_hammer.add_xaxis([p[0] for p in hammer_points])
+                scatter_hammer.add_yaxis(
+                    series_name="🔨 锤子线",
+                    y_axis=[p[1] - 0.3 for p in hammer_points],  # 向下偏移一点
+                    symbol='pin',
+                    symbol_size=12,
+                    itemstyle_opts=opts.ItemStyleOpts(color='#1890ff'),
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        color='#1890ff',
+                        font_size=16,
+                        font_weight='bold',
+                        formatter="🔨"
+                    )
+                )
+                kline = kline.overlap(scatter_hammer)
+
+            # 添加倒锤子线标记
+            if inverted_hammer_points:
+                scatter_inverted = Scatter()
+                scatter_inverted.add_xaxis([p[0] for p in inverted_hammer_points])
+                scatter_inverted.add_yaxis(
+                    series_name="🔨 倒锤子线",
+                    y_axis=[p[1] + 0.3 for p in inverted_hammer_points],  # 向上偏移一点
+                    symbol='pin',
+                    symbol_size=12,
+                    itemstyle_opts=opts.ItemStyleOpts(color='#fa8c16'),
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        color='#fa8c16',
+                        font_size=16,
+                        font_weight='bold',
+                        formatter="🔨"
+                    )
+                )
+                kline = kline.overlap(scatter_inverted)
+
         # 添加笔的连线（按类型分组合并）
         if strokes:
             # 分别收集向上笔和向下笔的数据
