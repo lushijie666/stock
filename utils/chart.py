@@ -781,34 +781,6 @@ class ChartBuilder:
 
                                 result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
                                 result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
-
-                                // 查找当前日期的蜡烛图形态
-                                var foundPattern = null;
-                                if (candlestickPatterns && candlestickPatterns.length > 0) {{
-                                    for (var i = 0; i < candlestickPatterns.length; i++) {{
-                                        if (candlestickPatterns[i] && candlestickPatterns[i].date === currentDate) {{
-                                            foundPattern = candlestickPatterns[i];
-                                            break;
-                                        }}
-                                    }}
-                                }}
-
-                                // 如果找到形态，显示形态信息
-                                if (foundPattern) {{
-                                    result += '<br/><div style="background-color:#fff3cd;padding:4px;border-radius:4px;margin-top:4px;">';
-                                    result += '<strong style="color:#856404;">';
-                                    if (foundPattern.icon) {{
-                                        result += foundPattern.icon + ' ';
-                                    }}
-                                    if (foundPattern.name) {{
-                                        result += foundPattern.name;
-                                    }}
-                                    result += '</strong><br/>';
-                                    if (foundPattern.description) {{
-                                        result += '<span style="color:#856404;font-size:11px;">' + foundPattern.description + '</span>';
-                                    }}
-                                    result += '</div>';
-                                }}
                             }}
                         }});
 
