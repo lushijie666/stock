@@ -4,6 +4,8 @@ from pyecharts.charts import Pie, Kline, Bar, Grid, Line, Scatter
 from pyecharts import options as opts
 from pyecharts.commons.utils import JsCode
 import pandas as pd
+
+from enums.candlestick_pattern import CandlestickPattern
 from enums.patterns import Patterns
 from enums.signal import SignalType, SignalStrength
 
@@ -380,13 +382,10 @@ class ChartBuilder:
         if candlestick_patterns:
             hammer_points = []
             inverted_hammer_points = []
-
             for pattern in candlestick_patterns:
-                from enums.candlestick_pattern import CandlestickPattern
-
-                if pattern['type'] == CandlestickPattern.HAMMER:
+                if pattern['pattern_type'] == CandlestickPattern.HAMMER:
                     hammer_points.append([pattern['date'], pattern['value']])
-                elif pattern['type'] == CandlestickPattern.INVERTED_HAMMER:
+                elif pattern['pattern_type'] == CandlestickPattern.INVERTED_HAMMER:
                     inverted_hammer_points.append([pattern['date'], pattern['value']])
 
             # 添加锤子线标记
@@ -395,7 +394,7 @@ class ChartBuilder:
                 scatter_hammer.add_xaxis([p[0] for p in hammer_points])
                 scatter_hammer.add_yaxis(
                     series_name="🔨 锤子线",
-                    y_axis=[p[1] - 0.3 for p in hammer_points],  # 向下偏移一点
+                    y_axis=[p[1] - 0.1 for p in hammer_points],  # 向下偏移一点
                     symbol='pin',
                     symbol_size=12,
                     itemstyle_opts=opts.ItemStyleOpts(color='#1890ff'),
@@ -415,7 +414,7 @@ class ChartBuilder:
                 scatter_inverted.add_xaxis([p[0] for p in inverted_hammer_points])
                 scatter_inverted.add_yaxis(
                     series_name="🔨 倒锤子线",
-                    y_axis=[p[1] + 0.3 for p in inverted_hammer_points],  # 向上偏移一点
+                    y_axis=[p[1] + 0.1 for p in inverted_hammer_points],  # 向上偏移一点
                     symbol='pin',
                     symbol_size=12,
                     itemstyle_opts=opts.ItemStyleOpts(color='#fa8c16'),
@@ -750,7 +749,11 @@ class ChartBuilder:
                         }}
 
                         var dfData = {df_json};
-                        var result = '<div style="padding:2px; width:200px;"><strong>' + params[0].axisValue + '</strong><br/>';
+                        var candlestickPatterns = {[p for p in (candlestick_patterns or [])]};
+                        var currentDate = params[0].axisValue;
+
+                        var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
+
                         params.forEach(function(item) {{
                             if (item.seriesName === 'K线') {{
                                 var index = item.dataIndex;
@@ -778,7 +781,24 @@ class ChartBuilder:
 
                                 result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
                                 result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
-                            }} 
+
+                                // 查找当前日期的蜡烛图形态
+                                var foundPattern = null;
+                                for (var i = 0; i < candlestickPatterns.length; i++) {{
+                                    if (candlestickPatterns[i].date === currentDate) {{
+                                        foundPattern = candlestickPatterns[i];
+                                        break;
+                                    }}
+                                }}
+
+                                // 如果找到形态，显示形态信息
+                                if (foundPattern) {{
+                                    result += '<br/><div style="background-color:#fff3cd;padding:4px;border-radius:4px;margin-top:4px;">';
+                                    result += '<strong style="color:#856404;">' + foundPattern.icon + ' ' + foundPattern.name + '</strong><br/>';
+                                    result += '<span style="color:#856404;font-size:11px;">' + foundPattern.description + '</span>';
+                                    result += '</div>';
+                                }}
+                            }}
                         }});
 
                         result += '</div>';

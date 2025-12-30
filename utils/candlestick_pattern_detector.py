@@ -26,7 +26,6 @@ class CandlestickPatternDetector:
             检测到的锤子线列表，每个元素包含日期、价格、形态类型等信息
         """
         patterns = []
-
         for i in range(len(df)):
             row = df.iloc[i]
             opening = row['opening']
@@ -56,15 +55,10 @@ class CandlestickPatternDetector:
                 patterns.append({
                     'date': row['date'] if 'date' in row else row.name,
                     'index': i,
-                    'opening': opening,
-                    'closing': closing,
-                    'highest': highest,
-                    'lowest': lowest,
+                    'row': row.to_dict(),
                     'pattern_type': CandlestickPattern.HAMMER,
-                    'pattern_name': CandlestickPattern.HAMMER.text,
-                    'pattern_icon': CandlestickPattern.HAMMER.icon,
-                    'price': lowest,  # 标记在最低点
-                    'description': f'下影线/实体比={lower_shadow/body:.2f}'
+                    'price': lowest,
+                    'description': f'下影线({lower_shadow:.2f})/实体({body:.2f})比={lower_shadow/body:.2f}'
                 })
 
         return patterns

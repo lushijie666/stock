@@ -79,13 +79,14 @@ def show_kline_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-    df, kline_chart, volume_bar = _build_stock_kline_chart(stock, t)
+    df, dates, k_line_data, volumes, extra_lines= _build_stock_kline_chart_data(stock, t)
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
               <span class="chart-title">K线图</span>
           </div>
       """, unsafe_allow_html=True)
+    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
     # 显示K线图
     streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart")
@@ -96,6 +97,7 @@ def show_kline_chart(stock, t: StockHistoryType):
                          <span class="chart-title">成交量</span>
                      </div>
                  """, unsafe_allow_html=True)
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar")
 
 def show_kline_pattern_chart(stock, t: StockHistoryType):
@@ -107,41 +109,28 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-
-    # 获取股票数据
-    df = _get_stock_history_data(stock, t)
-    dates = format_dates(df, t)
-    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-    volumes = df['turnover_count'].tolist()
-
-    # 检测蜡烛图形态
+    df, dates, k_line_data, volumes, extra_lines= _build_stock_kline_chart_data(stock, t)
     candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
 
     # 转换形态数据用于图表显示
     pattern_markers = []
     for pattern in candlestick_patterns:
         pattern_markers.append({
-            'date': pattern['date'].strftime('%Y-%m-%d') if hasattr(pattern['date'], 'strftime') else str(pattern['date']),
+            'date': format_date_by_type(pattern['date'], t),
             'value': pattern['price'],
-            'type': pattern['pattern_type'],
-            'name': pattern['pattern_name'],
-            'icon': pattern['pattern_icon'],
+            'pattern_type': pattern['pattern_type'],
             'description': pattern['description']
         })
 
-    # 创建K线图，添加形态标记
+    # 创建K线图
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
               <span class="chart-title">K线图</span>
           </div>
       """, unsafe_allow_html=True)
-
-    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df, candlestick_patterns=pattern_markers)
-    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
-
-    # 显示K线图
-    streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_pattern")
+    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
+    streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_pattern")
 
     # 显示成交量
     st.markdown(f"""
@@ -150,30 +139,29 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
                          <span class="chart-title">成交量</span>
                      </div>
                  """, unsafe_allow_html=True)
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px", key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar_pattern")
 
     # 显示形态信息表格
     if candlestick_patterns:
         st.markdown("""
               <div class="chart-header">
-                  <span class="chart-icon">📊</span>
-                  <span class="chart-title">蜡烛图形态统计</span>
+                  <span class="chart-icon">🔍</span>
+                  <span class="chart-title">形态信息</span>
               </div>
           """, unsafe_allow_html=True)
 
         # 构建表格数据
         pattern_table_data = []
-        for pattern in candlestick_patterns:
-            pattern_table_data.append({
-                '日期': pattern['date'].strftime('%Y-%m-%d') if hasattr(pattern['date'], 'strftime') else str(pattern['date']),
-                '形态': f"{pattern['pattern_icon']} {pattern['pattern_name']}",
-                '开盘价': f"{pattern['opening']:.2f}",
-                '收盘价': f"{pattern['closing']:.2f}",
-                '最高价': f"{pattern['highest']:.2f}",
-                '最低价': f"{pattern['lowest']:.2f}",
-                '说明': pattern['description']
-            })
-
+        pattern_table_data.append({
+            '日期': format_date_by_type(pattern['date'],t ),
+            '形态': f"{pattern['pattern_type'].icon} {pattern['pattern_type'].text}",
+            '开盘价': f"{pattern['row']['opening']:.2f}",
+            '收盘价': f"{pattern['row']['closing']:.2f}",
+            '最低价': f"{pattern['row']['lowest']:.2f}",
+            '最高价': f"{pattern['row']['highest']:.2f}",
+            '说明': pattern['description']
+        })
         # 显示表格
         pattern_df = pd.DataFrame(pattern_table_data)
         st.dataframe(
@@ -182,27 +170,6 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             hide_index=True,
             height=min(400, len(pattern_df) * 35 + 38)
         )
-
-        # 统计各种形态的数量
-        st.markdown("""
-              <div class="chart-header">
-                  <span class="chart-icon">📈</span>
-                  <span class="chart-title">形态分布</span>
-              </div>
-          """, unsafe_allow_html=True)
-
-        pattern_counts = {}
-        for pattern in candlestick_patterns:
-            pattern_key = f"{pattern['pattern_icon']} {pattern['pattern_name']}"
-            pattern_counts[pattern_key] = pattern_counts.get(pattern_key, 0) + 1
-
-        # 使用列展示统计
-        cols = st.columns(min(4, len(pattern_counts)))
-        for idx, (pattern_name, count) in enumerate(pattern_counts.items()):
-            with cols[idx % len(cols)]:
-                st.metric(label=pattern_name, value=count)
-    else:
-        st.info("📌 未检测到蜡烛图形态")
 
 
 def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
@@ -1318,7 +1285,7 @@ def _show_fusion_strategy_config(stock, t: StockHistoryType):
 
 
 
-def _build_stock_kline_chart(stock, t: StockHistoryType):
+def _build_stock_kline_chart_data(stock, t: StockHistoryType):
     df = _get_stock_history_data(stock, t)
     dates = format_dates(df, t)
     k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
@@ -1335,16 +1302,7 @@ def _build_stock_kline_chart(stock, t: StockHistoryType):
             'values': [min_lowest] * len(dates),  # 支撑线
             'color': '#14b143'  # 绿色
         }
-
-    st.markdown("""
-             <div class="chart-header">
-                 <span class="chart-icon">🔍</span>
-                 <span class="chart-title">K线图</span>
-             </div>
-         """, unsafe_allow_html=True)
-    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
-    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
-    return df, kline_chart, volume_bar
+    return df, dates, k_line_data, volumes, extra_lines
 
 def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
     model = get_history_model(t)
