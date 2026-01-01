@@ -119,7 +119,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
         pattern_markers.append({
             'date': format_date_by_type(pattern['date'], t),
             'value': pattern['price'],
-            'type': pattern['pattern_type'],
+            'type': pattern['pattern_type'].code,  # 使用code而不是enum对象
             'description': pattern['description']
         })
 

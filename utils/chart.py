@@ -381,14 +381,18 @@ class ChartBuilder:
         # 添加蜡烛图形态标记
         if candlestick_patterns:
             hammer_points = []
+            hanging_man_points = []
             inverted_hammer_points = []
+
             for pattern in candlestick_patterns:
-                if pattern.get('type') == CandlestickPattern.HAMMER:
+                if pattern.get('type') == 'hammer':
                     hammer_points.append([pattern['date'], pattern['value']])
-                elif pattern.get('type') == CandlestickPattern.INVERTED_HAMMER:
+                elif pattern.get('type') == 'hanging_man':
+                    hanging_man_points.append([pattern['date'], pattern['value']])
+                elif pattern.get('type') == 'inverted_hammer':
                     inverted_hammer_points.append([pattern['date'], pattern['value']])
 
-            # 添加锤子线标记
+            # 添加锤子线标记（底部反转 - 看涨）
             if hammer_points:
                 scatter_hammer = Scatter()
                 scatter_hammer.add_xaxis([p[0] for p in hammer_points])
@@ -407,6 +411,26 @@ class ChartBuilder:
                     )
                 )
                 kline = kline.overlap(scatter_hammer)
+
+            # 添加上吊线标记（顶部反转 - 看跌）
+            if hanging_man_points:
+                scatter_hanging = Scatter()
+                scatter_hanging.add_xaxis([p[0] for p in hanging_man_points])
+                scatter_hanging.add_yaxis(
+                    series_name="上吊线",
+                    y_axis=[p[1] + 0.1 for p in hanging_man_points],  # 向上偏移一点
+                    symbol='pin',
+                    symbol_size=12,
+                    itemstyle_opts=opts.ItemStyleOpts(color='#f5222d'),
+                    label_opts=opts.LabelOpts(
+                        is_show=True,
+                        color='#f5222d',
+                        font_size=16,
+                        font_weight='bold',
+                        formatter="🪢"
+                    )
+                )
+                kline = kline.overlap(scatter_hanging)
 
             # 添加倒锤子线标记
             if inverted_hammer_points:
