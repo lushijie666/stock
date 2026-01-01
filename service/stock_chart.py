@@ -5,6 +5,7 @@ import streamlit as st
 from sqlalchemy import func
 import streamlit_echarts
 
+from enums.candlestick_pattern import CandlestickPattern
 from enums.strategy import StrategyType, FusionStrategyModel
 from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
@@ -153,16 +154,44 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
 
         # 构建表格数据
         pattern_table_data = []
-        pattern_table_data.append({
-            '日期': format_date_by_type(pattern['date'],t ),
-            '形态': f"{pattern['pattern_type'].icon} {pattern['pattern_type'].text}",
-            '开盘价': f"{pattern['row']['opening']:.2f}",
-            '收盘价': f"{pattern['row']['closing']:.2f}",
-            '最低价': f"{pattern['row']['lowest']:.2f}",
-            '最高价': f"{pattern['row']['highest']:.2f}",
-            '涨跌额': f"{pattern['row']['change_amount']:.2f}",
-            '说明': pattern['description']
-        })
+        pattern_counts = {}
+        for pattern in candlestick_patterns:
+            pattern_table_data.append({
+                '日期': format_date_by_type(pattern['date'],t ),
+                '形态': f"{pattern['pattern_type'].icon} {pattern['pattern_type'].text}",
+                '开盘价': f"{pattern['row']['opening']:.2f}",
+                '收盘价': f"{pattern['row']['closing']:.2f}",
+                '最低价': f"{pattern['row']['lowest']:.2f}",
+                '最高价': f"{pattern['row']['highest']:.2f}",
+                '涨跌额': f"{pattern['row']['change_amount']:.2f}",
+                '说明': pattern['description']
+            })
+            pattern_type = pattern['pattern_type']
+            pattern_type_text = pattern_type.text
+            if pattern_type_text in pattern_counts:
+                pattern_counts[pattern_type_text] += 1
+            else:
+                pattern_counts[pattern_type_text] = 1
+
+        sorted_patterns = sorted(pattern_counts.items(), key=lambda x: x[1], reverse=True)
+        # 计算需要的行数
+        items_per_row = 4
+        rows = (len(sorted_patterns) + items_per_row - 1) // items_per_row
+        for row_idx in range(rows):
+            start_idx = row_idx * items_per_row
+            end_idx = min(start_idx + items_per_row, len(sorted_patterns))
+            current_row = sorted_patterns[start_idx:end_idx]
+            # 创建每行的4列布局
+            cols = st.columns(items_per_row)
+            for col_idx, (pattern_name, count) in enumerate(current_row):
+                with cols[col_idx]:
+                    st.markdown(f"""
+                            <div class="metric-sub-card metric-card-{row_idx * items_per_row + col_idx + 1}">
+                                <div class="metric-label">{pattern_name}</div>
+                                <div class="metric-value">{count}</div>
+                            </div>
+                    """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
         # 显示表格
         pattern_df = pd.DataFrame(pattern_table_data)
         st.dataframe(
@@ -172,6 +201,46 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             height=min(400, len(pattern_df) * 35 + 38)
         )
 
+    # 形态算法
+    st.markdown(f"""
+            <div class="chart-header">
+                <span class="chart-icon">🔮</span>
+                <span class="chart-title">形态算法</span>
+            </div>
+    """, unsafe_allow_html=True)
+    pattern_infos = [
+        [
+            (CandlestickPattern.HAMMER.icon, CandlestickPattern.HAMMER.text + "  -  [底部反转形态]",
+            "🗳 之前存在下降趋势 - 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)<br>"
+            "🗳 可以是阳线或阴线, 实体较小 - 实体长度(收盘价 - 开盘价绝对值) &gt; 0.01<br>"
+            "🗳 下影线长度至少是实体的2倍 - 下影线长度 &gt;= 实体长度 * 2.0<br>"
+            "🗳 上影线很短或没有 - 上影线长度 &lt;= 实体长度 * 0.3<br>"
+            "🗳 收盘价位于最高价或接近最高价 - (收盘价 - 最低价) / (最高价 - 最低价) &gt;= 0.6",
+            "sync-card-blue"),
+            (CandlestickPattern.HANGING_MAN.icon, CandlestickPattern.HANGING_MAN.text, "",
+            "sync-card-orange"),
+        ],
+        [
+            ("📈", "历史数据(周)", "同步关注的股票近N天的数据(周)", "sync-card-blue"),
+            ("💼", "历史数据(周)", "同步所有的股票近N天的数据(周)", "sync-card-orange"),
+        ],
+    ]
+
+    for row_idx, info_row in enumerate(pattern_infos):
+        info_cols = st.columns(len(info_row))
+        for col_idx, (icon, title, desc, color_class) in enumerate(info_row):
+            with info_cols[col_idx]:
+                st.markdown(f"""
+                <div class="sync-button-card {color_class}">
+                    <div class="sync-card-icon {color_class}">
+                        <span class="sync-icon-large">{icon}</span>
+                    </div>
+                    <div class="sync-card-content">
+                        <div class="sync-card-title">{title}</div>
+                        <div class="sync-card-desc">{desc}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
 def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
     st.markdown(

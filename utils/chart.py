@@ -185,7 +185,7 @@ class ChartBuilder:
                         values = values + [values[-1]] * (len(dates) - len(values))
                     else:
                         values = values[:len(dates)]
-                line_opts = opts.LineStyleOpts(type_="dashed", width=3)  # 使用虚线
+                line_opts = opts.LineStyleOpts(type_="dashed", width=1)  # 使用虚线
                 if color:
                     line_opts.color = color
                 lines.add_yaxis(

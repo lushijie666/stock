@@ -5,7 +5,7 @@ class CandlestickPattern(Enum):
     """蜡烛图形态枚举"""
 
     # 单K线形态
-    HAMMER = ("hammer", "锤子线", "🔨")
+    HAMMER = ("hammer", "锤子线", "🔨", )
     HANGING_MAN = ("hanging_man", "上吊线", "🪢")
     INVERTED_HAMMER = ("inverted_hammer", "倒锤子线", "🔨")
     SHOOTING_STAR = ("shooting_star", "流星线", "⭐")
