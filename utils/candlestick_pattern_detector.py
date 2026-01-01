@@ -252,7 +252,7 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.BULLISH_ENGULFING,
                 'price': curr_row['lowest'],  # 标记在最低点（底部反转）
-                'description': f'第 1 根阴线实体={prev_body:.2f}, 第 2 根阳线实体={curr_body:.2f}, 'f'吞没比={engulfing_ratio:.2f}, 下跌差价={abs(recent_avg-early_avg):.2f}'
+                'description': f'第 1 根阴线实体={prev_body:.2f}, 第 2 根阳线实体={curr_body:.2f}, 'f'吞没比={engulfing_ratio:.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
             })
 
         return patterns
@@ -338,6 +338,188 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
+    def detect_dark_cloud_cover(df: pd.DataFrame, trend_period: int = 5, min_penetration: float = 0.5) -> List[Dict]:
+        """
+        检测乌云盖顶形态（Dark Cloud Cover）
+        顶部反转形态 - 双K线形态
+
+        🗳 之前存在上升趋势 - 前 5 天的前半段收盘价平均值 < 后半段收盘价平均值
+        🗳 第一根K线是阳线（最好是大阳线） - 收盘价 > 开盘价
+        🗳 第二根K线是阴线 - 开盘价 > 收盘价
+        🗳 第二根K线的开盘价高于第一根K线的最高价 - 形成向上跳空
+        🗳 第二根K线的收盘价深入到第一根K线实体内部 - 穿透比例 >= 50%
+        🗳 第二根阴线的收盘价应该低于第一根阳线实体的中点
+        🗳 第二根阴线的收盘价应该高于第一根阳线的开盘价（未完全吞没）
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            min_penetration: 最小穿透比例，默认0.5（50%）
+
+        Returns:
+            检测到的乌云盖顶形态列表
+        """
+        patterns = []
+
+        # 从trend_period+1开始，需要前一天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 1, len(df)):
+            prev_row = df.iloc[i - 1]  # 第一根K线（阳线）
+            curr_row = df.iloc[i]       # 第二根K线（阴线）
+
+            prev_opening = prev_row['opening']
+            prev_closing = prev_row['closing']
+            prev_highest = prev_row['highest']
+            curr_opening = curr_row['opening']
+            curr_closing = curr_row['closing']
+
+            # 1. 判断第一根是阳线，第二根是阴线
+            if not (prev_closing > prev_opening and curr_closing < curr_opening):
+                continue
+
+            # 2. 计算实体长度
+            prev_body = abs(prev_closing - prev_opening)
+            curr_body = abs(curr_closing - curr_opening)
+
+            # 实体太小的跳过
+            if prev_body < 0.01:
+                continue
+
+            # 3. 第二根K线开盘价应该高于第一根K线的最高价（向上跳空）
+            if curr_opening <= prev_highest:
+                continue
+
+            # 4. 第二根阴线的收盘价应该深入第一根阳线实体内部
+            # 收盘价必须低于第一根阳线的收盘价
+            if curr_closing >= prev_closing:
+                continue
+
+            # 5. 计算穿透深度（第二根阴线收盘价穿透第一根阳线实体的比例）
+            penetration = (prev_closing - curr_closing) / prev_body
+
+            # 穿透深度应该至少达到50%（最好是50%-100%之间）
+            if penetration < min_penetration:
+                continue
+
+            # 6. 第二根阴线的收盘价应该高于第一根阳线的开盘价（未完全吞没）
+            if curr_closing <= prev_opening:
+                continue
+
+            # 7. 判断之前存在上升趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
+
+                # 上升趋势：早期平均 < 近期平均
+                if early_avg >= recent_avg:
+                    continue
+
+            # 计算穿透比例和趋势强度
+            gap = curr_opening - prev_highest  # 跳空缺口大小
+
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.DARK_CLOUD_COVER,
+                'price': curr_row['highest'],  # 标记在最高点（顶部反转）
+                'description': f'第 1 根阳线实体={prev_body:.2f}, 'f'第 2 根阴线实体={curr_body:.2f}, 'f'穿透比={penetration:.1%}, 跳空={gap:.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
+
+            })
+
+        return patterns
+
+    @staticmethod
+    def detect_piercing_pattern(df: pd.DataFrame, trend_period: int = 5, min_penetration: float = 0.5) -> List[Dict]:
+        """
+        检测刺透形态（Piercing Pattern）
+        底部反转形态 - 双K线形态
+
+        🗳 之前存在下降趋势 - 前 5 天的前半段收盘价平均值 > 后半段收盘价平均值
+        🗳 第一根K线是阴线（最好是大阴线） - 开盘价 > 收盘价
+        🗳 第二根K线是阳线 - 收盘价 > 开盘价
+        🗳 第二根K线的开盘价低于第一根K线的最低价 - 形成向下跳空
+        🗳 第二根K线的收盘价深入到第一根K线实体内部 - 穿透比例 >= 50%
+        🗳 第二根阳线的收盘价应该高于第一根阴线实体的中点
+        🗳 第二根阳线的收盘价应该低于第一根阴线的开盘价（未完全吞没）
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            min_penetration: 最小穿透比例，默认0.5（50%）
+
+        Returns:
+            检测到的刺透形态列表
+        """
+        patterns = []
+
+        # 从trend_period+1开始，需要前一天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 1, len(df)):
+            prev_row = df.iloc[i - 1]  # 第一根K线（阴线）
+            curr_row = df.iloc[i]       # 第二根K线（阳线）
+
+            prev_opening = prev_row['opening']
+            prev_closing = prev_row['closing']
+            prev_lowest = prev_row['lowest']
+            curr_opening = curr_row['opening']
+            curr_closing = curr_row['closing']
+
+            # 1. 判断第一根是阴线，第二根是阳线
+            if not (prev_closing < prev_opening and curr_closing > curr_opening):
+                continue
+
+            # 2. 计算实体长度
+            prev_body = abs(prev_closing - prev_opening)
+            curr_body = abs(curr_closing - curr_opening)
+
+            # 实体太小的跳过
+            if prev_body < 0.01:
+                continue
+
+            # 3. 第二根K线开盘价应该低于第一根K线的最低价
+            if curr_opening >= prev_lowest:
+                continue
+
+            # 4. 第二根阳线的收盘价应该深入第一根阴线实体内部
+            # 收盘价必须高于第一根阴线的收盘价
+            if curr_closing <= prev_closing:
+                continue
+
+            # 5. 计算穿透深度（第二根阳线收盘价穿透第一根阴线实体的比例）
+            penetration = (curr_closing - prev_closing) / prev_body
+
+            # 穿透深度应该至少达到50%（最好是50%-100%之间）
+            if penetration < min_penetration:
+                continue
+
+            # 6. 第二根阳线的收盘价应该低于第一根阴线的开盘价（未完全吞没）
+            if curr_closing >= prev_opening:
+                continue
+
+            # 7. 判断之前存在下降趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
+
+                # 下降趋势：早期平均 > 近期平均
+                if early_avg <= recent_avg:
+                    continue
+
+            gap = prev_lowest - curr_opening  # 跳空缺口大小
+
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.PIERCING_PATTERN,
+                'price': curr_row['lowest'],  # 标记在最低点（底部反转）
+                'description': f'第 1 根阴线实体={prev_body:.2f}, 'f'第 2 根阳线实体={curr_body:.2f}, 'f'穿透比={penetration:.1%}, 跳空={gap:.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
+            })
+
+        return patterns
+
+    @staticmethod
     def detect_all_patterns(df: pd.DataFrame) -> List[Dict]:
         """
         检测所有支持的蜡烛图形态
@@ -357,15 +539,20 @@ class CandlestickPatternDetector:
         # 检测上吊线（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_hanging_man(df))
 
-        # 检测倒锤子线
-        # all_patterns.extend(CandlestickPatternDetector.detect_inverted_hammer(df))
-
         # 双K线形态
         # 检测看涨吞没（底部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_bullish_engulfing(df))
 
         # 检测看跌吞没（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_bearish_engulfing(df))
+
+        # 检测刺透形态（底部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_piercing_pattern(df))
+
+        # 检测乌云盖顶（顶部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_dark_cloud_cover(df))
+
+
 
         # 按日期排序
         all_patterns.sort(key=lambda x: x['index'])
@@ -423,7 +610,7 @@ class CandlestickPatternDetector:
                     "第 2 根实体完全吞没第 1 根实体",
                     "第 2 根阳线开盘价低于第 1 根阴线收盘价 -> 第 2 根开盘价 &lt;= 第 1 根收盘价",
                     "第 2 根阳线收盘价高于第 1 根阴线开盘价 -> 第 2 根收盘价 &gt;= 第 1 根开盘价",
-                    "第 2 根实体明显大于第 1 根 -> 第 2根实体 &gt;= 第 1 根实体 * 1.0"
+                    "第 2 根实体明显大于第 1 根 -> 第 2 根实体 &gt;= 第 1 根实体 * 1.0"
                 ],
                 'color_class': 'sync-card-green'
             },
@@ -438,8 +625,37 @@ class CandlestickPatternDetector:
                     "第 2 根实体完全吞没第 1 根实体",
                     "第 2 根阴线开盘价高于第 1 根阳线收盘价 -> 第 2 根开盘价 &gt;= 第 1 根收盘价",
                     "第 2 根阴线收盘价低于第 1 根阳线开盘价 -> 第 2 根收盘价 &lt;= 第 1 根开盘价",
-                    "第 2 根实体明显大于第一根 -> 第 2 根实体 &gt;= 第 1 根实体 * 1.0"
+                    "第 2 根实体明显大于第 1 根 -> 第 2 根实体 &gt;= 第 1 根实体 * 1.0"
                 ],
                 'color_class': 'sync-card-purple'
-            }
+            },
+            {
+                'pattern_type': CandlestickPattern.PIERCING_PATTERN,
+                'category': '双K线 - 底部反转',
+                'signal': "看涨",
+                'criteria': [
+                    "之前存在下降趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是阴线 -> 开盘价 &gt; 收盘价",
+                    "第 2 根是阳线 -> 收盘价 &gt; 开盘价",
+                    "第 2 根开盘价低于第 1 根最低价, 形成向下跳空 ",
+                    "第 2 根阳线收盘价深入第 1 根阴线实体, 高于第 1 根阴线实体中点 -> (第 2 根收盘价 - 第 1 根收盘价) / 第 1 根实体 &gt;= 50%",
+                    "第 2 根阳线收盘价低于第 1 根阴线开盘价,未完全吞没 -> 第 2 根阳线收盘价 < 第 1 根阴线开盘价"
+                ],
+                'color_class': 'sync-card-blue'
+            },
+            {
+                'pattern_type': CandlestickPattern.DARK_CLOUD_COVER,
+                'category': '双K线 - 顶部反转',
+                'signal': "看跌",
+                'criteria': [
+                    "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是阳线 -> 收盘价 &gt; 开盘价",
+                    "第 2 根是阴线 -> 开盘价 &gt; 收盘价",
+                    "第 2 根开盘价高于第 1 根最高价, 形成向上跳空 ",
+                    "第 2 根阴线收盘价深入第 1 根阳线实体, 低于第 1 根阳线实体中点 -> (第 1 根收盘价 - 第 2 根收盘价) / 第 1 根实体 &gt;= 50%",
+                    "第 2 根阴线收盘价高于第 1 根阳线开盘价,未完全吞没 -> 第 2 根阳线收盘价 > 第 1 根阴线开盘价"
+                ],
+                'color_class': 'sync-card-orange'
+            },
+
         ]

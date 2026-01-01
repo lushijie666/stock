@@ -393,9 +393,13 @@ class ChartBuilder:
                         'offset': pattern.get('offset', 0)
                     }
                 pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
-
+            # 创建枚举顺序映射
+            enum_order = {enum.value: i for i, enum in enumerate(CandlestickPattern)}
+            # 对 pattern_groups 按照枚举顺序排序
+            sorted_pattern_types = sorted(pattern_groups.keys(), key=lambda x: enum_order.get(x, float('inf')))
             # 为每种形态类型创建散点图
-            for pattern_type, pattern_data in pattern_groups.items():
+            for pattern_type in sorted_pattern_types:
+                pattern_data = pattern_groups[pattern_type]
                 points = pattern_data['points']
                 if points:
                     scatter = Scatter()

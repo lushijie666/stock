@@ -178,7 +178,10 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             else:
                 pattern_counts[pattern_type_text] = 1
 
-        sorted_patterns = sorted(pattern_counts.items(), key=lambda x: x[1], reverse=True)
+        # 创建枚举顺序映射
+        enum_order = {enum.text: i for i, enum in enumerate(CandlestickPattern)}
+        # 按照枚举顺序对形态计数进行排序
+        sorted_patterns = sorted(pattern_counts.items(), key=lambda x: enum_order.get(x[0], float('inf')))
         # 计算需要的行数
         items_per_row = 4
         rows = (len(sorted_patterns) + items_per_row - 1) // items_per_row
@@ -196,7 +199,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
                                 <div class="metric-value">{count}</div>
                             </div>
                     """, unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
         # 显示表格
         pattern_df = pd.DataFrame(pattern_table_data)
         st.dataframe(
