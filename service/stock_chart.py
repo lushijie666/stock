@@ -206,43 +206,47 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             height=min(400, len(pattern_df) * 35 + 38)
         )
 
-    # 形态算法
+    # 形态算法说明
     st.markdown(f"""
             <div class="chart-header">
                 <span class="chart-icon">🔮</span>
                 <span class="chart-title">形态算法</span>
             </div>
     """, unsafe_allow_html=True)
-    pattern_infos = [
-        [
-            (CandlestickPattern.HAMMER.icon, CandlestickPattern.HAMMER.text + "  -  [底部反转形态]",
-            "🗳 之前存在下降趋势 - 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)<br>"
-            "🗳 可以是阳线或阴线, 实体较小 - 实体长度(收盘价 - 开盘价绝对值) &gt; 0.01<br>"
-            "🗳 下影线长度至少是实体的2倍 - 下影线长度 &gt;= 实体长度 * 2.0<br>"
-            "🗳 上影线很短或没有 - 上影线长度 &lt;= 实体长度 * 0.3<br>"
-            "🗳 收盘价位于最高价或接近最高价 - (收盘价 - 最低价) / (最高价 - 最低价) &gt;= 0.6",
-            "sync-card-blue"),
-            (CandlestickPattern.HANGING_MAN.icon, CandlestickPattern.HANGING_MAN.text, "",
-            "sync-card-orange"),
-        ],
-        [
-            ("📈", "历史数据(周)", "同步关注的股票近N天的数据(周)", "sync-card-blue"),
-            ("💼", "历史数据(周)", "同步所有的股票近N天的数据(周)", "sync-card-orange"),
-        ],
-    ]
 
-    for row_idx, info_row in enumerate(pattern_infos):
-        info_cols = st.columns(len(info_row))
-        for col_idx, (icon, title, desc, color_class) in enumerate(info_row):
+    # 从检测器获取算法信息
+    pattern_algorithm_infos = CandlestickPatternDetector.get_pattern_algorithm_info()
+
+    # 每行显示2个形态卡片
+    items_per_row = 2
+    rows = (len(pattern_algorithm_infos) + items_per_row - 1) // items_per_row
+
+    for row_idx in range(rows):
+        start_idx = row_idx * items_per_row
+        end_idx = min(start_idx + items_per_row, len(pattern_algorithm_infos))
+        current_row = pattern_algorithm_infos[start_idx:end_idx]
+
+        current_row_max_criteria = max(len(pattern['criteria']) for pattern in current_row) if current_row else 0
+        # 创建列布局
+        info_cols = st.columns(items_per_row)
+        for col_idx, pattern_info in enumerate(current_row):
             with info_cols[col_idx]:
+                pattern_type = pattern_info['pattern_type']
+                category = pattern_info['category']
+                signal = pattern_info['signal']
+                criteria = pattern_info['criteria']
+                color_class = pattern_info['color_class']
+
+                padded_criteria = criteria + [''] * (current_row_max_criteria - len(criteria))
+                criteria_html = '<br>'.join([f"🗳 {criterion}" if criterion else "&nbsp;" for criterion in padded_criteria])
                 st.markdown(f"""
                 <div class="sync-button-card {color_class}">
                     <div class="sync-card-icon {color_class}">
-                        <span class="sync-icon-large">{icon}</span>
+                        <span class="sync-icon-large">{pattern_type.icon}</span>
                     </div>
                     <div class="sync-card-content">
-                        <div class="sync-card-title">{title}</div>
-                        <div class="sync-card-desc">{desc}</div>
+                        <div class="sync-card-title">{pattern_type.text}  -  {category}  -  {signal}</div>
+                        <div class="sync-card-desc">{criteria_html}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
