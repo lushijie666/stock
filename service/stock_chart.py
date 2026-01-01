@@ -116,10 +116,15 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
     # 转换形态数据用于图表显示
     pattern_markers = []
     for pattern in candlestick_patterns:
+        pattern_type = pattern['pattern_type']
         pattern_markers.append({
             'date': format_date_by_type(pattern['date'], t),
             'value': pattern['price'],
-            'type': pattern['pattern_type'].code,  # 使用code而不是enum对象
+            'type': pattern_type.code,
+            'name': pattern_type.text,
+            'icon': pattern_type.icon,
+            'color': pattern_type.color,
+            'offset': pattern_type.offset,
             'description': pattern['description']
         })
 

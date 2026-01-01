@@ -378,79 +378,43 @@ class ChartBuilder:
                 )
                 kline = kline.overlap(scatter_sell_weak)
 
-        # 添加蜡烛图形态标记
+        # 添加蜡烛图形态标记（通用化处理）
         if candlestick_patterns:
-            hammer_points = []
-            hanging_man_points = []
-            inverted_hammer_points = []
-
+            # 按形态类型分组
+            pattern_groups = {}
             for pattern in candlestick_patterns:
-                if pattern.get('type') == 'hammer':
-                    hammer_points.append([pattern['date'], pattern['value']])
-                elif pattern.get('type') == 'hanging_man':
-                    hanging_man_points.append([pattern['date'], pattern['value']])
-                elif pattern.get('type') == 'inverted_hammer':
-                    inverted_hammer_points.append([pattern['date'], pattern['value']])
+                pattern_type = pattern.get('type')
+                if pattern_type not in pattern_groups:
+                    pattern_groups[pattern_type] = {
+                        'points': [],
+                        'name': pattern.get('name', pattern_type),
+                        'icon': pattern.get('icon', ''),
+                        'color': pattern.get('color', '#000000'),
+                        'offset': pattern.get('offset', 0)
+                    }
+                pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
 
-            # 添加锤子线标记（底部反转 - 看涨）
-            if hammer_points:
-                scatter_hammer = Scatter()
-                scatter_hammer.add_xaxis([p[0] for p in hammer_points])
-                scatter_hammer.add_yaxis(
-                    series_name="锤子线",
-                    y_axis=[p[1] - 0.1 for p in hammer_points],  # 向下偏移一点
-                    symbol='pin',
-                    symbol_size=12,
-                    itemstyle_opts=opts.ItemStyleOpts(color='#1890ff'),
-                    label_opts=opts.LabelOpts(
-                        is_show=True,
-                        color='#1890ff',
-                        font_size=16,
-                        font_weight='bold',
-                        formatter="🔨"
+            # 为每种形态类型创建散点图
+            for pattern_type, pattern_data in pattern_groups.items():
+                points = pattern_data['points']
+                if points:
+                    scatter = Scatter()
+                    scatter.add_xaxis([p[0] for p in points])
+                    scatter.add_yaxis(
+                        series_name=pattern_data['name'],
+                        y_axis=[p[1] + pattern_data['offset'] for p in points],
+                        symbol='pin',
+                        symbol_size=12,
+                        itemstyle_opts=opts.ItemStyleOpts(color=pattern_data['color']),
+                        label_opts=opts.LabelOpts(
+                            is_show=True,
+                            color=pattern_data['color'],
+                            font_size=16,
+                            font_weight='bold',
+                            formatter=pattern_data['icon']
+                        )
                     )
-                )
-                kline = kline.overlap(scatter_hammer)
-
-            # 添加上吊线标记（顶部反转 - 看跌）
-            if hanging_man_points:
-                scatter_hanging = Scatter()
-                scatter_hanging.add_xaxis([p[0] for p in hanging_man_points])
-                scatter_hanging.add_yaxis(
-                    series_name="上吊线",
-                    y_axis=[p[1] + 0.1 for p in hanging_man_points],  # 向上偏移一点
-                    symbol='pin',
-                    symbol_size=12,
-                    itemstyle_opts=opts.ItemStyleOpts(color='#f5222d'),
-                    label_opts=opts.LabelOpts(
-                        is_show=True,
-                        color='#f5222d',
-                        font_size=16,
-                        font_weight='bold',
-                        formatter="🪢"
-                    )
-                )
-                kline = kline.overlap(scatter_hanging)
-
-            # 添加倒锤子线标记
-            if inverted_hammer_points:
-                scatter_inverted = Scatter()
-                scatter_inverted.add_xaxis([p[0] for p in inverted_hammer_points])
-                scatter_inverted.add_yaxis(
-                    series_name="倒锤子线",
-                    y_axis=[p[1] + 0.1 for p in inverted_hammer_points],  # 向上偏移一点
-                    symbol='pin',
-                    symbol_size=12,
-                    itemstyle_opts=opts.ItemStyleOpts(color='#fa8c16'),
-                    label_opts=opts.LabelOpts(
-                        is_show=True,
-                        color='#fa8c16',
-                        font_size=16,
-                        font_weight='bold',
-                        formatter="🔨"
-                    )
-                )
-                kline = kline.overlap(scatter_inverted)
+                    kline = kline.overlap(scatter)
 
         # 添加笔的连线（按类型分组合并）
         if strokes:

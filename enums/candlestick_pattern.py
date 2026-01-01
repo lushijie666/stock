@@ -4,31 +4,34 @@ from enum import Enum
 class CandlestickPattern(Enum):
     """蜡烛图形态枚举"""
 
-    # 单K线形态
-    HAMMER = ("hammer", "锤子线", "🔨", )
-    HANGING_MAN = ("hanging_man", "上吊线", "🪢")
-    INVERTED_HAMMER = ("inverted_hammer", "倒锤子线", "🔨")
-    SHOOTING_STAR = ("shooting_star", "流星线", "⭐")
-    DOJI = ("doji", "十字星", "✝️")
+    # 单K线形态 - (code, text, icon, color, offset)
+    # offset: 正数向上偏移，负数向下偏移
+    HAMMER = ("hammer", "锤子线", "🔨", "#1890ff", -0.1)  # 底部反转-看涨，蓝色，向下
+    HANGING_MAN = ("hanging_man", "上吊线", "🪢", "#f5222d", 0.1)  # 顶部反转-看跌，红色，向上
+    INVERTED_HAMMER = ("inverted_hammer", "倒锤子线", "🔨", "#fa8c16", 0.1)  # 底部反转-看涨，橙色，向上
+    SHOOTING_STAR = ("shooting_star", "流星线", "⭐", "#f5222d", 0.1)  # 顶部反转-看跌，红色，向上
+    DOJI = ("doji", "十字星", "✝️", "#8c8c8c", 0)  # 中性，灰色，无偏移
 
     # 双K线形态
-    BULLISH_ENGULFING = ("bullish_engulfing", "看涨吞没", "📈")
-    BEARISH_ENGULFING = ("bearish_engulfing", "看跌吞没", "📉")
-    DARK_CLOUD_COVER = ("dark_cloud_cover", "乌云盖顶", "☁️")
-    PIERCING_PATTERN = ("piercing_pattern", "刺透形态", "🔆")
+    BULLISH_ENGULFING = ("bullish_engulfing", "看涨吞没", "📈", "#52c41a", -0.1)  # 看涨，绿色，向下
+    BEARISH_ENGULFING = ("bearish_engulfing", "看跌吞没", "📉", "#f5222d", 0.1)  # 看跌，红色，向上
+    DARK_CLOUD_COVER = ("dark_cloud_cover", "乌云盖顶", "☁️", "#f5222d", 0.1)  # 看跌，红色，向上
+    PIERCING_PATTERN = ("piercing_pattern", "刺透形态", "🔆", "#52c41a", -0.1)  # 看涨，绿色，向下
 
     # 三K线形态
-    MORNING_STAR = ("morning_star", "晨星", "🌟")
-    EVENING_STAR = ("evening_star", "黄昏星", "🌆")
-    THREE_WHITE_SOLDIERS = ("three_white_soldiers", "三只白兵", "⚪⚪⚪")
-    THREE_BLACK_CROWS = ("three_black_crows", "三只乌鸦", "⚫⚫⚫")
+    MORNING_STAR = ("morning_star", "晨星", "🌟", "#52c41a", -0.1)  # 看涨，绿色，向下
+    EVENING_STAR = ("evening_star", "黄昏星", "🌆", "#f5222d", 0.1)  # 看跌，红色，向上
+    THREE_WHITE_SOLDIERS = ("three_white_soldiers", "三只白兵", "⚪⚪⚪", "#52c41a", -0.1)  # 看涨，绿色，向下
+    THREE_BLACK_CROWS = ("three_black_crows", "三只乌鸦", "⚫⚫⚫", "#f5222d", 0.1)  # 看跌，红色，向上
 
-    def __new__(cls, code, text, icon):
+    def __new__(cls, code, text, icon, color, offset):
         obj = object.__new__(cls)
         obj._value_ = code
         obj.code = code
         obj.text = text
         obj.icon = icon
+        obj.color = color  # 图表显示颜色
+        obj.offset = offset  # Y轴偏移量
         return obj
 
     @property
