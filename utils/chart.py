@@ -382,6 +382,8 @@ class ChartBuilder:
         if candlestick_patterns:
             # 按形态类型分组
             pattern_groups = {}
+            three_kline_patterns = []  # 收集三K线形态，用于绘制虚线框
+
             for pattern in candlestick_patterns:
                 pattern_type = pattern.get('type')
                 if pattern_type not in pattern_groups:
@@ -393,6 +395,11 @@ class ChartBuilder:
                         'offset': pattern.get('offset', 0)
                     }
                 pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
+
+                # 收集三K线形态（有start_index和end_index的形态）
+                if 'start_index' in pattern and 'end_index' in pattern:
+                    three_kline_patterns.append(pattern)
+
             # 创建枚举顺序映射
             enum_order = {enum.value: i for i, enum in enumerate(CandlestickPattern)}
             # 对 pattern_groups 按照枚举顺序排序
@@ -419,6 +426,66 @@ class ChartBuilder:
                         )
                     )
                     kline = kline.overlap(scatter)
+
+            # 为三K线形态添加虚线框标记
+            if three_kline_patterns:
+                # 为每个三K线形态绘制矩形框
+                for pattern in three_kline_patterns:
+                    start_idx = pattern.get('start_index')
+                    end_idx = pattern.get('end_index')
+
+                    # 确保索引在有效范围内
+                    if start_idx < len(dates) and end_idx < len(dates):
+                        # 获取形态涵盖的三根K线的日期范围
+                        start_date = dates[start_idx]
+                        end_date = dates[end_idx]
+
+                        # 获取三根K线的价格范围（最高和最低）
+                        pattern_high = max([
+                            df.iloc[start_idx]['highest'],
+                            df.iloc[start_idx + 1]['highest'] if start_idx + 1 < len(df) else 0,
+                            df.iloc[end_idx]['highest']
+                        ])
+                        pattern_low = min([
+                            df.iloc[start_idx]['lowest'],
+                            df.iloc[start_idx + 1]['lowest'] if start_idx + 1 < len(df) else float('inf'),
+                            df.iloc[end_idx]['lowest']
+                        ])
+
+                        # 添加一些边距
+                        price_range = pattern_high - pattern_low
+                        margin = price_range * 0.05  # 5%边距
+
+                        # 创建线条绘制矩形框（虚线）
+                        # 使用Line图绘制矩形的四条边
+                        box_line = Line()
+
+                        # 矩形的四个顶点：左下 -> 左上 -> 右上 -> 右下 -> 左下（闭合）
+                        box_x = [start_date, start_date, end_date, end_date, start_date]
+                        box_y = [
+                            pattern_low - margin,
+                            pattern_high + margin,
+                            pattern_high + margin,
+                            pattern_low - margin,
+                            pattern_low - margin
+                        ]
+
+                        box_line.add_xaxis(box_x)
+                        box_line.add_yaxis(
+                            series_name="",  # 不显示图例
+                            y_axis=box_y,
+                            is_symbol_show=False,  # 不显示数据点
+                            is_smooth=False,
+                            linestyle_opts=opts.LineStyleOpts(
+                                type_='dashed',  # 虚线
+                                width=2,
+                                color=pattern.get('color', '#888888'),
+                                opacity=0.6
+                            ),
+                            label_opts=opts.LabelOpts(is_show=False)
+                        )
+
+                        kline = kline.overlap(box_line)
 
         # 添加笔的连线（按类型分组合并）
         if strokes:

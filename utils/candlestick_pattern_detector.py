@@ -252,7 +252,7 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.BULLISH_ENGULFING,
                 'price': curr_row['lowest'],  # 标记在最低点（底部反转）
-                'description': f'第 1 根阴线实体={prev_body:.2f}, 第 2 根阳线实体={curr_body:.2f}, 'f'吞没比={engulfing_ratio:.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
+                'description': f'实体=1:{prev_body:.2f}, 2:{curr_body:.2f}, 'f'吞没比(2-1)={abs(engulfing_ratio):.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
             })
 
         return patterns
@@ -332,7 +332,7 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.BEARISH_ENGULFING,
                 'price': curr_row['highest'],  # 标记在最高点（顶部反转）
-                'description': f'第 1 根阳线实体={prev_body:.2f}, 第 2 根阴线实体={curr_body:.2f}, 'f'吞没比={engulfing_ratio:.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
+                'description': f'实体=1:{prev_body:.2f},2:{curr_body:.2f}, 'f'吞没比(2-1)={abs(engulfing_ratio):.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
             })
 
         return patterns
@@ -423,7 +423,7 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.DARK_CLOUD_COVER,
                 'price': curr_row['highest'],  # 标记在最高点（顶部反转）
-                'description': f'第 1 根阳线实体={prev_body:.2f}, 'f'第 2 根阴线实体={curr_body:.2f}, 'f'穿透比={penetration:.1%}, 跳空={gap:.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
+                'description': f'实体=1:{prev_body:.2f}, 2: {curr_body:.2f}, 'f'穿透比(2-1)={abs(penetration):.1%}, 跳空(1-2)={abs(gap):.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
 
             })
 
@@ -514,9 +514,229 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.PIERCING_PATTERN,
                 'price': curr_row['lowest'],  # 标记在最低点（底部反转）
-                'description': f'第 1 根阴线实体={prev_body:.2f}, 'f'第 2 根阳线实体={curr_body:.2f}, 'f'穿透比={penetration:.1%}, 跳空={gap:.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
+                'description': f'实体=1:{prev_body:.2f}, 2:{curr_body:.2f}, 'f'穿透比(2-1)={abs(penetration):.1%}, 跳空(1-2)={abs(gap):.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
             })
 
+        return patterns
+
+    @staticmethod
+    def detect_morning_star(df: pd.DataFrame, trend_period: int = 5, star_body_ratio: float = 0.3, min_gap: float = 0.01) -> List[Dict]:
+        """
+        检测启明星形态（Morning Star）
+        底部反转形态 - 三K线形态
+
+        🗳 之前存在下降趋势 - 前 5 天的前半段收盘价平均值 > 后半段收盘价平均值
+        🗳 第一根K线是大阴线 - 开盘价 > 收盘价，实体较大
+        🗳 第二根K线是小实体星线（可阴可阳） - 实体很小，低于第一根K线
+        🗳 第二根星线与第一根阴线之间有向下跳空 - 形成缺口
+        🗳 第三根K线是阳线 - 收盘价 > 开盘价
+        🗳 第三根阳线与第二根星线之间有向上跳空 - 形成缺口
+        🗳 第三根阳线的收盘价深入第一根阴线实体内部 - 最好超过50%
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            star_body_ratio: 星线实体占第一根K线实体的最大比例，默认0.3（30%）
+            min_gap: 最小跳空缺口，默认0.01
+
+        Returns:
+            检测到的启明星形态列表
+        """
+        patterns = []
+
+        # 从trend_period+2开始，需要前两天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 2, len(df)):
+            first_row = df.iloc[i - 2]   # 第一根K线（大阴线）
+            second_row = df.iloc[i - 1]  # 第二根K线（星线）
+            third_row = df.iloc[i]       # 第三根K线（阳线）
+
+            first_opening = first_row['opening']
+            first_closing = first_row['closing']
+            first_lowest = first_row['lowest']
+
+            second_opening = second_row['opening']
+            second_closing = second_row['closing']
+            second_highest = second_row['highest']
+            second_lowest = second_row['lowest']
+
+            third_opening = third_row['opening']
+            third_closing = third_row['closing']
+
+            # 1. 第一根必须是阴线
+            if first_closing >= first_opening:
+                continue
+
+            # 2. 计算第一根阴线的实体长度
+            first_body = first_opening - first_closing
+
+            # 第一根实体应该较大
+            if first_body < 0.01:
+                continue
+
+            # 3. 第二根是小实体星线（可阴可阳）
+            second_body = abs(second_closing - second_opening)
+
+            # 星线实体应该很小，小于第一根实体的30%
+            if second_body > first_body * star_body_ratio:
+                continue
+
+            # 4. 第二根星线与第一根阴线之间有向下跳空
+            # 星线的最高价应该低于第一根阴线的最低价
+            gap_down = first_lowest - second_highest
+            #if gap_down < min_gap:
+            #    continue
+
+            # 5. 第三根必须是阳线
+            if third_closing <= third_opening:
+                continue
+            third_body = abs(third_closing - third_opening)
+
+            # 6. 第三根阳线与第二根星线之间有向上跳空
+            # 第三根的开盘价应该高于星线的最高价
+            gap_up = third_opening - second_highest
+            #if gap_up < min_gap:
+            #    continue
+
+            # 7. 第三根阳线的收盘价应该深入第一根阴线实体内部
+            # 收盘价应该高于第一根阴线的收盘价
+            if third_closing <= first_closing:
+                continue
+
+            # 8. 判断之前存在下降趋势
+            if i >= trend_period + 2:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period - 2:i - trend_period - 2 + half]['closing'].mean()
+                recent_avg = df.iloc[i - half - 2:i - 2]['closing'].mean()
+
+                # 下降趋势：早期平均 > 近期平均
+                if early_avg <= recent_avg:
+                    continue
+
+            # 计算穿透深度
+            penetration = (third_closing - first_closing) / first_body if first_body > 0 else 0
+
+            patterns.append({
+                'date': third_row['date'] if 'date' in third_row else third_row.name,
+                'index': i,
+                'row': third_row,
+                'pattern_type': CandlestickPattern.MORNING_STAR,
+                'price': third_row['lowest'],  # 标记在最低点（底部反转）
+                'start_index': i - 2,  # 形态开始位置
+                'end_index': i,        # 形态结束位置
+                'description': f'实体=1:{first_body:.2f}, 2:{second_body:.2f}, 3:{third_body:.2f}, 'f'穿透比(3-1)={abs(penetration):.1%}, 下跳空(1-2)={abs(gap_down):.2f}, 上跳空(2-3)={abs(gap_up):.2f}, 'f'下跌差价={abs(recent_avg - early_avg):.2f}'
+            })
+
+        return patterns
+
+    @staticmethod
+    def detect_evening_star(df: pd.DataFrame, trend_period: int = 5, star_body_ratio: float = 0.3,
+                           min_gap: float = 0.01) -> List[Dict]:
+        """
+        检测黄昏星形态（Evening Star）
+        顶部反转形态 - 三K线形态
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 之前存在上升趋势 - 前 5 天的前半段收盘价平均值 < 后半段收盘价平均值
+        🗳 第一根K线是大阳线 - 收盘价 > 开盘价，实体较大
+        🗳 第二根K线是小实体星线（可阴可阳） - 实体很小，高于第一根K线
+        🗳 第二根星线与第一根阳线之间有向上跳空 - 形成缺口
+        🗳 第三根K线是阴线 - 开盘价 > 收盘价
+        🗳 第三根阴线与第二根星线之间有向下跳空 - 形成缺口
+        🗳 第三根阴线的收盘价深入第一根阳线实体内部 - 最好超过50%
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            star_body_ratio: 星线实体占第一根K线实体的最大比例，默认0.3（30%）
+            min_gap: 最小跳空缺口，默认0.01
+
+        Returns:
+            检测到的黄昏星形态列表
+        """
+        patterns = []
+
+        # 从trend_period+2开始，需要前两天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 2, len(df)):
+            first_row = df.iloc[i - 2]   # 第一根K线（大阳线）
+            second_row = df.iloc[i - 1]  # 第二根K线（星线）
+            third_row = df.iloc[i]       # 第三根K线（阴线）
+
+            first_opening = first_row['opening']
+            first_closing = first_row['closing']
+            first_highest = first_row['highest']
+
+            second_opening = second_row['opening']
+            second_closing = second_row['closing']
+            second_highest = second_row['highest']
+            second_lowest = second_row['lowest']
+
+            third_opening = third_row['opening']
+            third_closing = third_row['closing']
+
+            # 1. 第一根必须是阳线
+            if first_closing <= first_opening:
+                continue
+
+            # 2. 计算第一根阳线的实体长度
+            first_body = first_closing - first_opening
+
+            # 第一根实体应该较大
+            if first_body < 0.01:
+                continue
+
+            # 3. 第二根是小实体星线（可阴可阳）
+            second_body = abs(second_closing - second_opening)
+
+            # 星线实体应该很小，小于第一根实体的30%
+            if second_body > first_body * star_body_ratio:
+                continue
+
+            # 4. 第二根星线与第一根阳线之间有向上跳空
+            # 星线的最低价应该高于第一根阳线的最高价
+            gap_up = second_lowest - first_highest
+            if gap_up < min_gap:
+                continue
+
+            # 5. 第三根必须是阴线
+            if third_closing >= third_opening:
+                continue
+            third_body = abs(third_closing - third_opening)
+
+            # 6. 第三根阴线与第二根星线之间有向下跳空
+            # 第三根的开盘价应该低于星线的最低价
+            gap_down = second_lowest - third_opening
+            #if gap_down < min_gap:
+            #    continue
+
+            # 7. 第三根阴线的收盘价应该深入第一根阳线实体内部
+            # 收盘价应该低于第一根阳线的收盘价
+            #if third_closing >= first_closing:
+            #    continue
+
+            # 8. 判断之前存在上升趋势
+            if i >= trend_period + 2:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period - 2:i - trend_period - 2 + half]['closing'].mean()
+                recent_avg = df.iloc[i - half - 2:i - 2]['closing'].mean()
+
+                # 上升趋势：早期平均 < 近期平均
+                if early_avg >= recent_avg:
+                    continue
+
+            # 计算穿透深度
+            penetration = (first_closing - third_closing) / first_body if first_body > 0 else 0
+
+            patterns.append({
+                'date': third_row['date'] if 'date' in third_row else third_row.name,
+                'index': i,
+                'row': third_row,
+                'pattern_type': CandlestickPattern.EVENING_STAR,
+                'price': third_row['highest'],  # 标记在最高点（顶部反转）
+                'start_index': i - 2,  # 形态开始位置
+                'end_index': i,        # 形态结束位置
+                'description': f'实体=1:{first_body:.2f}, 2:{second_body:.2f}, 3:{third_body:.2f}, 'f'穿透比(3-1)={abs(penetration):.1%}, 上跳空(1-2)={abs(gap_up):.2f}, 下跳空(2-3)={abs(gap_down):.2f}, 'f'下跌差价={abs(recent_avg - early_avg):.2f}'
+
+            })
         return patterns
 
     @staticmethod
@@ -552,6 +772,12 @@ class CandlestickPatternDetector:
         # 检测乌云盖顶（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_dark_cloud_cover(df))
 
+        # 三K线形态
+        # 检测启明星（底部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_morning_star(df))
+
+        # 检测黄昏星（顶部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_evening_star(df))
 
 
         # 按日期排序
@@ -622,10 +848,10 @@ class CandlestickPatternDetector:
                     "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
                     "第 1 根是阳线 -> 收盘价 &gt; 开盘价",
                     "第 2 根是阴线 -> 开盘价 &gt; 收盘价",
-                    "第 2 根实体完全吞没第 1 根实体",
+                    "第 2 根阴线实体完全吞没第 1 根阳线实体",
                     "第 2 根阴线开盘价高于第 1 根阳线收盘价 -> 第 2 根开盘价 &gt;= 第 1 根收盘价",
                     "第 2 根阴线收盘价低于第 1 根阳线开盘价 -> 第 2 根收盘价 &lt;= 第 1 根开盘价",
-                    "第 2 根实体明显大于第 1 根 -> 第 2 根实体 &gt;= 第 1 根实体 * 1.0"
+                    "第 2 根阴线实体明显大于第 1 根阳线实体 -> 第 2 根实体 &gt;= 第 1 根实体 * 1.0"
                 ],
                 'color_class': 'sync-card-purple'
             },
@@ -637,7 +863,7 @@ class CandlestickPatternDetector:
                     "之前存在下降趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)",
                     "第 1 根是阴线 -> 开盘价 &gt; 收盘价",
                     "第 2 根是阳线 -> 收盘价 &gt; 开盘价",
-                    "第 2 根开盘价低于第 1 根最低价, 形成向下跳空 ",
+                    "第 2 根阳线开盘价低于第 1 根阴线最低价, 形成向下跳空 ",
                     "第 2 根阳线收盘价深入第 1 根阴线实体, 高于第 1 根阴线实体中点 -> (第 2 根收盘价 - 第 1 根收盘价) / 第 1 根实体 &gt;= 50%",
                     "第 2 根阳线收盘价低于第 1 根阴线开盘价,未完全吞没 -> 第 2 根阳线收盘价 < 第 1 根阴线开盘价"
                 ],
@@ -651,11 +877,41 @@ class CandlestickPatternDetector:
                     "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
                     "第 1 根是阳线 -> 收盘价 &gt; 开盘价",
                     "第 2 根是阴线 -> 开盘价 &gt; 收盘价",
-                    "第 2 根开盘价高于第 1 根最高价, 形成向上跳空 ",
+                    "第 2 根阴线开盘价高于第 1 根阳线最高价, 形成向上跳空 ",
                     "第 2 根阴线收盘价深入第 1 根阳线实体, 低于第 1 根阳线实体中点 -> (第 1 根收盘价 - 第 2 根收盘价) / 第 1 根实体 &gt;= 50%",
                     "第 2 根阴线收盘价高于第 1 根阳线开盘价,未完全吞没 -> 第 2 根阳线收盘价 > 第 1 根阴线开盘价"
                 ],
                 'color_class': 'sync-card-orange'
             },
+            {
+                'pattern_type': CandlestickPattern.MORNING_STAR,
+                'category': '三K线 - 底部反转',
+                'signal': "看涨",
+                'criteria': [
+                    "之前存在下降趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是大阴线, 实体较大 -> 开盘价 &gt; 收盘价",
+                    "第 1 根是小实体星线(可阴可阳), 实体很小 -> &lt; 第 1 根实体 * 30%",
+                    "第 3 根是阳线 -> 收盘价 &gt; 开盘价",
+                    "第 2 根星线与第 1 根阴线之间有向下跳空 -> 第 2 根星线最高价 &lt; 第 1 根阴线最低价",
+                    "第 3 根阳线与第 2 根星线之间有向上跳空 -> 第 3 根阳线开盘价 &gt; 第 2 根星线最高价",
+                    "第 3 根阳线收盘价深入第 1 根阴线实体 -> 第 3 根阳线收盘价 &gt; 第 1 根阴线收盘价"
+                ],
+                'color_class': 'sync-card-green'
+            },
+            {
+                'pattern_type': CandlestickPattern.EVENING_STAR,
+                'category': '三K线 - 顶部反转',
+                'signal': "看跌",
+                'criteria': [
+                    "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是大阳线, 实体较大 -> 收盘价 &gt; 开盘价",
+                    "第 2 根是小实体星线(可阴可阳), 实体很小 -> &lt; 第 1 根实体 * 30%",
+                    "第 3 根是阴线 -> 开盘价 &gt; 收盘价",
+                    "第 2 根星线与第 1 根阳线之间有向上跳空 -> 第 2 根星线最低价 &gt; 第 1 根阳线最高价",
+                    "第 3 根阴线与第 2 根星线之间有向下跳空 -> 第 3 根阴线开盘价 &lt;  第 2 根星线最低价",
+                    "第 3 根阴线收盘价深入第 1 根阳线实体 -> 第 3 根阴线收盘价 &lt; 第 1 根阳线收盘价"
+                ],
+                'color_class': 'sync-card-purple'
+            }
 
         ]

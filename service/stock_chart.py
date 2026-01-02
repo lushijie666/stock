@@ -117,7 +117,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
     pattern_markers = []
     for pattern in candlestick_patterns:
         pattern_type = pattern['pattern_type']
-        pattern_markers.append({
+        marker_data = {
             'date': format_date_by_type(pattern['date'], t),
             'value': pattern['price'],
             'type': pattern_type.code,
@@ -126,7 +126,13 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             'color': pattern_type.color,
             'offset': pattern_type.offset,
             'description': pattern['description']
-        })
+        }
+        # 如果是三K线形态，添加起始和结束索引（用于绘制虚线框）
+        if 'start_index' in pattern and 'end_index' in pattern:
+            marker_data['start_index'] = pattern['start_index']
+            marker_data['end_index'] = pattern['end_index']
+
+        pattern_markers.append(marker_data)
 
     # 创建K线图
     st.markdown("""
