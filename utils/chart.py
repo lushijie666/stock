@@ -383,6 +383,7 @@ class ChartBuilder:
             # 按形态类型分组
             pattern_groups = {}
             box_patterns = []
+            arrow_lines = []  # 收集所有需要绘制箭头的形态
 
             for pattern in candlestick_patterns:
                 pattern_type = pattern.get('type')
@@ -397,6 +398,14 @@ class ChartBuilder:
                 pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
                 if 'start_index' in pattern and 'end_index' in pattern:
                     box_patterns.append(pattern)
+
+                # 收集需要绘制箭头的形态（所有形态）
+                arrow_lines.append({
+                    'date': pattern['date'],
+                    'value': pattern['value'],
+                    'offset': pattern.get('offset', 0),
+                    'color': pattern.get('color', '#000000')
+                })
 
             # 创建枚举顺序映射
             enum_order = {enum.value: i for i, enum in enumerate(CandlestickPattern)}
@@ -424,6 +433,34 @@ class ChartBuilder:
                         )
                     )
                     kline = kline.overlap(scatter)
+
+            # 为每个形态添加指向箭头线
+            if arrow_lines:
+                for arrow_data in arrow_lines:
+                    arrow_line = Line()
+                    date = arrow_data['date']
+                    k_value = arrow_data['value']  # K线的价格点
+                    icon_value = k_value + arrow_data['offset']  # 图标的位置
+                    color = arrow_data['color']
+
+                    # 绘制从K线到图标的箭头线
+                    # 线的两个端点：K线价格点 -> 图标位置
+                    arrow_line.add_xaxis([date, date])
+                    arrow_line.add_yaxis(
+                        series_name="",  # 不显示图例
+                        y_axis=[k_value, icon_value],
+                        is_symbol_show=False,  # 不显示数据点
+                        is_smooth=False,
+                        linestyle_opts=opts.LineStyleOpts(
+                            type_='solid',  # 实线
+                            width=1.5,
+                            color=color,
+                            opacity=0.5
+                        ),
+                        areastyle_opts=opts.AreaStyleOpts(opacity=0),  # 不填充区域
+                        label_opts=opts.LabelOpts(is_show=False)
+                    )
+                    kline = kline.overlap(arrow_line)
 
             # 虚线框标记
             if box_patterns:
