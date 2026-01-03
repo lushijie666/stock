@@ -440,22 +440,34 @@ class ChartBuilder:
                     arrow_line = Line()
                     date = arrow_data['date']
                     k_value = arrow_data['value']  # K线的价格点
-                    icon_value = k_value + arrow_data['offset']  # 图标的位置
+                    offset = arrow_data['offset']
+                    icon_value = k_value + offset  # 图标的位置
                     color = arrow_data['color']
 
-                    # 绘制从K线到图标的箭头线
-                    # 线的两个端点：K线价格点 -> 图标位置
+                    # 计算箭头线的起点，留出间隙避免与K线价格标签重叠
+                    # 根据偏移方向决定间隙大小
+                    gap_ratio = 0.3  # 间隙占总偏移量的比例
+                    if offset > 0:  # 向上偏移（顶部形态）
+                        # 箭头线从K线上方一点开始，向上延伸到图标
+                        arrow_start = k_value + abs(offset) * gap_ratio
+                        arrow_end = icon_value
+                    else:  # 向下偏移（底部形态）
+                        # 箭头线从K线下方一点开始，向下延伸到图标
+                        arrow_start = k_value - abs(offset) * gap_ratio
+                        arrow_end = icon_value
+
+                    # 绘制指向箭头线，不完全到达K线价格点
                     arrow_line.add_xaxis([date, date])
                     arrow_line.add_yaxis(
                         series_name="",  # 不显示图例
-                        y_axis=[k_value, icon_value],
+                        y_axis=[arrow_start, arrow_end],
                         is_symbol_show=False,  # 不显示数据点
                         is_smooth=False,
                         linestyle_opts=opts.LineStyleOpts(
-                            type_='solid',  # 实线
+                            type_='dashed',  # 改为虚线，更轻量
                             width=1.5,
                             color=color,
-                            opacity=0.5
+                            opacity=0.4  # 降低透明度，更轻量
                         ),
                         areastyle_opts=opts.AreaStyleOpts(opacity=0),  # 不填充区域
                         label_opts=opts.LabelOpts(is_show=False)
