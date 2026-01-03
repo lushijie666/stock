@@ -464,10 +464,10 @@ class ChartBuilder:
                         is_symbol_show=False,  # 不显示数据点
                         is_smooth=False,
                         linestyle_opts=opts.LineStyleOpts(
-                            type_='dashed',  # 改为虚线，更轻量
-                            width=1.5,
+                            type_='dashed',  # 虚线样式
+                            width=1,  # 细线，更轻量
                             color=color,
-                            opacity=0.4  # 降低透明度，更轻量
+                            opacity=0.25  # 更低的透明度，不影响K线展示
                         ),
                         areastyle_opts=opts.AreaStyleOpts(opacity=0),  # 不填充区域
                         label_opts=opts.LabelOpts(is_show=False)
@@ -524,9 +524,9 @@ class ChartBuilder:
                             is_smooth=False,
                             linestyle_opts=opts.LineStyleOpts(
                                 type_='dashed',  # 虚线
-                                width=2,
+                                width=1.5,  # 稍细的线条
                                 color=pattern.get('color', '#888888'),
-                                opacity=0.6
+                                opacity=0.3  # 更低的透明度，不影响K线展示
                             ),
                             label_opts=opts.LabelOpts(is_show=False)
                         )

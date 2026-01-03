@@ -591,8 +591,8 @@ class CandlestickPatternDetector:
             # 4. 第二根星线与第一根阴线之间有向下跳空
             # 星线的最高价应该低于第一根阴线的最低价
             gap_down = first_lowest - second_highest
-            #if gap_down < min_gap:
-            #    continue
+            if gap_down < min_gap:
+                continue
 
             # 5. 第三根必须是阳线
             if third_closing <= third_opening:
@@ -602,8 +602,8 @@ class CandlestickPatternDetector:
             # 6. 第三根阳线与第二根星线之间有向上跳空
             # 第三根的开盘价应该高于星线的最高价
             gap_up = third_opening - second_highest
-            #if gap_up < min_gap:
-            #    continue
+            if gap_up < min_gap:
+                continue
 
             # 7. 第三根阳线的收盘价应该深入第一根阴线实体内部
             # 收盘价应该高于第一根阴线的收盘价
@@ -713,13 +713,13 @@ class CandlestickPatternDetector:
             # 6. 第三根阴线与第二根星线之间有向下跳空
             # 第三根的开盘价应该低于星线的最低价
             gap_down = second_lowest - third_opening
-            #if gap_down < min_gap:
-            #    continue
+            if gap_down < min_gap:
+                continue
 
             # 7. 第三根阴线的收盘价应该深入第一根阳线实体内部
             # 收盘价应该低于第一根阳线的收盘价
-            #if third_closing >= first_closing:
-            #    continue
+            if third_closing >= first_closing:
+                continue
 
             # 8. 判断之前存在上升趋势
             if i >= trend_period + 2:
@@ -786,7 +786,6 @@ class CandlestickPatternDetector:
 
         # 检测黄昏星（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_evening_star(df))
-
 
         # 按日期排序
         all_patterns.sort(key=lambda x: x['index'])
