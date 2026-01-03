@@ -382,7 +382,7 @@ class ChartBuilder:
         if candlestick_patterns:
             # 按形态类型分组
             pattern_groups = {}
-            three_kline_patterns = []  # 收集三K线形态，用于绘制虚线框
+            box_patterns = []
 
             for pattern in candlestick_patterns:
                 pattern_type = pattern.get('type')
@@ -395,10 +395,8 @@ class ChartBuilder:
                         'offset': pattern.get('offset', 0)
                     }
                 pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
-
-                # 收集三K线形态（有start_index和end_index的形态）
                 if 'start_index' in pattern and 'end_index' in pattern:
-                    three_kline_patterns.append(pattern)
+                    box_patterns.append(pattern)
 
             # 创建枚举顺序映射
             enum_order = {enum.value: i for i, enum in enumerate(CandlestickPattern)}
@@ -427,16 +425,15 @@ class ChartBuilder:
                     )
                     kline = kline.overlap(scatter)
 
-            # 为三K线形态添加虚线框标记
-            if three_kline_patterns:
+            # 虚线框标记
+            if box_patterns:
                 # 为每个三K线形态绘制矩形框
-                for pattern in three_kline_patterns:
+                for pattern in box_patterns:
                     start_idx = pattern.get('start_index')
                     end_idx = pattern.get('end_index')
 
                     # 确保索引在有效范围内
                     if start_idx < len(dates) and end_idx < len(dates):
-                        # 获取形态涵盖的三根K线的日期范围
                         start_date = dates[start_idx]
                         end_date = dates[end_idx]
 

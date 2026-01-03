@@ -252,7 +252,9 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.BULLISH_ENGULFING,
                 'price': curr_row['lowest'],  # 标记在最低点（底部反转）
-                'description': f'实体=1:{prev_body:.2f}, 2:{curr_body:.2f}, 'f'吞没比(2-1)={abs(engulfing_ratio):.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
+                'start_index': i - 1,  # 双K线形态开始位置（第一根K线）
+                'end_index': i,        # 双K线形态结束位置（第二根K线）
+                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, 'f'吞没比(2-1)={abs(engulfing_ratio):.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
             })
 
         return patterns
@@ -332,7 +334,9 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.BEARISH_ENGULFING,
                 'price': curr_row['highest'],  # 标记在最高点（顶部反转）
-                'description': f'实体=1:{prev_body:.2f},2:{curr_body:.2f}, 'f'吞没比(2-1)={abs(engulfing_ratio):.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
+                'start_index': i - 1,  # 双K线形态开始位置（第一根K线）
+                'end_index': i,        # 双K线形态结束位置（第二根K线）
+                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, 'f'吞没比(2-1)={abs(engulfing_ratio):.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
             })
 
         return patterns
@@ -423,7 +427,9 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.DARK_CLOUD_COVER,
                 'price': curr_row['highest'],  # 标记在最高点（顶部反转）
-                'description': f'实体=1:{prev_body:.2f}, 2: {curr_body:.2f}, 'f'穿透比(2-1)={abs(penetration):.1%}, 跳空(1-2)={abs(gap):.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
+                'start_index': i - 1,  # 双K线形态开始位置（第一根K线）
+                'end_index': i,        # 双K线形态结束位置（第二根K线）
+                'description': f'实体=1:{prev_body:.2f} → 2: {curr_body:.2f}, 'f'穿透比(2-1)={abs(penetration):.1%}, 跳空(1-2)={abs(gap):.2f}, 上涨差价={abs(recent_avg - early_avg):.2f}'
 
             })
 
@@ -514,7 +520,9 @@ class CandlestickPatternDetector:
                 'row': curr_row,
                 'pattern_type': CandlestickPattern.PIERCING_PATTERN,
                 'price': curr_row['lowest'],  # 标记在最低点（底部反转）
-                'description': f'实体=1:{prev_body:.2f}, 2:{curr_body:.2f}, 'f'穿透比(2-1)={abs(penetration):.1%}, 跳空(1-2)={abs(gap):.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
+                'start_index': i - 1,  # 双K线形态开始位置（第一根K线）
+                'end_index': i,        # 双K线形态结束位置（第二根K线）
+                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, 'f'穿透比(2-1)={abs(penetration):.1%}, 跳空(1-2)={abs(gap):.2f}, 下跌差价={abs(recent_avg - early_avg):.2f}'
             })
 
         return patterns
@@ -623,7 +631,7 @@ class CandlestickPatternDetector:
                 'price': third_row['lowest'],  # 标记在最低点（底部反转）
                 'start_index': i - 2,  # 形态开始位置
                 'end_index': i,        # 形态结束位置
-                'description': f'实体=1:{first_body:.2f}, 2:{second_body:.2f}, 3:{third_body:.2f}, 'f'穿透比(3-1)={abs(penetration):.1%}, 下跳空(1-2)={abs(gap_down):.2f}, 上跳空(2-3)={abs(gap_up):.2f}, 'f'下跌差价={abs(recent_avg - early_avg):.2f}'
+                'description': f'实体=1:{first_body:.2f} → 2:{second_body:.2f} → 3:{third_body:.2f}, 'f'穿透比(3-1)={abs(penetration):.1%}, 下跳空(1-2)={abs(gap_down):.2f}, 上跳空(2-3)={abs(gap_up):.2f}, 'f'下跌差价={abs(recent_avg - early_avg):.2f}'
             })
 
         return patterns
@@ -734,7 +742,7 @@ class CandlestickPatternDetector:
                 'price': third_row['highest'],  # 标记在最高点（顶部反转）
                 'start_index': i - 2,  # 形态开始位置
                 'end_index': i,        # 形态结束位置
-                'description': f'实体=1:{first_body:.2f}, 2:{second_body:.2f}, 3:{third_body:.2f}, 'f'穿透比(3-1)={abs(penetration):.1%}, 上跳空(1-2)={abs(gap_up):.2f}, 下跳空(2-3)={abs(gap_down):.2f}, 'f'下跌差价={abs(recent_avg - early_avg):.2f}'
+                'description': f'实体=1:{first_body:.2f} → 2:{second_body:.2f} → 3:{third_body:.2f}, 'f'穿透比(3-1)={abs(penetration):.1%}, 上跳空(1-2)={abs(gap_up):.2f}, 下跳空(2-3)={abs(gap_down):.2f}, 'f'下跌差价={abs(recent_avg - early_avg):.2f}'
 
             })
         return patterns

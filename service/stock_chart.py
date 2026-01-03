@@ -127,7 +127,6 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             'offset': pattern_type.offset,
             'description': pattern['description']
         }
-        # 如果是三K线形态，添加起始和结束索引（用于绘制虚线框）
         if 'start_index' in pattern and 'end_index' in pattern:
             marker_data['start_index'] = pattern['start_index']
             marker_data['end_index'] = pattern['end_index']
@@ -167,14 +166,49 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
         pattern_table_data = []
         pattern_counts = {}
         for pattern in candlestick_patterns:
+            # 构建日期字符串（包含所有涉及的K线日期）
+            if 'start_index' in pattern and 'end_index' in pattern:
+                start_idx = pattern['start_index']
+                end_idx = pattern['end_index']
+                pattern_dates = []
+                pattern_opens = []
+                pattern_closes = []
+                pattern_lows = []
+                pattern_highs = []
+                pattern_changes = []
+                # 获取形态涉及的所有日期
+                pattern_dates = []
+                for idx in range(start_idx, end_idx + 1):
+                    if idx < len(df):
+                        date_str = format_date_by_type(df.iloc[idx]['date'], t)
+                        pattern_dates.append(date_str)
+                        pattern_opens.append(f"{df.iloc[idx]['opening']:.2f}")
+                        pattern_closes.append(f"{df.iloc[idx]['closing']:.2f}")
+                        pattern_lows.append(f"{df.iloc[idx]['lowest']:.2f}")
+                        pattern_highs.append(f"{df.iloc[idx]['highest']:.2f}")
+                        pattern_changes.append(f"{df.iloc[idx]['change_amount']:.2f}")
+                date_display = ' → '.join(pattern_dates)
+                open_display = ' → '.join(pattern_opens)
+                close_display = ' → '.join(pattern_closes)
+                low_display = ' → '.join(pattern_lows)
+                high_display = ' → '.join(pattern_highs)
+                change_display = ' → '.join(pattern_changes)
+            else:
+                # 单K线形态，只显示一个日期
+                date_display = format_date_by_type(pattern['date'], t)
+                open_display = f"{pattern['row']['opening']:.2f}"
+                close_display = f"{pattern['row']['closing']:.2f}"
+                low_display = f"{pattern['row']['lowest']:.2f}"
+                high_display = f"{pattern['row']['highest']:.2f}"
+                change_display = f"{pattern['row']['change_amount']:.2f}"
             pattern_table_data.append({
-                '日期': format_date_by_type(pattern['date'],t ),
+                '日期': date_display,
                 '形态': f"{pattern['pattern_type'].icon} {pattern['pattern_type'].text}",
-                '开盘价': f"{pattern['row']['opening']:.2f}",
-                '收盘价': f"{pattern['row']['closing']:.2f}",
-                '最低价': f"{pattern['row']['lowest']:.2f}",
-                '最高价': f"{pattern['row']['highest']:.2f}",
-                '涨跌额': f"{pattern['row']['change_amount']:.2f}",
+                '开盘价': open_display,
+                '收盘价': close_display,
+                '最低价': low_display,
+                '最高价': high_display,
+                '涨跌额': change_display,
                 '说明': pattern['description']
             })
             pattern_type = pattern['pattern_type']
