@@ -2010,6 +2010,22 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
     border-top: 3px solid #8b5cf6;
 }
 
+.sync-button-card.sync-card-red {
+    border-top: 3px solid #ef4444;
+}
+
+.sync-button-card.sync-card-pink {
+    border-top: 3px solid #ec4899;
+}
+
+.sync-button-card.sync-card-indigo {
+    border-top: 3px solid #6366f1;
+}
+
+.sync-button-card.sync-card-cyan {
+    border-top: 3px solid #06b6d4;
+}
+
 .sync-card-icon {
     width: 60px;
     height: 60px;
@@ -2034,6 +2050,22 @@ div:has(.scheduler-toggle-card) + div [data-testid="stToggle"] {
 
 .sync-card-icon.sync-card-purple {
     background: linear-gradient(135deg, #8b5cf615, #8b5cf608);
+}
+
+.sync-card-icon.sync-card-red {
+    background: linear-gradient(135deg, #ef444415, #ef444408);
+}
+
+.sync-card-icon.sync-card-pink {
+    background: linear-gradient(135deg, #ec489915, #ec489908);
+}
+
+.sync-card-icon.sync-card-indigo {
+    background: linear-gradient(135deg, #6366f115, #6366f108);
+}
+
+.sync-card-icon.sync-card-cyan {
+    background: linear-gradient(135deg, #06b6d415, #06b6d408);
 }
 
 .sync-icon-large {

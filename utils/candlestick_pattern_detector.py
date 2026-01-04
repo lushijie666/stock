@@ -77,7 +77,7 @@ class CandlestickPatternDetector:
                 'row': row.to_dict(),
                 'pattern_type': CandlestickPattern.HAMMER,
                 'price': lowest,
-                'description': f'下影线/实体比={lower_shadow/body:.2f}, 收盘位置={close_position:.1%}, 下跌差价={abs(recent_avg-early_avg):.2f}'
+                'description': f'实体={body:.2f}, 'f'下影线/实体比={lower_shadow/body:.2f}, 收盘位置={close_position:.1%}, 下跌差价={abs(recent_avg-early_avg):.2f}'
             })
         return patterns
 
@@ -171,7 +171,7 @@ class CandlestickPatternDetector:
                 'row': row.to_dict(),
                 'pattern_type': CandlestickPattern.HANGING_MAN,
                 'price': highest,  # 标记在最高点，因为是顶部反转信号
-                'description': f'下影线/实体比={lower_shadow/body:.2f}, 收盘位置={close_position:.1%}, 上涨差价={abs(recent_avg-early_avg):.2f}'
+                'description': f'实体={body:.2f}, 'f'下影线/实体比={lower_shadow/body:.2f}, 收盘位置={close_position:.1%}, 上涨差价={abs(recent_avg-early_avg):.2f}'
             })
 
         return patterns
@@ -182,7 +182,6 @@ class CandlestickPatternDetector:
         检测倒锤子线形态（Inverted Hammer）
         底部反转形态（看涨信号）
 
-        核心特征（参考《日本蜡烛图技术》）：
         🗳 之前存在下降趋势 - 前 5 天的前半段(5/2天的收盘价平均值) < 后半段(5 - 5/2天的收盘价平均值)
         🗳 可以是阳线或阴线, 实体较小 - 实体长度(收盘价 - 开盘价绝对值) > 0.01
         🗳 上影线长度至少是实体的2倍 - 上影线长度 >= 实体长度 * 2.0
@@ -260,7 +259,7 @@ class CandlestickPatternDetector:
                 'row': row.to_dict(),
                 'pattern_type': CandlestickPattern.INVERTED_HAMMER,
                 'price': highest,  # 标记在最高点（上影线顶部）
-                'description': f'上影线/实体比={upper_shadow/body:.2f}, 收盘位置={close_position:.1%}, 下跌差价={abs(recent_avg-early_avg):.2f}'
+                'description': f'实体={body:.2f}, 'f'上影线/实体比={upper_shadow/body:.2f}, 收盘位置={close_position:.1%}, 下跌差价={abs(recent_avg-early_avg):.2f}'
             })
 
         return patterns
@@ -358,7 +357,7 @@ class CandlestickPatternDetector:
                 'row': row.to_dict(),
                 'pattern_type': CandlestickPattern.SHOOTING_STAR,
                 'price': highest,  # 标记在最高点（顶部反转信号）
-                'description': f'上影线/实体比={upper_shadow/body:.2f}, 收盘位置={close_position:.1%}, 上涨差价={abs(recent_avg-early_avg):.2f}'
+                'description': f'实体={body:.2f}, 'f'上影线/实体比={upper_shadow/body:.2f}, 收盘位置={close_position:.1%}, 上涨差价={abs(recent_avg-early_avg):.2f}'
             })
 
         return patterns
@@ -1036,7 +1035,7 @@ class CandlestickPatternDetector:
                     "下影线很短或没有 -> 下影线长度 &lt;= 实体长度 * 0.3",
                     "收盘价位于最低价或接近最低价 -> (最高价 - 收盘价) / (最高价 - 最低价) &gt;= 0.6"
                 ],
-                'color_class': 'sync-card-gold'
+                'color_class': 'sync-card-pink'
             },
             {
                 'pattern_type': CandlestickPattern.SHOOTING_STAR,
@@ -1050,7 +1049,7 @@ class CandlestickPatternDetector:
                     "下影线很短或没有 -> 下影线长度 &lt;= 实体长度 * 0.3",
                     "收盘价位于最低价或接近最低价 -> (最高价 - 收盘价) / (最高价 - 最低价) &gt;= 0.6"
                 ],
-                'color_class': 'sync-card-red'
+                'color_class': 'sync-card-cyan'
             },
             {
                 'pattern_type': CandlestickPattern.BULLISH_ENGULFING,
