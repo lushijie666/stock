@@ -206,17 +206,9 @@ def handle_row_click(selected_rows):
     :param selected_rows: 选中的行数据
     """
     if selected_rows:
-        # 获取选中的第一行数据
         selected_row = selected_rows[0]
-        try:
-            with get_db_session() as session:
-                stock = session.query(Stock).filter(Stock.code == selected_row['code']).first()
-                if stock:
-                    show_detail_dialog(stock)
-                else:
-                    st.error(f"未找到股票代码为 {selected_row['code']} 的股票信息")
-        except Exception as e:
-            st.error(f"加载股票信息失败：{str(e)}")
+        show_detail_dialog(selected_row['code'])
+
 
 def reload(category: Category, t: StockHistoryType, ignore_message: bool = False):
     # 获取选择的日期范围

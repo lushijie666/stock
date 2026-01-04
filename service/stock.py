@@ -245,12 +245,12 @@ def show_follow_chart():
                                     st.markdown(card_html, unsafe_allow_html=True)
                                     if st.button("股票图表", key=f"chart_{stock_item.code}", type="secondary",
                                                  use_container_width=True):
-                                        st.session_state['show_chart_dialog'] = stock_item
+                                        st.session_state['show_stock_chart_dialog'] = stock_item.code
                                         st.rerun()
         if 'show_chart_dialog' in st.session_state:
-            show_detail_dialog(st.session_state['show_chart_dialog'])
+            show_detail_dialog(st.session_state['show_stock_chart_dialog'])
             if 'show_chart_dialog' in st.session_state:
-                del st.session_state['show_chart_dialog']
+                del st.session_state['show_stock_chart_dialog']
     except Exception as e:
         st.error(f"加载关注股票数据失败：{str(e)}")
 

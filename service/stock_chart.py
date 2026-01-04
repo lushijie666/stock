@@ -7,6 +7,7 @@ import streamlit_echarts
 
 from enums.candlestick_pattern import CandlestickPattern
 from enums.strategy import StrategyType, FusionStrategyModel
+from models.stock import Stock
 from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
 from enums.patterns import Patterns
@@ -27,8 +28,13 @@ KEY_PREFIX = "stock_chart"
 
 
 @st.dialog("股票图表", width="large")
-def show_detail_dialog(stock):
-    show_detail(stock)
+def show_detail_dialog(stock_code):
+    with get_db_session() as session:
+        stock = session.query(Stock).filter(Stock.code == stock_code).first()
+        if stock:
+            show_detail(stock)
+        else:
+            st.error(f"未找到股票代码为 {stock_code} 的股票信息")
 
 def show_detail(stock):
     t = st.radio(
