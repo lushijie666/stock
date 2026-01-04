@@ -714,6 +714,182 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
+    def detect_bullish_harami(df: pd.DataFrame, trend_period: int = 5, max_body_ratio: float = 0.8) -> List[Dict]:
+        """
+        检测看涨孕线形态（Bullish Harami）
+        底部反转形态 - 双K线形态
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 之前存在下降趋势 - 前 5 天的前半段收盘价平均值 > 后半段收盘价平均值
+        🗳 第一根K线是大阴线 - 开盘价 > 收盘价，实体较大
+        🗳 第二根K线是小阳线（也可以是小阴线） - 实体较小
+        🗳 第二根K线的实体完全被第一根K线的实体包含（孕育关系）
+        🗳 第二根K线的开盘价 >= 第一根阴线的收盘价（下方）
+        🗳 第二根K线的收盘价 <= 第一根阴线的开盘价（上方）
+        🗳 第二根K线实体应该明显小于第一根（通常小于80%）
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            max_body_ratio: 第二根K线实体与第一根的最大比例，默认0.8（80%）
+
+        Returns:
+            检测到的看涨孕线形态列表
+        """
+        patterns = []
+
+        # 从trend_period+1开始，需要前一天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 1, len(df)):
+            prev_row = df.iloc[i - 1]  # 第一根K线（母线，大阴线）
+            curr_row = df.iloc[i]       # 第二根K线（子线，小K线）
+
+            prev_opening = prev_row['opening']
+            prev_closing = prev_row['closing']
+            curr_opening = curr_row['opening']
+            curr_closing = curr_row['closing']
+
+            # 1. 判断第一根是阴线
+            if not (prev_closing < prev_opening):
+                continue
+
+            # 2. 计算实体长度
+            prev_body = abs(prev_closing - prev_opening)
+            curr_body = abs(curr_closing - curr_opening)
+
+            # 第一根实体应该较大
+            if prev_body < 0.01:
+                continue
+
+            # 3. 第二根K线实体应该明显小于第一根（孕育关系的关键）
+            if curr_body >= prev_body * max_body_ratio:
+                continue
+
+            # 4. 判断孕育关系：第二根K线的实体完全被第一根K线的实体包含
+            # 对于阴线母线（开盘价 > 收盘价）：
+            # - 第二根的最高价（开盘或收盘的较大值） <= 第一根的开盘价（阴线上端）
+            # - 第二根的最低价（开盘或收盘的较小值） >= 第一根的收盘价（阴线下端）
+            curr_high_body = max(curr_opening, curr_closing)
+            curr_low_body = min(curr_opening, curr_closing)
+
+            # 第二根K线必须完全在第一根阴线实体内部
+            if not (curr_low_body >= prev_closing and curr_high_body <= prev_opening):
+                continue
+
+            # 5. 判断之前存在下降趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
+
+                # 下降趋势：早期平均 > 近期平均
+                if early_avg <= recent_avg:
+                    continue
+
+            # 计算孕育比例（第二根实体占第一根实体的比例）
+            harami_ratio = curr_body / prev_body if prev_body > 0 else 0
+
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.BULLISH_HARAMI,
+                'price': curr_row['lowest'],  # 标记在最低点（底部反转）
+                'start_index': i - 1,  # 双K线形态开始位置（第一根K线）
+                'end_index': i,        # 双K线形态结束位置（第二根K线）
+                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, 孕育比(2/1)={harami_ratio:.1%}, 下跌差价={abs(recent_avg - early_avg):.2f}'
+            })
+
+        return patterns
+
+    @staticmethod
+    def detect_bearish_harami(df: pd.DataFrame, trend_period: int = 5, max_body_ratio: float = 0.8) -> List[Dict]:
+        """
+        检测看跌孕线形态（Bearish Harami）
+        顶部反转形态 - 双K线形态
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 之前存在上升趋势 - 前 5 天的前半段收盘价平均值 < 后半段收盘价平均值
+        🗳 第一根K线是大阳线 - 收盘价 > 开盘价，实体较大
+        🗳 第二根K线是小阴线（也可以是小阳线） - 实体较小
+        🗳 第二根K线的实体完全被第一根K线的实体包含（孕育关系）
+        🗳 第二根K线的开盘价 <= 第一根阳线的收盘价（上方）
+        🗳 第二根K线的收盘价 >= 第一根阳线的开盘价（下方）
+        🗳 第二根K线实体应该明显小于第一根（通常小于80%）
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            max_body_ratio: 第二根K线实体与第一根的最大比例，默认0.8（80%）
+
+        Returns:
+            检测到的看跌孕线形态列表
+        """
+        patterns = []
+
+        # 从trend_period+1开始，需要前一天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 1, len(df)):
+            prev_row = df.iloc[i - 1]  # 第一根K线（母线，大阳线）
+            curr_row = df.iloc[i]       # 第二根K线（子线，小K线）
+
+            prev_opening = prev_row['opening']
+            prev_closing = prev_row['closing']
+            curr_opening = curr_row['opening']
+            curr_closing = curr_row['closing']
+
+            # 1. 判断第一根是阳线
+            if not (prev_closing > prev_opening):
+                continue
+
+            # 2. 计算实体长度
+            prev_body = abs(prev_closing - prev_opening)
+            curr_body = abs(curr_closing - curr_opening)
+
+            # 第一根实体应该较大
+            if prev_body < 0.01:
+                continue
+
+            # 3. 第二根K线实体应该明显小于第一根（孕育关系的关键）
+            if curr_body >= prev_body * max_body_ratio:
+                continue
+
+            # 4. 判断孕育关系：第二根K线的实体完全被第一根K线的实体包含
+            # 对于阳线母线（收盘价 > 开盘价）：
+            # - 第二根的最高价（开盘或收盘的较大值） <= 第一根的收盘价（阳线上端）
+            # - 第二根的最低价（开盘或收盘的较小值） >= 第一根的开盘价（阳线下端）
+            curr_high_body = max(curr_opening, curr_closing)
+            curr_low_body = min(curr_opening, curr_closing)
+
+            # 第二根K线必须完全在第一根阳线实体内部
+            if not (curr_low_body >= prev_opening and curr_high_body <= prev_closing):
+                continue
+
+            # 5. 判断之前存在上升趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
+
+                # 上升趋势：早期平均 < 近期平均
+                if early_avg >= recent_avg:
+                    continue
+
+            # 计算孕育比例（第二根实体占第一根实体的比例）
+            harami_ratio = curr_body / prev_body if prev_body > 0 else 0
+
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.BEARISH_HARAMI,
+                'price': curr_row['highest'],  # 标记在最高点（顶部反转）
+                'start_index': i - 1,  # 双K线形态开始位置（第一根K线）
+                'end_index': i,        # 双K线形态结束位置（第二根K线）
+                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, 孕育比(2/1)={harami_ratio:.1%}, 上涨差价={abs(recent_avg - early_avg):.2f}'
+            })
+
+        return patterns
+
+    @staticmethod
     def detect_morning_star(df: pd.DataFrame, trend_period: int = 5, star_body_ratio: float = 0.3, min_gap: float = 0.01) -> List[Dict]:
         """
         检测启明星形态（Morning Star）
@@ -934,6 +1110,232 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
+    def detect_three_white_soldiers(df: pd.DataFrame, trend_period: int = 5, min_body_ratio: float = 0.01,
+                                    max_shadow_ratio: float = 0.3) -> List[Dict]:
+        """
+        检测三只白兵形态（Three White Soldiers）
+        底部反转形态 - 三K线形态
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 之前存在下降趋势 - 前 5 天的前半段收盘价平均值 > 后半段收盘价平均值
+        🗳 连续三根阳线 - 每根K线收盘价 > 开盘价
+        🗳 三根阳线逐步上升 - 每根K线的收盘价 > 前一根的收盘价
+        🗳 每根阳线的开盘价在前一根实体内部 - 开盘价 > 前一根开盘价 且 < 前一根收盘价
+        🗳 上影线较短 - 上影线长度 <= 实体 * 0.3
+        🗳 实体较大 - 每根实体长度 >= 整体K线范围的一定比例
+        🗳 收盘价逐步走高且接近最高价 - 显示买方控制力度强
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            min_body_ratio: 最小实体占K线范围的比例，默认0.01
+            max_shadow_ratio: 上影线占实体的最大比例，默认0.3
+
+        Returns:
+            检测到的三只白兵形态列表
+        """
+        patterns = []
+
+        # 从trend_period+2开始，需要前两天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 2, len(df)):
+            first_row = df.iloc[i - 2]   # 第一根K线
+            second_row = df.iloc[i - 1]  # 第二根K线
+            third_row = df.iloc[i]       # 第三根K线
+
+            first_opening = first_row['opening']
+            first_closing = first_row['closing']
+            first_highest = first_row['highest']
+            first_lowest = first_row['lowest']
+
+            second_opening = second_row['opening']
+            second_closing = second_row['closing']
+            second_highest = second_row['highest']
+            second_lowest = second_row['lowest']
+
+            third_opening = third_row['opening']
+            third_closing = third_row['closing']
+            third_highest = third_row['highest']
+            third_lowest = third_row['lowest']
+
+            # 1. 三根K线必须都是阳线
+            if not (first_closing > first_opening and
+                   second_closing > second_opening and
+                   third_closing > third_opening):
+                continue
+
+            # 2. 计算实体长度
+            first_body = first_closing - first_opening
+            second_body = second_closing - second_opening
+            third_body = third_closing - third_opening
+
+            # 实体不能太小
+            if first_body < min_body_ratio or second_body < min_body_ratio or third_body < min_body_ratio:
+                continue
+
+            # 3. 三根阳线逐步上升 - 每根收盘价高于前一根
+            if not (second_closing > first_closing and third_closing > second_closing):
+                continue
+
+            # 4. 每根阳线的开盘价应该在前一根实体内部（或接近）
+            # 第二根开盘价应该在第一根实体内
+            if not (second_opening > first_opening and second_opening <= first_closing):
+                continue
+
+            # 第三根开盘价应该在第二根实体内
+            if not (third_opening > second_opening and third_opening <= second_closing):
+                continue
+
+            # 5. 上影线不能太长（表示买方控制力强）
+            first_upper_shadow = first_highest - first_closing
+            second_upper_shadow = second_highest - second_closing
+            third_upper_shadow = third_highest - third_closing
+
+            if (first_upper_shadow > first_body * max_shadow_ratio or
+                second_upper_shadow > second_body * max_shadow_ratio or
+                third_upper_shadow > third_body * max_shadow_ratio):
+                continue
+
+            # 6. 判断之前存在下降趋势
+            if i >= trend_period + 2:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period - 2:i - trend_period - 2 + half]['closing'].mean()
+                recent_avg = df.iloc[i - half - 2:i - 2]['closing'].mean()
+
+                # 下降趋势：早期平均 > 近期平均
+                if early_avg <= recent_avg:
+                    continue
+
+            # 计算整体涨幅
+            total_rise = third_closing - first_opening
+            rise_pct = (total_rise / first_opening) * 100 if first_opening > 0 else 0
+
+            patterns.append({
+                'date': third_row['date'] if 'date' in third_row else third_row.name,
+                'index': i,
+                'row': third_row,
+                'pattern_type': CandlestickPattern.THREE_WHITE_SOLDIERS,
+                'price': third_row['lowest'],  # 标记在最低点（底部反转）
+                'start_index': i - 2,  # 形态开始位置
+                'end_index': i,        # 形态结束位置
+                'description': f'实体=1:{first_body:.2f} → 2:{second_body:.2f} → 3:{third_body:.2f}, ' f'总涨幅={rise_pct:.2f}%, 下跌差价={abs(recent_avg - early_avg):.2f}'
+            })
+
+        return patterns
+
+    @staticmethod
+    def detect_three_black_crows(df: pd.DataFrame, trend_period: int = 5, min_body_ratio: float = 0.01,
+                                 max_shadow_ratio: float = 0.3) -> List[Dict]:
+        """
+        检测三只乌鸦形态（Three Black Crows）
+        顶部反转形态 - 三K线形态
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 之前存在上升趋势 - 前 5 天的前半段收盘价平均值 < 后半段收盘价平均值
+        🗳 连续三根阴线 - 每根K线开盘价 > 收盘价
+        🗳 三根阴线逐步下降 - 每根K线的收盘价 < 前一根的收盘价
+        🗳 每根阴线的开盘价在前一根实体内部 - 开盘价 < 前一根开盘价 且 > 前一根收盘价
+        🗳 下影线较短 - 下影线长度 <= 实体 * 0.3
+        🗳 实体较大 - 每根实体长度 >= 整体K线范围的一定比例
+        🗳 收盘价逐步走低且接近最低价 - 显示卖方控制力度强
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            min_body_ratio: 最小实体占K线范围的比例，默认0.01
+            max_shadow_ratio: 下影线占实体的最大比例，默认0.3
+
+        Returns:
+            检测到的三只乌鸦形态列表
+        """
+        patterns = []
+
+        # 从trend_period+2开始，需要前两天数据和足够的历史数据判断趋势
+        for i in range(trend_period + 2, len(df)):
+            first_row = df.iloc[i - 2]   # 第一根K线
+            second_row = df.iloc[i - 1]  # 第二根K线
+            third_row = df.iloc[i]       # 第三根K线
+
+            first_opening = first_row['opening']
+            first_closing = first_row['closing']
+            first_highest = first_row['highest']
+            first_lowest = first_row['lowest']
+
+            second_opening = second_row['opening']
+            second_closing = second_row['closing']
+            second_highest = second_row['highest']
+            second_lowest = second_row['lowest']
+
+            third_opening = third_row['opening']
+            third_closing = third_row['closing']
+            third_highest = third_row['highest']
+            third_lowest = third_row['lowest']
+
+            # 1. 三根K线必须都是阴线
+            if not (first_closing < first_opening and
+                   second_closing < second_opening and
+                   third_closing < third_opening):
+                continue
+
+            # 2. 计算实体长度
+            first_body = first_opening - first_closing
+            second_body = second_opening - second_closing
+            third_body = third_opening - third_closing
+
+            # 实体不能太小
+            if first_body < min_body_ratio or second_body < min_body_ratio or third_body < min_body_ratio:
+                continue
+
+            # 3. 三根阴线逐步下降 - 每根收盘价低于前一根
+            if not (second_closing < first_closing and third_closing < second_closing):
+                continue
+
+            # 4. 每根阴线的开盘价应该在前一根实体内部（或接近）
+            # 第二根开盘价应该在第一根实体内
+            if not (second_opening < first_opening and second_opening >= first_closing):
+                continue
+
+            # 第三根开盘价应该在第二根实体内
+            if not (third_opening < second_opening and third_opening >= second_closing):
+                continue
+
+            # 5. 下影线不能太长（表示卖方控制力强）
+            first_lower_shadow = first_closing - first_lowest
+            second_lower_shadow = second_closing - second_lowest
+            third_lower_shadow = third_closing - third_lowest
+
+            if (first_lower_shadow > first_body * max_shadow_ratio or
+                second_lower_shadow > second_body * max_shadow_ratio or
+                third_lower_shadow > third_body * max_shadow_ratio):
+                continue
+
+            # 6. 判断之前存在上升趋势
+            if i >= trend_period + 2:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period - 2:i - trend_period - 2 + half]['closing'].mean()
+                recent_avg = df.iloc[i - half - 2:i - 2]['closing'].mean()
+
+                # 上升趋势：早期平均 < 近期平均
+                if early_avg >= recent_avg:
+                    continue
+
+            # 计算整体跌幅
+            total_fall = first_opening - third_closing
+            fall_pct = (total_fall / first_opening) * 100 if first_opening > 0 else 0
+
+            patterns.append({
+                'date': third_row['date'] if 'date' in third_row else third_row.name,
+                'index': i,
+                'row': third_row,
+                'pattern_type': CandlestickPattern.THREE_BLACK_CROWS,
+                'price': third_row['highest'],  # 标记在最高点（顶部反转）
+                'start_index': i - 2,  # 形态开始位置
+                'end_index': i,        # 形态结束位置
+                'description': f'实体=1:{first_body:.2f} → 2:{second_body:.2f} → 3:{third_body:.2f}, 'f'总跌幅={fall_pct:.2f}%, 上涨差价={abs(recent_avg - early_avg):.2f}'
+            })
+
+        return patterns
+
+    @staticmethod
     def detect_all_patterns(df: pd.DataFrame) -> List[Dict]:
         """
         检测所有支持的蜡烛图形态
@@ -972,12 +1374,24 @@ class CandlestickPatternDetector:
         # 检测乌云盖顶（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_dark_cloud_cover(df))
 
+        # 检测看涨孕线（底部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_bullish_harami(df))
+
+        # 检测看跌孕线（顶部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_bearish_harami(df))
+
         # 三K线形态
         # 检测启明星（底部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_morning_star(df))
 
         # 检测黄昏星（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_evening_star(df))
+
+        # 检测三只白兵（底部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_three_white_soldiers(df))
+
+        # 检测三只乌鸦（顶部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_three_black_crows(df))
 
         # 按日期排序
         all_patterns.sort(key=lambda x: x['index'])
@@ -1110,6 +1524,32 @@ class CandlestickPatternDetector:
                 'color_class': 'sync-card-orange'
             },
             {
+                'pattern_type': CandlestickPattern.BULLISH_HARAMI,
+                'category': '双K线 - 底部反转',
+                'signal': "看涨",
+                'criteria': [
+                    "之前存在下降趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是大阴线, 实体较大 -> 开盘价 &gt; 收盘价",
+                    "第 2 根是小实体(可阴可阳),实体较小",
+                    "第 2 根实体完全被第 1 根阴线实体包含(孕育关系) -> 第 2 根最高价(开/收盘较大值) &lt;= 第 1 根开盘价 且 第 2 根最低价(开/收盘较小值) &gt;= 第 1 根收盘价",
+                    "第 2 根实体明显小于第 1 根阴线 -> 第 2 根实体 &lt; 第 1 根实体 * 0.8"
+                ],
+                'color_class': 'sync-card-pink'
+            },
+            {
+                'pattern_type': CandlestickPattern.BEARISH_HARAMI,
+                'category': '双K线 - 顶部反转',
+                'signal': "看跌",
+                'criteria': [
+                    "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是大阳线, 实体较大 -> 收盘价 &gt; 开盘价",
+                    "第 2 根是小实体(可阴可阳), 实体较小",
+                    "第 2 根实体完全被第 1 根阳线实体包含(孕育关系) -> 第 2 根最高价(开/收盘较大值) &lt;= 第 1 根收盘价 且 第 2 根最低价(开/收盘较小值) &gt;= 第 1 根开盘价",
+                    "第 2 根实体明显小于第 1 根阳线 -> 第 2 根实体 &lt; 第 1 根实体 * 0.8"
+                ],
+                'color_class': 'sync-card-cyan'
+            },
+            {
                 'pattern_type': CandlestickPattern.MORNING_STAR,
                 'category': '三K线 - 底部反转',
                 'signal': "看涨",
@@ -1138,6 +1578,34 @@ class CandlestickPatternDetector:
                     "第 3 根阴线收盘价深入第 1 根阳线实体 -> 第 3 根阴线收盘价 &lt; 第 1 根阳线收盘价"
                 ],
                 'color_class': 'sync-card-purple'
+            },
+            {
+                'pattern_type': CandlestickPattern.THREE_WHITE_SOLDIERS,
+                'category': '三K线 - 底部反转',
+                'signal': "看涨",
+                'criteria': [
+                    "之前存在下降趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "连续三根阳线, 实体较大 -> 每根收盘价 &gt; 开盘价",
+                    "三根阳线逐步上升 -> 每根收盘价 &gt; 前一根收盘价",
+                    "每根阳线开盘价在前一根实体内部 -> 第 2 根开盘价 &gt; 第 1 根开盘价 且 &lt;= 第 1 根收盘价，第 3 根开盘价 &gt; 第 2 根开盘价 且 &lt;= 第 2 根收盘价",
+                    "上影线较短 -> 上影线长度 &lt;= 实体 * 0.3",
+                    "收盘价逐步走高且接近最高价"
+                ],
+                'color_class': 'sync-card-blue'
+            },
+            {
+                'pattern_type': CandlestickPattern.THREE_BLACK_CROWS,
+                'category': '三K线 - 顶部反转',
+                'signal': "看跌",
+                'criteria': [
+                    "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "连续三根阴线, 实体较大 -> 每根开盘价 &gt; 收盘价",
+                    "三根阴线逐步下降 -> 每根收盘价 &lt; 前一根收盘价",
+                    "每根阴线开盘价在前一根实体内部 -> 第 2 根开盘价 &lt; 第 1 根开盘价 且 &gt;= 第 1 根收盘价，第 3 根开盘价 &lt; 第 2 根开盘价 且 &gt;= 第 2 根收盘价",
+                    "下影线较短 -> 下影线长度 &lt;= 实体 * 0.3",
+                    "收盘价逐步走低且接近最低价"
+                ],
+                'color_class': 'sync-card-orange'
             }
 
         ]
