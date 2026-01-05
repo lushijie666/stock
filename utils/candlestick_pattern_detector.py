@@ -890,6 +890,172 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
+    def detect_bullish_counterattack(df: pd.DataFrame, trend_period: int = 5, close_tolerance: float = 0.003) -> List[Dict]:
+        """
+        检测看涨反击线形态（Bullish Counterattack）
+        底部反转形态 - 双K线形态
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 之前存在下降趋势
+        🗳 第一根K线是阴线 - 开盘价 > 收盘价，实体较大
+        🗳 第二根K线是阳线 - 收盘价 > 开盘价，实体较大
+        🗳 第二根阳线开盘价明显低于第一根阴线的收盘价（显示继续下跌）
+        🗳 关键特征：第二根阳线的收盘价与第一根阴线的收盘价几乎相同（在容差范围内）
+        🗳 这表示多方反击，将价格拉回到前一日收盘价附近
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            close_tolerance: 收盘价相近的容差比例，默认0.003（0.3%）
+
+        Returns:
+            检测到的看涨反击线形态列表
+        """
+        patterns = []
+
+        for i in range(trend_period + 1, len(df)):
+            prev_row = df.iloc[i - 1]  # 第一根K线（阴线）
+            curr_row = df.iloc[i]  # 第二根K线（阳线）
+
+            prev_opening = prev_row['opening']
+            prev_closing = prev_row['closing']
+            curr_opening = curr_row['opening']
+            curr_closing = curr_row['closing']
+
+            # 1. 判断第一根是阴线，第二根是阳线
+            if not (prev_closing < prev_opening and curr_closing > curr_opening):
+                continue
+
+            # 2. 计算实体长度
+            prev_body = abs(prev_closing - prev_opening)
+            curr_body = abs(curr_closing - curr_opening)
+
+            # 实体应该较大
+            if prev_body < 0.01 or curr_body < 0.01:
+                continue
+
+            # 3. 第二根阳线的开盘价应该明显低于第一根阴线的收盘价
+            # 显示继续下跌的趋势
+            if curr_opening >= prev_closing:
+                continue
+
+            # 4. 关键特征：两根K线的收盘价应该非常接近（反击的核心）
+            close_diff = abs(curr_closing - prev_closing)
+            close_tolerance_value = prev_closing * close_tolerance
+            if close_diff > close_tolerance_value:
+                continue
+
+            # 5. 判断之前存在下降趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
+
+                # 下降趋势：早期平均 > 近期平均
+                if early_avg <= recent_avg:
+                    continue
+
+            # 计算反击力度（开盘到收盘的拉升幅度）
+            pullback = curr_closing - curr_opening
+            pullback_pct = (pullback / curr_opening) * 100 if curr_opening > 0 else 0
+
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.BULLISH_COUNTERATTACK,
+                'price': curr_row['lowest'],  # 标记在最低点（底部反转）
+                'start_index': i - 1,
+                'end_index': i,
+                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, 'f'收盘差={close_diff:.2f}, 反击力度={pullback_pct:.2f}%'
+            })
+
+        return patterns
+
+    @staticmethod
+    def detect_bearish_counterattack(df: pd.DataFrame, trend_period: int = 5, close_tolerance: float = 0.003) -> List[Dict]:
+        """
+        检测看跌反击线形态（Bearish Counterattack）
+        顶部反转形态 - 双K线形态
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 之前存在上升趋势
+        🗳 第一根K线是阳线 - 收盘价 > 开盘价，实体较大
+        🗳 第二根K线是阴线 - 开盘价 > 收盘价，实体较大
+        🗳 第二根阴线开盘价明显高于第一根阳线的收盘价（显示继续上涨）
+        🗳 关键特征：第二根阴线的收盘价与第一根阳线的收盘价几乎相同（在容差范围内）
+        🗳 这表示空方反击，将价格打回到前一日收盘价附近
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
+            close_tolerance: 收盘价相近的容差比例，默认0.003（0.3%）
+
+        Returns:
+            检测到的看跌反击线形态列表
+        """
+        patterns = []
+
+        for i in range(trend_period + 1, len(df)):
+            prev_row = df.iloc[i - 1]  # 第一根K线（阳线）
+            curr_row = df.iloc[i]  # 第二根K线（阴线）
+
+            prev_opening = prev_row['opening']
+            prev_closing = prev_row['closing']
+            curr_opening = curr_row['opening']
+            curr_closing = curr_row['closing']
+
+            # 1. 判断第一根是阳线，第二根是阴线
+            if not (prev_closing > prev_opening and curr_closing < curr_opening):
+                continue
+
+            # 2. 计算实体长度
+            prev_body = abs(prev_closing - prev_opening)
+            curr_body = abs(curr_closing - curr_opening)
+
+            # 实体应该较大
+            if prev_body < 0.01 or curr_body < 0.01:
+                continue
+
+            # 3. 第二根阴线的开盘价应该明显高于第一根阳线的收盘价
+            # 显示继续上涨的趋势
+            if curr_opening <= prev_closing:
+                continue
+
+            # 4. 关键特征：两根K线的收盘价应该非常接近（反击的核心）
+            close_diff = abs(curr_closing - prev_closing)
+            close_tolerance_value = prev_closing * close_tolerance
+            if close_diff > close_tolerance_value:
+                continue
+
+            # 5. 判断之前存在上升趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
+
+                # 上升趋势：早期平均 < 近期平均
+                if early_avg >= recent_avg:
+                    continue
+
+            # 计算反击力度（开盘到收盘的下跌幅度）
+            pullback = curr_opening - curr_closing
+            pullback_pct = (pullback / curr_opening) * 100 if curr_opening > 0 else 0
+
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.BEARISH_COUNTERATTACK,
+                'price': curr_row['highest'],  # 标记在最高点（顶部反转）
+                'start_index': i - 1,
+                'end_index': i,
+                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, 'f'收盘差={close_diff:.2f}, 反击力度={pullback_pct:.2f}%'
+            })
+
+        return patterns
+
+    @staticmethod
     def detect_morning_star(df: pd.DataFrame, trend_period: int = 5, star_body_ratio: float = 0.3, min_gap: float = 0.01) -> List[Dict]:
         """
         检测启明星形态（Morning Star）
@@ -1110,8 +1276,7 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
-    def detect_three_white_soldiers(df: pd.DataFrame, trend_period: int = 5, min_body_ratio: float = 0.01,
-                                    max_shadow_ratio: float = 0.3) -> List[Dict]:
+    def detect_three_white_soldiers(df: pd.DataFrame, trend_period: int = 5, min_body_ratio: float = 0.01, max_shadow_ratio: float = 0.3) -> List[Dict]:
         """
         检测三只白兵形态（Three White Soldiers）
         底部反转形态 - 三K线形态
@@ -1223,8 +1388,7 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
-    def detect_three_black_crows(df: pd.DataFrame, trend_period: int = 5, min_body_ratio: float = 0.01,
-                                 max_shadow_ratio: float = 0.3) -> List[Dict]:
+    def detect_three_black_crows(df: pd.DataFrame, trend_period: int = 5, min_body_ratio: float = 0.01, max_shadow_ratio: float = 0.3) -> List[Dict]:
         """
         检测三只乌鸦形态（Three Black Crows）
         顶部反转形态 - 三K线形态
@@ -1336,174 +1500,6 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
-    def detect_bullish_counterattack(df: pd.DataFrame, trend_period: int = 5, close_tolerance: float = 0.003) -> List[Dict]:
-        """
-        检测看涨反击线形态（Bullish Counterattack）
-        底部反转形态 - 双K线形态
-
-        核心特征（参考《日本蜡烛图技术》）：
-        🗳 之前存在下降趋势
-        🗳 第一根K线是阴线 - 开盘价 > 收盘价，实体较大
-        🗳 第二根K线是阳线 - 收盘价 > 开盘价，实体较大
-        🗳 第二根阳线开盘价明显低于第一根阴线的收盘价（显示继续下跌）
-        🗳 关键特征：第二根阳线的收盘价与第一根阴线的收盘价几乎相同（在容差范围内）
-        🗳 这表示多方反击，将价格拉回到前一日收盘价附近
-
-        Args:
-            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
-            trend_period: 判断趋势的周期，默认5天
-            close_tolerance: 收盘价相近的容差比例，默认0.003（0.3%）
-
-        Returns:
-            检测到的看涨反击线形态列表
-        """
-        patterns = []
-
-        for i in range(trend_period + 1, len(df)):
-            prev_row = df.iloc[i - 1]  # 第一根K线（阴线）
-            curr_row = df.iloc[i]       # 第二根K线（阳线）
-
-            prev_opening = prev_row['opening']
-            prev_closing = prev_row['closing']
-            curr_opening = curr_row['opening']
-            curr_closing = curr_row['closing']
-
-            # 1. 判断第一根是阴线，第二根是阳线
-            if not (prev_closing < prev_opening and curr_closing > curr_opening):
-                continue
-
-            # 2. 计算实体长度
-            prev_body = abs(prev_closing - prev_opening)
-            curr_body = abs(curr_closing - curr_opening)
-
-            # 实体应该较大
-            if prev_body < 0.01 or curr_body < 0.01:
-                continue
-
-            # 3. 第二根阳线的开盘价应该明显低于第一根阴线的收盘价
-            # 显示继续下跌的趋势
-            if curr_opening >= prev_closing:
-                continue
-
-            # 4. 关键特征：两根K线的收盘价应该非常接近（反击的核心）
-            close_diff = abs(curr_closing - prev_closing)
-            close_tolerance_value = prev_closing * close_tolerance
-            if close_diff > close_tolerance_value:
-                continue
-
-            # 5. 判断之前存在下降趋势
-            if i >= trend_period:
-                half = trend_period // 2
-                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
-                recent_avg = df.iloc[i - half:i]['closing'].mean()
-
-                # 下降趋势：早期平均 > 近期平均
-                if early_avg <= recent_avg:
-                    continue
-
-            # 计算反击力度（开盘到收盘的拉升幅度）
-            pullback = curr_closing - curr_opening
-            pullback_pct = (pullback / curr_opening) * 100 if curr_opening > 0 else 0
-
-            patterns.append({
-                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
-                'index': i,
-                'row': curr_row,
-                'pattern_type': CandlestickPattern.BULLISH_COUNTERATTACK,
-                'price': curr_row['lowest'],  # 标记在最低点（底部反转）
-                'start_index': i - 1,
-                'end_index': i,
-                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, '
-                              f'收盘差={close_diff:.2f}, 反击力度={pullback_pct:.2f}%'
-            })
-
-        return patterns
-
-    @staticmethod
-    def detect_bearish_counterattack(df: pd.DataFrame, trend_period: int = 5, close_tolerance: float = 0.003) -> List[Dict]:
-        """
-        检测看跌反击线形态（Bearish Counterattack）
-        顶部反转形态 - 双K线形态
-
-        核心特征（参考《日本蜡烛图技术》）：
-        🗳 之前存在上升趋势
-        🗳 第一根K线是阳线 - 收盘价 > 开盘价，实体较大
-        🗳 第二根K线是阴线 - 开盘价 > 收盘价，实体较大
-        🗳 第二根阴线开盘价明显高于第一根阳线的收盘价（显示继续上涨）
-        🗳 关键特征：第二根阴线的收盘价与第一根阳线的收盘价几乎相同（在容差范围内）
-        🗳 这表示空方反击，将价格打回到前一日收盘价附近
-
-        Args:
-            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
-            trend_period: 判断趋势的周期，默认5天
-            close_tolerance: 收盘价相近的容差比例，默认0.003（0.3%）
-
-        Returns:
-            检测到的看跌反击线形态列表
-        """
-        patterns = []
-
-        for i in range(trend_period + 1, len(df)):
-            prev_row = df.iloc[i - 1]  # 第一根K线（阳线）
-            curr_row = df.iloc[i]       # 第二根K线（阴线）
-
-            prev_opening = prev_row['opening']
-            prev_closing = prev_row['closing']
-            curr_opening = curr_row['opening']
-            curr_closing = curr_row['closing']
-
-            # 1. 判断第一根是阳线，第二根是阴线
-            if not (prev_closing > prev_opening and curr_closing < curr_opening):
-                continue
-
-            # 2. 计算实体长度
-            prev_body = abs(prev_closing - prev_opening)
-            curr_body = abs(curr_closing - curr_opening)
-
-            # 实体应该较大
-            if prev_body < 0.01 or curr_body < 0.01:
-                continue
-
-            # 3. 第二根阴线的开盘价应该明显高于第一根阳线的收盘价
-            # 显示继续上涨的趋势
-            if curr_opening <= prev_closing:
-                continue
-
-            # 4. 关键特征：两根K线的收盘价应该非常接近（反击的核心）
-            close_diff = abs(curr_closing - prev_closing)
-            close_tolerance_value = prev_closing * close_tolerance
-            if close_diff > close_tolerance_value:
-                continue
-
-            # 5. 判断之前存在上升趋势
-            if i >= trend_period:
-                half = trend_period // 2
-                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
-                recent_avg = df.iloc[i - half:i]['closing'].mean()
-
-                # 上升趋势：早期平均 < 近期平均
-                if early_avg >= recent_avg:
-                    continue
-
-            # 计算反击力度（开盘到收盘的下跌幅度）
-            pullback = curr_opening - curr_closing
-            pullback_pct = (pullback / curr_opening) * 100 if curr_opening > 0 else 0
-
-            patterns.append({
-                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
-                'index': i,
-                'row': curr_row,
-                'pattern_type': CandlestickPattern.BEARISH_COUNTERATTACK,
-                'price': curr_row['highest'],  # 标记在最高点（顶部反转）
-                'start_index': i - 1,
-                'end_index': i,
-                'description': f'实体=1:{prev_body:.2f} → 2:{curr_body:.2f}, '
-                              f'收盘差={close_diff:.2f}, 反击力度={pullback_pct:.2f}%'
-            })
-
-        return patterns
-
-    @staticmethod
     def detect_rounding_top(df: pd.DataFrame, window_size: int = 10, curvature_threshold: float = 0.7) -> List[Dict]:
         """
         检测圆形顶部形态（Rounding Top）
@@ -1584,8 +1580,7 @@ class CandlestickPatternDetector:
                 'price': peak_high,  # 标记在最高点
                 'start_index': i - window_size,
                 'end_index': i - 1,
-                'description': f'窗口大小={width}, 高度={height:.2f}, '
-                              f'左侧上升比={left_trend_ratio:.1%}, 右侧下降比={right_trend_ratio:.1%}'
+                'description': f'窗口大小={width}, 高度={height:.2f}, 'f'左侧上升比={left_trend_ratio:.1%}, 右侧下降比={right_trend_ratio:.1%}'
             })
 
         return patterns
@@ -1785,8 +1780,7 @@ class CandlestickPatternDetector:
                     'price': peak_price,  # 标记在最高点
                     'start_index': i - window_size + 1,
                     'end_index': i,
-                    'description': f'K线数={window_size}, 上涨={rise:.2f}, 下跌={fall:.2f}, '
-                                  f'总变化={total_change:.2f}'
+                    'description': f'K线数={window_size}, 上涨={rise:.2f}, 下跌={fall:.2f}, 'f'总变化={total_change:.2f}'
                 })
                 break  # 找到形态后跳出窗口大小循环
 
@@ -1952,6 +1946,12 @@ class CandlestickPatternDetector:
         # 检测看跌孕线（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_bearish_harami(df))
 
+        # 检测看涨反击（底部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_bullish_counterattack(df))
+
+        # 检测看跌反击（顶部反转）
+        all_patterns.extend(CandlestickPatternDetector.detect_bearish_counterattack(df))
+
         # 三K线形态
         # 检测启明星（底部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_morning_star(df))
@@ -1965,25 +1965,18 @@ class CandlestickPatternDetector:
         # 检测三只乌鸦（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_three_black_crows(df))
 
-        # 反击线形态
-        # 检测看涨反击（底部反转）
-        all_patterns.extend(CandlestickPatternDetector.detect_bullish_counterattack(df))
-
-        # 检测看跌反击（顶部反转）
-        all_patterns.extend(CandlestickPatternDetector.detect_bearish_counterattack(df))
-
         # 多K线复杂形态
         # 检测圆形顶部（顶部反转）
-        all_patterns.extend(CandlestickPatternDetector.detect_rounding_top(df))
+        #all_patterns.extend(CandlestickPatternDetector.detect_rounding_top(df))
 
         # 检测平底锅底部（底部反转）
-        all_patterns.extend(CandlestickPatternDetector.detect_rounding_bottom(df))
+        #all_patterns.extend(CandlestickPatternDetector.detect_rounding_bottom(df))
 
         # 检测塔型顶部（顶部反转）
-        all_patterns.extend(CandlestickPatternDetector.detect_tower_top(df))
+        #all_patterns.extend(CandlestickPatternDetector.detect_tower_top(df))
 
         # 检测塔型底部（底部反转）
-        all_patterns.extend(CandlestickPatternDetector.detect_tower_bottom(df))
+        #all_patterns.extend(CandlestickPatternDetector.detect_tower_bottom(df))
 
         # 按日期排序
         all_patterns.sort(key=lambda x: x['index'])
@@ -2142,6 +2135,32 @@ class CandlestickPatternDetector:
                 'color_class': 'sync-card-cyan'
             },
             {
+                'pattern_type': CandlestickPattern.BULLISH_COUNTERATTACK,
+                'category': '双K线 - 底部反转',
+                'signal': "看涨",
+                'criteria': [
+                    "之前存在下降趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是阴线, 实体较大 -> 开盘价 &gt; 收盘价",
+                    "第 2 根是阳线, 实体较大 -> 收盘价 &gt; 开盘价",
+                    "第 2 根阳线开盘价明显低于第 1 根阴线收盘价（显示继续下跌）",
+                    "第 2 根阳线收盘价与第 1 根阴线收盘价几乎相同, 表示多方反击，将价格拉回到前一日收盘价附近 -> 收盘差在容差范围内0.3%",
+                ],
+                'color_class': 'sync-card-blue'
+            },
+            {
+                'pattern_type': CandlestickPattern.BEARISH_COUNTERATTACK,
+                'category': '双K线 - 顶部反转',
+                'signal': "看跌",
+                'criteria': [
+                    "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)",
+                    "第 1 根是阳线, 实体较大 -> 收盘价 &gt; 开盘价",
+                    "第 2 根是阴线, 实体较大 -> 开盘价 &gt; 收盘价",
+                    "第 2 根阴线开盘价明显高于第 1 根阳线收盘价（显示继续上涨）",
+                    "第 2 根阴线收盘价与第 1 根阳线收盘价几乎相同, 表示空方反击，将价格打回到前一日收盘价附近 -> 收盘差在容差范围内0.3%",
+                ],
+                'color_class': 'sync-card-orange'
+            },
+            {
                 'pattern_type': CandlestickPattern.MORNING_STAR,
                 'category': '三K线 - 底部反转',
                 'signal': "看涨",
@@ -2199,34 +2218,8 @@ class CandlestickPatternDetector:
                 ],
                 'color_class': 'sync-card-orange'
             },
-            {
-                'pattern_type': CandlestickPattern.BULLISH_COUNTERATTACK,
-                'category': '双K线 - 底部反转',
-                'signal': "看涨",
-                'criteria': [
-                    "之前存在下降趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &gt;  后半段(5 - 5/2天的收盘价平均值)",
-                    "第 1 根是阴线，实体较大 -> 开盘价 &gt; 收盘价",
-                    "第 2 根是阳线，实体较大 -> 收盘价 &gt; 开盘价",
-                    "第 2 根阳线开盘价明显低于第 1 根阴线收盘价（显示继续下跌）",
-                    "关键特征：第 2 根阳线收盘价与第 1 根阴线收盘价几乎相同 -> 收盘差在容差范围内（默认0.3%）",
-                    "表示多方反击，将价格拉回到前一日收盘价附近"
-                ],
-                'color_class': 'sync-card-green'
-            },
-            {
-                'pattern_type': CandlestickPattern.BEARISH_COUNTERATTACK,
-                'category': '双K线 - 顶部反转',
-                'signal': "看跌",
-                'criteria': [
-                    "之前存在上升趋势 -> 前 5 天的前半段(5/2天的收盘价平均值) &lt;  后半段(5 - 5/2天的收盘价平均值)",
-                    "第 1 根是阳线，实体较大 -> 收盘价 &gt; 开盘价",
-                    "第 2 根是阴线，实体较大 -> 开盘价 &gt; 收盘价",
-                    "第 2 根阴线开盘价明显高于第 1 根阳线收盘价（显示继续上涨）",
-                    "关键特征：第 2 根阴线收盘价与第 1 根阳线收盘价几乎相同 -> 收盘差在容差范围内（默认0.3%）",
-                    "表示空方反击，将价格打回到前一日收盘价附近"
-                ],
-                'color_class': 'sync-card-purple'
-            },
+
+"""
             {
                 'pattern_type': CandlestickPattern.ROUNDING_TOP,
                 'category': '多K线 - 顶部反转',
@@ -2287,5 +2280,5 @@ class CandlestickPatternDetector:
                 ],
                 'color_class': 'sync-card-orange'
             }
-
+"""
         ]

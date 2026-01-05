@@ -19,16 +19,14 @@ class CandlestickPattern(Enum):
     PIERCING_PATTERN = ("piercing_pattern", "刺透形态", "💡", "#006400", -0.1)  # 看涨，深绿色，向下
     BULLISH_HARAMI = ("bullish_harami", "看涨孕线", "🤰", "#228B22", -0.1)  # 看涨，森林绿，向下
     BEARISH_HARAMI = ("bearish_harami", "看跌孕线", "🫄", "#B22222", 0.1)  # 看跌，火砖红，向上
+    BULLISH_COUNTERATTACK = ("bullish_counterattack", "看涨反击", "⚔️", "#00FF00", -0.1)  # 看涨，亮绿色，向下
+    BEARISH_COUNTERATTACK = ("bearish_counterattack", "看跌反击", "🗡️", "#FF0000", 0.1)  # 看跌，亮红色，向上
 
     # 三K线形态
     MORNING_STAR = ("morning_star", "启明星", "🌟", "#FFA500", -0.1)  # 看涨，橙色，向下
     EVENING_STAR = ("evening_star", "黄昏星", "🌆", "#800080", 0.1)  # 看跌，紫色，向上
     THREE_WHITE_SOLDIERS = ("three_white_soldiers", "三只白兵", "⚪", "#00CED1", -0.1)  # 看涨，深青色，向下
     THREE_BLACK_CROWS = ("three_black_crows", "三只乌鸦", "⚫", "#2F4F4F", 0.1)  # 看跌，深石板灰，向上
-
-    # 反击线形态
-    BULLISH_COUNTERATTACK = ("bullish_counterattack", "看涨反击", "⚔️", "#00FF00", -0.1)  # 看涨，亮绿色，向下
-    BEARISH_COUNTERATTACK = ("bearish_counterattack", "看跌反击", "🗡️", "#FF0000", 0.1)  # 看跌，亮红色，向上
 
     # 多K线复杂形态
     ROUNDING_TOP = ("rounding_top", "圆形顶部", "🔴", "#8B0000", 0.1)  # 看跌，深红色，向上
