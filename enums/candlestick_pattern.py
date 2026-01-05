@@ -26,6 +26,16 @@ class CandlestickPattern(Enum):
     THREE_WHITE_SOLDIERS = ("three_white_soldiers", "三只白兵", "⚪", "#00CED1", -0.1)  # 看涨，深青色，向下
     THREE_BLACK_CROWS = ("three_black_crows", "三只乌鸦", "⚫", "#2F4F4F", 0.1)  # 看跌，深石板灰，向上
 
+    # 反击线形态
+    BULLISH_COUNTERATTACK = ("bullish_counterattack", "看涨反击", "⚔️", "#00FF00", -0.1)  # 看涨，亮绿色，向下
+    BEARISH_COUNTERATTACK = ("bearish_counterattack", "看跌反击", "🗡️", "#FF0000", 0.1)  # 看跌，亮红色，向上
+
+    # 多K线复杂形态
+    ROUNDING_TOP = ("rounding_top", "圆形顶部", "🔴", "#8B0000", 0.1)  # 看跌，深红色，向上
+    ROUNDING_BOTTOM = ("rounding_bottom", "平底锅底部", "🟢", "#006400", -0.1)  # 看涨，深绿色，向下
+    TOWER_TOP = ("tower_top", "塔型顶部", "🏰", "#B22222", 0.1)  # 看跌，火砖红，向上
+    TOWER_BOTTOM = ("tower_bottom", "塔型底部", "🏛️", "#228B22", -0.1)  # 看涨，森林绿，向下
+
     def __new__(cls, code, text, icon, color, offset):
         obj = object.__new__(cls)
         obj._value_ = code
