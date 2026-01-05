@@ -34,6 +34,10 @@ class CandlestickPattern(Enum):
     TOWER_TOP = ("tower_top", "塔型顶部", "🏰", "#B22222", 0.1)  # 看跌，火砖红，向上
     TOWER_BOTTOM = ("tower_bottom", "塔型底部", "🏛️", "#228B22", -0.1)  # 看涨，森林绿，向下
 
+    # 窗口形态（跳空缺口）
+    RISING_WINDOW = ("rising_window", "上升窗口", "⬆️", "#FF6B6B", 0.1)  # 看涨延续，红色，向上
+    FALLING_WINDOW = ("falling_window", "下降窗口", "⬇️", "#4ECDC4", -0.1)  # 看跌延续，青色，向下
+
     def __new__(cls, code, text, icon, color, offset):
         obj = object.__new__(cls)
         obj._value_ = code

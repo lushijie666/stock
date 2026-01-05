@@ -1902,6 +1902,159 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
+    def detect_rising_window(df: pd.DataFrame, min_gap_ratio: float = 0.002) -> List[Dict]:
+        """
+        检测上升窗口形态（Rising Window / Upward Gap）
+        趋势延续形态 - 看涨信号
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 在上升趋势中出现
+        🗳 当前K线的最低价高于前一根K线的最高价
+        🗳 两根K线之间形成向上的价格跳空（窗口）
+        🗳 窗口通常起到支撑作用
+        🗳 窗口未被回补（后续K线未填补窗口）
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            min_gap_ratio: 最小跳空比例，默认0.002（0.2%）
+
+        Returns:
+            检测到的上升窗口列表，包含窗口的上下边界
+        """
+        patterns = []
+
+        for i in range(1, len(df)):
+            prev_row = df.iloc[i - 1]
+            curr_row = df.iloc[i]
+
+            prev_highest = prev_row['highest']
+            curr_lowest = curr_row['lowest']
+
+            # 1. 判断是否形成向上跳空：当前K线最低价 > 前一根K线最高价
+            if curr_lowest <= prev_highest:
+                continue
+
+            # 2. 计算跳空大小
+            gap_size = curr_lowest - prev_highest
+            gap_ratio = gap_size / prev_highest
+
+            # 跳空必须足够大（避免微小波动）
+            if gap_ratio < min_gap_ratio:
+                continue
+
+            # 3. 判断是否在上升趋势中（检查前5根K线）
+            if i >= 5:
+                early_closes = df.iloc[i-5:i-2]['closing'].mean()
+                recent_closes = df.iloc[i-2:i]['closing'].mean()
+
+                # 上升趋势：近期平均价 > 早期平均价
+                if recent_closes <= early_closes:
+                    continue
+
+            # 4. 检查窗口是否被回补（向后查看最多30根K线）
+            window_filled = False
+            check_range = min(30, len(df) - i)
+
+            for j in range(i, i + check_range):
+                if df.iloc[j]['lowest'] <= prev_highest:
+                    window_filled = True
+                    break
+
+            # 窗口信息
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.RISING_WINDOW,
+                'price': (prev_highest + curr_lowest) / 2,  # 标记在窗口中间
+                'start_index': i - 1,
+                'end_index': i,
+                'window_top': curr_lowest,  # 窗口上边界
+                'window_bottom': prev_highest,  # 窗口下边界
+                'gap_size': gap_size,
+                'is_filled': window_filled,
+                'description': f'窗口大小={gap_size:.2f}({gap_ratio:.2%}), 'f'边界=[{prev_highest:.2f}, {curr_lowest:.2f}], 'f'状态={"已回补" if window_filled else "未回补"}'
+            })
+
+        return patterns
+
+    @staticmethod
+    def detect_falling_window(df: pd.DataFrame, min_gap_ratio: float = 0.002) -> List[Dict]:
+        """
+        检测下降窗口形态（Falling Window / Downward Gap）
+        趋势延续形态 - 看跌信号
+
+        核心特征（参考《日本蜡烛图技术》）：
+        🗳 在下降趋势中出现
+        🗳 当前K线的最高价低于前一根K线的最低价
+        🗳 两根K线之间形成向下的价格跳空（窗口）
+        🗳 窗口通常起到阻力作用
+        🗳 窗口未被回补（后续K线未填补窗口）
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            min_gap_ratio: 最小跳空比例，默认0.002（0.2%）
+
+        Returns:
+            检测到的下降窗口列表，包含窗口的上下边界
+        """
+        patterns = []
+
+        for i in range(1, len(df)):
+            prev_row = df.iloc[i - 1]
+            curr_row = df.iloc[i]
+
+            prev_lowest = prev_row['lowest']
+            curr_highest = curr_row['highest']
+
+            # 1. 判断是否形成向下跳空：当前K线最高价 < 前一根K线最低价
+            if curr_highest >= prev_lowest:
+                continue
+
+            # 2. 计算跳空大小
+            gap_size = prev_lowest - curr_highest
+            gap_ratio = gap_size / prev_lowest
+
+            # 跳空必须足够大（避免微小波动）
+            if gap_ratio < min_gap_ratio:
+                continue
+
+            # 3. 判断是否在下降趋势中（检查前5根K线）
+            if i >= 5:
+                early_closes = df.iloc[i-5:i-2]['closing'].mean()
+                recent_closes = df.iloc[i-2:i]['closing'].mean()
+
+                # 下降趋势：近期平均价 < 早期平均价
+                if recent_closes >= early_closes:
+                    continue
+
+            # 4. 检查窗口是否被回补（向后查看最多30根K线）
+            window_filled = False
+            check_range = min(30, len(df) - i)
+
+            for j in range(i, i + check_range):
+                if df.iloc[j]['highest'] >= prev_lowest:
+                    window_filled = True
+                    break
+
+            # 窗口信息
+            patterns.append({
+                'date': curr_row['date'] if 'date' in curr_row else curr_row.name,
+                'index': i,
+                'row': curr_row,
+                'pattern_type': CandlestickPattern.FALLING_WINDOW,
+                'price': (prev_lowest + curr_highest) / 2,  # 标记在窗口中间
+                'start_index': i - 1,
+                'end_index': i,
+                'window_top': prev_lowest,  # 窗口上边界
+                'window_bottom': curr_highest,  # 窗口下边界
+                'gap_size': gap_size,
+                'is_filled': window_filled,
+                'description': f'窗口大小={gap_size:.2f}({gap_ratio:.2%}), 'f'边界=[{curr_highest:.2f}, {prev_lowest:.2f}], 'f'状态={"已回补" if window_filled else "未回补"}'
+            })
+        return patterns
+
+    @staticmethod
     def detect_all_patterns(df: pd.DataFrame) -> List[Dict]:
         """
         检测所有支持的蜡烛图形态
@@ -1977,6 +2130,13 @@ class CandlestickPatternDetector:
 
         # 检测塔型底部（底部反转）
         #all_patterns.extend(CandlestickPatternDetector.detect_tower_bottom(df))
+
+        # 窗口形态
+        # 检测上升窗口（趋势延续）
+        all_patterns.extend(CandlestickPatternDetector.detect_rising_window(df))
+
+        # 检测下降窗口（趋势延续）
+        all_patterns.extend(CandlestickPatternDetector.detect_falling_window(df))
 
         # 按日期排序
         all_patterns.sort(key=lambda x: x['index'])
@@ -2218,67 +2378,34 @@ class CandlestickPatternDetector:
                 ],
                 'color_class': 'sync-card-orange'
             },
-
-"""
             {
-                'pattern_type': CandlestickPattern.ROUNDING_TOP,
-                'category': '多K线 - 顶部反转',
-                'signal': "看跌",
+                'pattern_type': CandlestickPattern.RISING_WINDOW,
+                'category': '窗口形态 - 趋势延续',
+                'signal': "看涨延续",
                 'criteria': [
-                    "在上升趋势之后出现",
-                    "价格形成圆弧状的顶部（碗状倒扣）",
-                    "最高价逐渐上升到最高点，然后逐渐下降",
-                    "左侧呈上升趋势，右侧呈下降趋势",
-                    "最高点应该在中间部分（30%-70%位置）",
-                    "左右两侧具有较好的单调性（曲率阈值默认70%）",
-                    "整体形成平滑的圆弧形态"
+                    "在上升趋势中出现",
+                    "当前K线的最低价高于前一根K线的最高价 -> 形成向上跳空",
+                    "两根K线之间形成价格窗口（缺口）",
+                    "跳空大小至少为前一根最高价的0.2%",
+                    "窗口通常起到支撑作用 -> 价格回调时不易跌破",
+                    "未被回补的窗口信号更强",
+                    "窗口被回补后失去支撑作用"
                 ],
-                'color_class': 'sync-card-blue'
+                'color_class': 'sync-card-green'
             },
             {
-                'pattern_type': CandlestickPattern.ROUNDING_BOTTOM,
-                'category': '多K线 - 底部反转',
-                'signal': "看涨",
+                'pattern_type': CandlestickPattern.FALLING_WINDOW,
+                'category': '窗口形态 - 趋势延续',
+                'signal': "看跌延续",
                 'criteria': [
-                    "在下降趋势之后出现",
-                    "价格形成圆弧状的底部（碗状）",
-                    "最低价逐渐下降到最低点，然后逐渐上升",
-                    "左侧呈下降趋势，右侧呈上升趋势",
-                    "最低点应该在中间部分（30%-70%位置）",
-                    "左右两侧具有较好的单调性（曲率阈值默认70%）",
-                    "整体形成平滑的圆弧形态"
+                    "在下降趋势中出现",
+                    "当前K线的最高价低于前一根K线的最低价 -> 形成向下跳空",
+                    "两根K线之间形成价格窗口（缺口）",
+                    "跳空大小至少为前一根最低价的0.2%",
+                    "窗口通常起到阻力作用 -> 价格反弹时不易突破",
+                    "未被回补的窗口信号更强",
+                    "窗口被回补后失去阻力作用"
                 ],
-                'color_class': 'sync-card-pink'
+                'color_class': 'sync-card-purple'
             },
-            {
-                'pattern_type': CandlestickPattern.TOWER_TOP,
-                'category': '多K线 - 顶部反转',
-                'signal': "看跌",
-                'criteria': [
-                    "在上升趋势之后出现",
-                    "左侧：一根或多根大阳线（塔的基础）",
-                    "中间：一系列小实体K线（顶部盘整，像塔顶）-> 至少60%的K线实体小于平均实体的60%",
-                    "右侧：一根或多根大阴线（塔的崩塌）",
-                    "形态像一座塔：强劲上升 → 高位整理 → 急剧下跌",
-                    "最高点应该在前70%部分",
-                    "最少7根K线形成完整形态"
-                ],
-                'color_class': 'sync-card-cyan'
-            },
-            {
-                'pattern_type': CandlestickPattern.TOWER_BOTTOM,
-                'category': '多K线 - 底部反转',
-                'signal': "看涨",
-                'criteria': [
-                    "在下降趋势之后出现",
-                    "左侧：一根或多根大阴线（塔的基础）",
-                    "中间：一系列小实体K线（底部盘整，像塔基）-> 至少60%的K线实体小于平均实体的60%",
-                    "右侧：一根或多根大阳线（塔的建立）",
-                    "形态像一座塔：急剧下跌 → 低位整理 → 强劲上升",
-                    "最低点应该在前70%部分",
-                    "最少7根K线形成完整形态"
-                ],
-                'color_class': 'sync-card-orange'
-            }
-"""
         ]
