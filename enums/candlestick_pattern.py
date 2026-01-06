@@ -10,7 +10,16 @@ class CandlestickPattern(Enum):
     HANGING_MAN = ("hanging_man", "上吊线", "⚖️", "#FF4500", 0.1)  # 顶部反转-看跌，橙红色，向上
     INVERTED_HAMMER = ("inverted_hammer", "倒锤子线", "🔨", "#FFD700", 0.1)  # 底部反转-看涨，金色，向上
     SHOOTING_STAR = ("shooting_star", "流星线", "☄️", "#8B0000", 0.1)  # 顶部反转-看跌，深红色，向上
-    DOJI = ("doji", "十字星", "✝️", "#708090", 0)  # 中性，石板灰，无偏移
+
+    # 十字线形态（细分类型）
+    DOJI = ("doji", "标准十字线", "✝️", "#708090", 0)  # 中性/反转，石板灰，无偏移
+    DRAGONFLY_DOJI_BULLISH = ("dragonfly_doji_bullish", "蜻蜓十字(涨)", "🦟", "#228B22", -0.1)  # 底部看涨，森林绿，向下
+    DRAGONFLY_DOJI_BEARISH = ("dragonfly_doji_bearish", "蜻蜓十字(跌)", "🦟", "#B8860B", 0.1)  # 顶部看跌，深金黄，向上
+    GRAVESTONE_DOJI_BULLISH = ("gravestone_doji_bullish", "墓碑十字(涨)", "🪦", "#DAA520", -0.1)  # 底部看涨，金黄，向下
+    GRAVESTONE_DOJI_BEARISH = ("gravestone_doji_bearish", "墓碑十字(跌)", "🪦", "#8B0000", 0.1)  # 顶部看跌，深红，向上
+    LONG_LEGGED_DOJI_BULLISH = ("long_legged_doji_bullish", "长腿十字(涨)", "🕷️", "#2E8B57", -0.1)  # 底部看涨，海绿，向下
+    LONG_LEGGED_DOJI_BEARISH = ("long_legged_doji_bearish", "长腿十字(跌)", "🕷️", "#A0522D", 0.1)  # 顶部看跌，赭石棕，向上
+    FOUR_PRICE_DOJI = ("four_price_doji", "四价十字", "➕", "#696969", 0)  # 极罕见，暗灰色，无偏移
 
     # 双K线形态
     BULLISH_ENGULFING = ("bullish_engulfing", "看涨吞没", "📈", "#32CD32", -0.1)  # 看涨，酸石灰绿，向下

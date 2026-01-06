@@ -363,6 +363,215 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
+    def detect_doji_patterns(df: pd.DataFrame, body_threshold: float = 0.001, trend_period: int = 5) -> List[Dict]:
+        """
+        检测所有类型的十字线形态（Doji Patterns）
+        根据《日本蜡烛图技术》，十字线是重要的反转信号，特别是在趋势末端
+
+        十字线定义：开盘价和收盘价相同或极其接近
+        - 标准十字线(Doji)：上下影线长度相近
+        - 长腿十字线(Long-Legged Doji)：上下影线都很长，表示市场犹豫不决
+        - 蜻蜓十字线(Dragonfly Doji)：只有下影线，在下跌趋势底部是看涨信号，在上涨趋势顶部是看跌信号
+        - 墓碑十字线(Gravestone Doji)：只有上影线，在上涨趋势顶部是看跌信号，在下跌趋势底部是看涨信号
+        - 四价十字线(Four-Price Doji)：开高收低完全相同，极罕见
+
+        信号解读：
+        - 在上升趋势中：十字线是顶部反转信号（看跌）
+        - 在下降趋势中：十字线是底部反转信号（看涨）
+        - 在盘整中：表示市场犹豫不决，需等待确认
+
+        Args:
+            df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            body_threshold: 判断为十字线的实体最大比例，默认0.001（实体/总长度小于0.1%）
+            trend_period: 判断趋势的周期，默认5天
+
+        Returns:
+            检测到的十字线列表，包含具体类型和信号方向
+        """
+        patterns = []
+
+        for i in range(trend_period, len(df)):
+            row = df.iloc[i]
+            opening = row['opening']
+            closing = row['closing']
+            highest = row['highest']
+            lowest = row['lowest']
+
+            # 计算K线总长度和实体长度
+            total_range = highest - lowest
+            if total_range == 0:  # 四价十字线（极罕见）
+                patterns.append({
+                    'date': row['date'] if 'date' in row else row.name,
+                    'index': i,
+                    'row': row.to_dict(),
+                    'pattern_type': CandlestickPattern.FOUR_PRICE_DOJI,
+                    'price': opening,
+                    'value': opening,
+                    'type': CandlestickPattern.FOUR_PRICE_DOJI.value,
+                    'name': CandlestickPattern.FOUR_PRICE_DOJI.text,
+                    'icon': CandlestickPattern.FOUR_PRICE_DOJI.icon,
+                    'color': CandlestickPattern.FOUR_PRICE_DOJI.color,
+                    'offset': CandlestickPattern.FOUR_PRICE_DOJI.offset,
+                    'description': '四价十字线：开高收低完全相同，极罕见'
+                })
+                continue
+
+            body = abs(closing - opening)
+            body_ratio = body / total_range
+
+            # 判断是否为十字线：实体占总长度的比例极小
+            if body_ratio > body_threshold:
+                continue
+
+            # 计算上下影线长度
+            upper_shadow = highest - max(opening, closing)
+            lower_shadow = min(opening, closing) - lowest
+
+            # 判断趋势
+            half = trend_period // 2
+            early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+            recent_avg = df.iloc[i - half:i]['closing'].mean()
+
+            is_uptrend = recent_avg > early_avg  # 上升趋势
+            is_downtrend = recent_avg < early_avg  # 下降趋势
+
+            # 分类十字线类型
+            shadow_ratio = 0.3  # 影线长度判断阈值
+
+            # 1. 蜻蜓十字线：只有下影线（或上影线极短）
+            if lower_shadow > body * 5 and upper_shadow < total_range * shadow_ratio:
+                if is_downtrend:
+                    # 下跌趋势中的蜻蜓十字线 -> 看涨信号（底部反转）
+                    pattern_type = CandlestickPattern.DRAGONFLY_DOJI_BULLISH
+                    signal = "看涨"
+                    description = f'蜻蜓十字(底部看涨)：下影线={lower_shadow:.2f}, 上影线={upper_shadow:.2f}, 下跌趋势反转信号'
+                elif is_uptrend:
+                    # 上涨趋势中的蜻蜓十字线 -> 看跌警告（可能的顶部反转）
+                    pattern_type = CandlestickPattern.DRAGONFLY_DOJI_BEARISH
+                    signal = "看跌"
+                    description = f'蜻蜓十字(顶部看跌)：下影线={lower_shadow:.2f}, 上影线={upper_shadow:.2f}, 上涨趋势可能反转'
+                else:
+                    # 盘整中，使用标准十字线
+                    pattern_type = CandlestickPattern.DOJI
+                    signal = "中性"
+                    description = f'蜻蜓十字(盘整)：下影线={lower_shadow:.2f}, 上影线={upper_shadow:.2f}, 市场犹豫'
+
+                patterns.append({
+                    'date': row['date'] if 'date' in row else row.name,
+                    'index': i,
+                    'row': row.to_dict(),
+                    'pattern_type': pattern_type,
+                    'price': lowest,  # 标记在最低点
+                    'value': lowest,
+                    'type': pattern_type.value,
+                    'name': pattern_type.text,
+                    'icon': pattern_type.icon,
+                    'color': pattern_type.color,
+                    'offset': pattern_type.offset,
+                    'description': description,
+                    'signal': signal
+                })
+
+            # 2. 墓碑十字线：只有上影线（或下影线极短）
+            elif upper_shadow > body * 5 and lower_shadow < total_range * shadow_ratio:
+                if is_uptrend:
+                    # 上涨趋势中的墓碑十字线 -> 看跌信号（顶部反转）
+                    pattern_type = CandlestickPattern.GRAVESTONE_DOJI_BEARISH
+                    signal = "看跌"
+                    description = f'墓碑十字(顶部看跌)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 上涨趋势反转信号'
+                elif is_downtrend:
+                    # 下跌趋势中的墓碑十字线 -> 看涨警告（可能的底部反转）
+                    pattern_type = CandlestickPattern.GRAVESTONE_DOJI_BULLISH
+                    signal = "看涨"
+                    description = f'墓碑十字(底部看涨)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 下跌趋势可能反转'
+                else:
+                    # 盘整中，使用标准十字线
+                    pattern_type = CandlestickPattern.DOJI
+                    signal = "中性"
+                    description = f'墓碑十字(盘整)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 市场犹豫'
+
+                patterns.append({
+                    'date': row['date'] if 'date' in row else row.name,
+                    'index': i,
+                    'row': row.to_dict(),
+                    'pattern_type': pattern_type,
+                    'price': highest,  # 标记在最高点
+                    'value': highest,
+                    'type': pattern_type.value,
+                    'name': pattern_type.text,
+                    'icon': pattern_type.icon,
+                    'color': pattern_type.color,
+                    'offset': pattern_type.offset,
+                    'description': description,
+                    'signal': signal
+                })
+
+            # 3. 长腿十字线：上下影线都很长
+            elif upper_shadow > body * 3 and lower_shadow > body * 3:
+                if is_downtrend:
+                    # 下跌趋势中的长腿十字线 -> 看涨信号（底部反转，市场犹豫不决）
+                    pattern_type = CandlestickPattern.LONG_LEGGED_DOJI_BULLISH
+                    signal = "看涨"
+                    description = f'长腿十字(底部看涨)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 市场犹豫，可能反转向上'
+                elif is_uptrend:
+                    # 上涨趋势中的长腿十字线 -> 看跌信号（顶部反转，市场犹豫不决）
+                    pattern_type = CandlestickPattern.LONG_LEGGED_DOJI_BEARISH
+                    signal = "看跌"
+                    description = f'长腿十字(顶部看跌)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 市场犹豫，可能反转向下'
+                else:
+                    # 盘整中，使用标准十字线
+                    pattern_type = CandlestickPattern.DOJI
+                    signal = "中性"
+                    description = f'长腿十字(盘整)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 市场高度犹豫'
+
+                patterns.append({
+                    'date': row['date'] if 'date' in row else row.name,
+                    'index': i,
+                    'row': row.to_dict(),
+                    'pattern_type': pattern_type,
+                    'price': (highest + lowest) / 2,  # 标记在中点
+                    'value': (highest + lowest) / 2,
+                    'type': pattern_type.value,
+                    'name': pattern_type.text,
+                    'icon': pattern_type.icon,
+                    'color': pattern_type.color,
+                    'offset': pattern_type.offset,
+                    'description': description,
+                    'signal': signal
+                })
+
+            # 4. 标准十字线：上下影线长度相对均衡
+            else:
+                # 标准十字线的信号依赖于趋势和下一根K线的确认
+                if is_downtrend:
+                    signal = "看涨"
+                    description = f'标准十字线(下跌趋势)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 可能底部反转'
+                elif is_uptrend:
+                    signal = "看跌"
+                    description = f'标准十字线(上涨趋势)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 可能顶部反转'
+                else:
+                    signal = "中性"
+                    description = f'标准十字线(盘整)：上影线={upper_shadow:.2f}, 下影线={lower_shadow:.2f}, 市场犹豫'
+
+                patterns.append({
+                    'date': row['date'] if 'date' in row else row.name,
+                    'index': i,
+                    'row': row.to_dict(),
+                    'pattern_type': CandlestickPattern.DOJI,
+                    'price': (highest + lowest) / 2,  # 标记在中点
+                    'value': (highest + lowest) / 2,
+                    'type': CandlestickPattern.DOJI.value,
+                    'name': CandlestickPattern.DOJI.text,
+                    'icon': CandlestickPattern.DOJI.icon,
+                    'color': CandlestickPattern.DOJI.color,
+                    'offset': CandlestickPattern.DOJI.offset,
+                    'description': description,
+                    'signal': signal
+                })
+
+        return patterns
+
+    @staticmethod
     def detect_bullish_engulfing(df: pd.DataFrame, trend_period: int = 5, min_body_ratio: float = 1.0) -> List[Dict]:
         """
         检测看涨吞没形态（Bullish Engulfing）
@@ -1165,8 +1374,7 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
-    def detect_evening_star(df: pd.DataFrame, trend_period: int = 5, star_body_ratio: float = 0.3,
-                           min_gap: float = 0.01) -> List[Dict]:
+    def detect_evening_star(df: pd.DataFrame, trend_period: int = 5, star_body_ratio: float = 0.3, min_gap: float = 0.01) -> List[Dict]:
         """
         检测黄昏星形态（Evening Star）
         顶部反转形态 - 三K线形态
@@ -2084,6 +2292,9 @@ class CandlestickPatternDetector:
         # 检测流星线（顶部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_shooting_star(df))
 
+        # 检测所有类型的十字线（反转信号）
+        all_patterns.extend(CandlestickPatternDetector.detect_doji_patterns(df))
+
         # 双K线形态
         # 检测看涨吞没（底部反转）
         all_patterns.extend(CandlestickPatternDetector.detect_bullish_engulfing(df))
@@ -2213,6 +2424,95 @@ class CandlestickPatternDetector:
                     "收盘价位于最低价或接近最低价 -> (最高价 - 收盘价) / (最高价 - 最低价) &gt;= 0.6"
                 ],
                 'color_class': 'sync-card-cyan'
+            },
+            {
+                'pattern_type': CandlestickPattern.DOJI,
+                'category': '单K线 - 反转信号',
+                'signal': "看涨/看跌(依趋势)",
+                'criteria': [
+                    "开盘价和收盘价相同或极其接近 -> 实体/总长度 &lt; 0.1%",
+                    "上下影线长度相对均衡",
+                    "在下降趋势中为看涨信号 (底部反转)",
+                    "在上升趋势中为看跌信号 (顶部反转)",
+                    "表示市场犹豫不决，需等待确认"
+                ],
+                'color_class': 'sync-card-blue'
+            },
+            {
+                'pattern_type': CandlestickPattern.FOUR_PRICE_DOJI,
+                'category': '单K线 - 中性',
+                'signal': "中性",
+                'criteria': [
+                    "开盘价、收盘价、最高价、最低价完全相同",
+                    "表示市场完全没有波动, 极度清淡或停牌",
+                ],
+                'color_class': 'sync-card-orange'
+            },
+            {
+                'pattern_type': CandlestickPattern.DRAGONFLY_DOJI_BULLISH,
+                'category': '单K线 - 蜻蜓十字',
+                'signal': "看涨",
+                'criteria': [
+                    "开盘价和收盘价相同或极其接近 -> 实体/总长度 &lt; 0.1%",
+                    "只有下影线（或上影线极短） -> 下影线 &gt; 实体 * 5 且 上影线 &lt; 总长度 * 30%",
+                    "出现在下降趋势中 -> 前 5 天的前半段收盘均价 &gt; 后半段收盘均价",
+                ],
+                'color_class': 'sync-card-green'
+            },
+            {
+                'pattern_type': CandlestickPattern.DRAGONFLY_DOJI_BEARISH,
+                'category': '单K线 - 蜻蜓十字',
+                'signal': "看跌",
+                'criteria': [
+                    "开盘价和收盘价相同或极其接近 -> 实体/总长度 &lt; 0.1%",
+                    "只有下影线（或上影线极短） -> 下影线 &gt; 实体 * 5 且 上影线 &lt; 总长度 * 30%",
+                    "出现在上升趋势中 -> 前 5 天的前半段收盘均价 &lt; 后半段收盘均价",
+                ],
+                'color_class': 'sync-card-pink'
+            },
+            {
+                'pattern_type': CandlestickPattern.GRAVESTONE_DOJI_BULLISH,
+                'category': '单K线 - 墓碑十字',
+                'signal': "看涨",
+                'criteria': [
+                    "开盘价和收盘价相同或极其接近 -> 实体/总长度 &lt; 0.1%",
+                    "只有上影线（或下影线极短） -> 上影线 &gt; 实体 * 5 且 下影线 &lt; 总长度 * 30%",
+                    "出现在下降趋势中 -> 前 5 天的前半段收盘均价 &gt; 后半段收盘均价",
+                ],
+                'color_class': 'sync-card-cyan'
+            },
+            {
+                'pattern_type': CandlestickPattern.GRAVESTONE_DOJI_BEARISH,
+                'category': '单K线 - 墓碑十字',
+                'signal': "看跌",
+                'criteria': [
+                    "开盘价和收盘价相同或极其接近 -> 实体/总长度 &lt; 0.1%",
+                    "只有上影线（或下影线极短） -> 上影线 &gt; 实体 * 5 且 下影线 &lt; 总长度 * 30%",
+                    "出现在上升趋势中 -> 前 5 天的前半段收盘均价 &lt; 后半段收盘均价",
+                ],
+                'color_class': 'sync-card-red'
+            },
+            {
+                'pattern_type': CandlestickPattern.LONG_LEGGED_DOJI_BULLISH,
+                'category': '单K线 - 长腿十字',
+                'signal': "看涨",
+                'criteria': [
+                    "开盘价和收盘价相同或极其接近 -> 实体/总长度 &lt; 0.1%",
+                    "上下影线都很长 -> 上影线 &gt; 实体 * 3 且 下影线 &gt; 实体 * 3",
+                    "出现在下降趋势中 -> 前 5 天的前半段收盘均价 &gt; 后半段收盘均价",
+                ],
+                'color_class': 'sync-card-teal'
+            },
+            {
+                'pattern_type': CandlestickPattern.LONG_LEGGED_DOJI_BEARISH,
+                'category': '单K线 - 长腿十字',
+                'signal': "看跌",
+                'criteria': [
+                    "开盘价和收盘价相同或极其接近 -> 实体/总长度 &lt; 0.1%",
+                    "上下影线都很长 -> 上影线 &gt; 实体 * 3 且 下影线 &gt; 实体 * 3",
+                    "出现在上升趋势中 -> 前 5 天的前半段收盘均价 &lt; 后半段收盘均价",
+                ],
+                'color_class': 'sync-card-brown'
             },
             {
                 'pattern_type': CandlestickPattern.BULLISH_ENGULFING,
