@@ -387,16 +387,18 @@ class ChartBuilder:
 
             for pattern in candlestick_patterns:
                 pattern_type = pattern.get('type')
-                if pattern_type not in pattern_groups:
-                    pattern_groups[pattern_type] = {
-                        'points': [],
-                        'name': pattern.get('name', pattern_type),
-                        'icon': pattern.get('icon', ''),
-                        'color': pattern.get('color', '#000000'),
-                        'offset': pattern.get('offset', 0)
-                    }
-                pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
-                # Only add to box_patterns if it's not a window pattern
+                # 排除窗口形态，窗口形态单独处理，不加入pattern_groups
+                if 'window_top' not in pattern:
+                    if pattern_type not in pattern_groups:
+                        pattern_groups[pattern_type] = {
+                            'points': [],
+                            'name': pattern.get('name', pattern_type),
+                            'icon': pattern.get('icon', ''),
+                            'color': pattern.get('color', '#000000'),
+                            'offset': pattern.get('offset', 0)
+                        }
+                    pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
+
                 if 'start_index' in pattern and 'end_index' in pattern and 'window_top' not in pattern:
                     box_patterns.append(pattern)
 
@@ -551,47 +553,11 @@ class ChartBuilder:
                     if start_idx < len(dates) and end_idx < len(dates):
                         start_date = dates[start_idx]
                         # 延长窗口显示范围，使其更容易看到后续K线是否越过窗口
-                        # 向右延伸到数据末尾或者延伸10个K线，取较小值
-                        extended_end_idx = min(end_idx + 10, len(dates) - 1)
+                        # 向右延伸到数据末尾或者延伸15个K线，取较小值
+                        extended_end_idx = min(end_idx + 15, len(dates) - 1)
                         end_date = dates[extended_end_idx]
 
-                        # 1. 绘制窗口填充区域（半透明）
-                        area_line = Line()
-                        area_line.add_xaxis([start_date, end_date])
-                        area_line.add_yaxis(
-                            series_name="",  # 不显示图例
-                            y_axis=[window_middle, window_middle],  # 使用中间值
-                            is_symbol_show=False,
-                            is_smooth=False,
-                            linestyle_opts=opts.LineStyleOpts(
-                                width=0,  # 不显示线条
-                                opacity=0
-                            ),
-                            # 使用areastyle来填充窗口区域
-                            areastyle_opts=opts.AreaStyleOpts(
-                                color=pattern.get('color', '#FF6B6B'),
-                                opacity=0.1  # 半透明填充
-                            ),
-                            # 设置填充的上下界
-                            markarea_opts=opts.MarkAreaOpts(
-                                data=[
-                                    opts.MarkAreaItem(
-                                        name="",
-                                        x=(start_date, end_date),
-                                        y=(window_bottom, window_top),
-                                        itemstyle_opts=opts.ItemStyleOpts(
-                                            color=pattern.get('color', '#FF6B6B'),
-                                            opacity=0.15,
-                                            border_width=0
-                                        )
-                                    )
-                                ]
-                            ),
-                            label_opts=opts.LabelOpts(is_show=False)
-                        )
-                        kline = kline.overlap(area_line)
-
-                        # 2. 绘制窗口上边界虚线
+                        # 1. 绘制窗口上边界虚线
                         top_line = Line()
                         top_line.add_xaxis([start_date, end_date])
                         top_line.add_yaxis(
@@ -601,21 +567,21 @@ class ChartBuilder:
                             is_smooth=False,
                             linestyle_opts=opts.LineStyleOpts(
                                 type_='dashed',  # 虚线
-                                width=2,
+                                width=1.5,
                                 color=pattern.get('color', '#FF6B6B'),
-                                opacity=0.8
+                                opacity=0.3
                             ),
                             label_opts=opts.LabelOpts(
                                 is_show=True,
                                 position="end",
                                 formatter=f"{window_top:.2f}",
-                                font_size=10,
+                                font_size=14,
                                 color=pattern.get('color', '#FF6B6B')
                             )
                         )
                         kline = kline.overlap(top_line)
 
-                        # 3. 绘制窗口下边界虚线
+                        # 2. 绘制窗口下边界虚线
                         bottom_line = Line()
                         bottom_line.add_xaxis([start_date, end_date])
                         bottom_line.add_yaxis(
@@ -625,26 +591,53 @@ class ChartBuilder:
                             is_smooth=False,
                             linestyle_opts=opts.LineStyleOpts(
                                 type_='dashed',  # 虚线
-                                width=2,
+                                width=1.5,
                                 color=pattern.get('color', '#FF6B6B'),
-                                opacity=0.8
+                                opacity=0.3
                             ),
                             label_opts=opts.LabelOpts(
                                 is_show=True,
                                 position="end",
                                 formatter=f"{window_bottom:.2f}",
-                                font_size=10,
+                                font_size=14,
                                 color=pattern.get('color', '#FF6B6B')
                             )
                         )
                         kline = kline.overlap(bottom_line)
 
+                        # 3. 绘制窗口填充区域（只填充上下虚线之间的区域）
+                        # 使用markarea来精确填充窗口区域
+                        fill_line = Line()
+                        fill_line.add_xaxis([start_date])
+                        fill_line.add_yaxis(
+                            series_name="",
+                            y_axis=[window_middle],
+                            is_symbol_show=False,
+                            linestyle_opts=opts.LineStyleOpts(width=0, opacity=0),
+                            label_opts=opts.LabelOpts(is_show=False),
+                            markarea_opts=opts.MarkAreaOpts(
+                                data=[
+                                    opts.MarkAreaItem(
+                                        name="",
+                                        x=(start_date, end_date),
+                                        y=(window_bottom, window_top),
+                                        itemstyle_opts=opts.ItemStyleOpts(
+                                            color=pattern.get('color', '#FF6B6B'),
+                                            opacity=0.1,
+                                            border_width=0
+                                        )
+                                    )
+                                ]
+                            )
+                        )
+                        kline = kline.overlap(fill_line)
+                        """
                         # 4. 在窗口中间位置添加图标标记
                         window_scatter = Scatter()
                         window_scatter.add_xaxis([start_date])
                         window_scatter.add_yaxis(
                             series_name=pattern.get('name', ''),
-                            y_axis=[window_middle],  # 放在窗口中间
+                            y_axis=[window_middle - 0.03],  # 放在窗口中间
                             symbol='pin',
                             symbol_size=12,
                             itemstyle_opts=opts.ItemStyleOpts(color=pattern.get('color', '#FF6B6B')),
@@ -657,6 +650,7 @@ class ChartBuilder:
                             )
                         )
                         kline = kline.overlap(window_scatter)
+                        """
 
         # 添加笔的连线（按类型分组合并）
         if strokes:

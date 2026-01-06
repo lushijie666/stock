@@ -1953,9 +1953,9 @@ class CandlestickPatternDetector:
                 if early_avg >= recent_avg:
                     continue
 
-            # 4. 检查窗口是否被回补（向后查看最多30根K线）
+            # 4. 检查窗口是否被回补（向后查看最多15根K线）
             window_filled = False
-            check_range = min(30, len(df) - i)
+            check_range = min(15, len(df) - i)
 
             for j in range(i, i + check_range):
                 if df.iloc[j]['lowest'] <= prev_highest:
@@ -2032,9 +2032,9 @@ class CandlestickPatternDetector:
                 if early_avg <= recent_avg:
                     continue
 
-            # 4. 检查窗口是否被回补（向后查看最多30根K线）
+            # 4. 检查窗口是否被回补（向后查看最多15根K线）
             window_filled = False
-            check_range = min(30, len(df) - i)
+            check_range = min(15, len(df) - i)
 
             for j in range(i, i + check_range):
                 if df.iloc[j]['highest'] >= prev_lowest:
@@ -2391,7 +2391,7 @@ class CandlestickPatternDetector:
                     "第 2 根最低价高于第 1 根最高价, 两根之间形成价格窗口, 形成向上跳空",
                     "跳空大小至少为第 1 根最高价的0.2%",
                     "窗口通常起到支撑作用, 价格回调时不易跌破",
-                    "未被回补的窗口信号更强, 被回补后失去支撑作用 -> 向后查看最多30根",
+                    "未被回补的窗口信号更强, 被回补后失去支撑作用 -> 向后查看最多15根",
                 ],
                 'color_class': 'sync-card-green'
             },
@@ -2404,7 +2404,7 @@ class CandlestickPatternDetector:
                     "第 2 根最高价低于第 1 根最低价, 两根之间形成价格窗口, 形成向下跳空",
                     "跳空大小至少为第 1 根最低价的0.2%",
                     "窗口通常起到阻力作用, 价格反弹时不易突破",
-                    "未被回补的窗口信号更强, 被回补后失去阻力作用 -> 向后查看最多30根",
+                    "未被回补的窗口信号更强, 被回补后失去阻力作用 -> 向后查看最多15根",
                 ],
                 'color_class': 'sync-card-purple'
             },
