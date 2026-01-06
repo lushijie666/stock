@@ -396,16 +396,18 @@ class ChartBuilder:
                         'offset': pattern.get('offset', 0)
                     }
                 pattern_groups[pattern_type]['points'].append([pattern['date'], pattern['value']])
-                if 'start_index' in pattern and 'end_index' in pattern:
+                # Only add to box_patterns if it's not a window pattern
+                if 'start_index' in pattern and 'end_index' in pattern and 'window_top' not in pattern:
                     box_patterns.append(pattern)
 
-                # 收集需要绘制箭头的形态（所有形态）
-                arrow_lines.append({
-                    'date': pattern['date'],
-                    'value': pattern['value'],
-                    'offset': pattern.get('offset', 0),
-                    'color': pattern.get('color', '#000000')
-                })
+                # 收集需要绘制箭头的形态（排除窗口形态，窗口只显示边界线）
+                if 'window_top' not in pattern:
+                    arrow_lines.append({
+                        'date': pattern['date'],
+                        'value': pattern['value'],
+                        'offset': pattern.get('offset', 0),
+                        'color': pattern.get('color', '#000000')
+                    })
 
             # 创建枚举顺序映射
             enum_order = {enum.value: i for i, enum in enumerate(CandlestickPattern)}
