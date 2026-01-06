@@ -136,7 +136,10 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
         if 'start_index' in pattern and 'end_index' in pattern:
             marker_data['start_index'] = pattern['start_index']
             marker_data['end_index'] = pattern['end_index']
-
+        if 'window_top' in pattern:
+            marker_data['window_top'] = pattern['window_top']
+        if 'window_bottom' in pattern:
+            marker_data['window_bottom'] = pattern['window_bottom']
         pattern_markers.append(marker_data)
 
     # 创建K线图
