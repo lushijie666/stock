@@ -1902,7 +1902,7 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
-    def detect_rising_window(df: pd.DataFrame, min_gap_ratio: float = 0.002) -> List[Dict]:
+    def detect_rising_window(df: pd.DataFrame, trend_period: int = 5, min_gap_ratio: float = 0.002) -> List[Dict]:
         """
         检测上升窗口形态（Rising Window / Upward Gap）
         趋势延续形态 - 看涨信号
@@ -1916,6 +1916,7 @@ class CandlestickPatternDetector:
 
         Args:
             df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
             min_gap_ratio: 最小跳空比例，默认0.002（0.2%）
 
         Returns:
@@ -1923,7 +1924,7 @@ class CandlestickPatternDetector:
         """
         patterns = []
 
-        for i in range(1, len(df)):
+        for i in range(trend_period + 1, len(df)):
             prev_row = df.iloc[i - 1]
             curr_row = df.iloc[i]
 
@@ -1942,13 +1943,14 @@ class CandlestickPatternDetector:
             if gap_ratio < min_gap_ratio:
                 continue
 
-            # 3. 判断是否在上升趋势中（检查前5根K线）
-            if i >= 5:
-                early_closes = df.iloc[i-5:i-2]['closing'].mean()
-                recent_closes = df.iloc[i-2:i]['closing'].mean()
+            # 3. 判断之前是否存在上升趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
 
-                # 上升趋势：近期平均价 > 早期平均价
-                if recent_closes <= early_closes:
+                # 上升趋势：早期平均 < 近期平均
+                if early_avg >= recent_avg:
                     continue
 
             # 4. 检查窗口是否被回补（向后查看最多30根K线）
@@ -1979,7 +1981,7 @@ class CandlestickPatternDetector:
         return patterns
 
     @staticmethod
-    def detect_falling_window(df: pd.DataFrame, min_gap_ratio: float = 0.002) -> List[Dict]:
+    def detect_falling_window(df: pd.DataFrame, trend_period: int = 5, min_gap_ratio: float = 0.002) -> List[Dict]:
         """
         检测下降窗口形态（Falling Window / Downward Gap）
         趋势延续形态 - 看跌信号
@@ -1993,6 +1995,7 @@ class CandlestickPatternDetector:
 
         Args:
             df: 包含开盘价、收盘价、最高价、最低价的DataFrame
+            trend_period: 判断趋势的周期，默认5天
             min_gap_ratio: 最小跳空比例，默认0.002（0.2%）
 
         Returns:
@@ -2000,7 +2003,7 @@ class CandlestickPatternDetector:
         """
         patterns = []
 
-        for i in range(1, len(df)):
+        for i in range(trend_period + 1, len(df)):
             prev_row = df.iloc[i - 1]
             curr_row = df.iloc[i]
 
@@ -2019,13 +2022,14 @@ class CandlestickPatternDetector:
             if gap_ratio < min_gap_ratio:
                 continue
 
-            # 3. 判断是否在下降趋势中（检查前5根K线）
-            if i >= 5:
-                early_closes = df.iloc[i-5:i-2]['closing'].mean()
-                recent_closes = df.iloc[i-2:i]['closing'].mean()
+            # 3. 判断之前是否存在下降趋势
+            if i >= trend_period:
+                half = trend_period // 2
+                early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
+                recent_avg = df.iloc[i - half:i]['closing'].mean()
 
-                # 下降趋势：近期平均价 < 早期平均价
-                if recent_closes >= early_closes:
+                # 下降趋势：早期平均 > 近期平均
+                if early_avg <= recent_avg:
                     continue
 
             # 4. 检查窗口是否被回补（向后查看最多30根K线）
