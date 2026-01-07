@@ -427,10 +427,13 @@ class CandlestickPatternDetector:
             upper_shadow = highest - max(opening, closing)
             lower_shadow = min(opening, closing) - lowest
 
-            # 判断趋势
+            # 判断趋势（与其他形态检测方法保持一致）
+            previous_closes = df.iloc[i-trend_period:i]['closing'].tolist()
+            if len(previous_closes) < 2:
+                continue
             half = trend_period // 2
-            early_avg = df.iloc[i - trend_period:i - trend_period + half]['closing'].mean()
-            recent_avg = df.iloc[i - half:i]['closing'].mean()
+            early_avg = sum(previous_closes[:half]) / half
+            recent_avg = sum(previous_closes[half:]) / (trend_period - half)
 
             is_uptrend = recent_avg > early_avg  # 上升趋势
             is_downtrend = recent_avg < early_avg  # 下降趋势
