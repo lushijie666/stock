@@ -114,18 +114,15 @@ def show_kline_chart(stock, t: StockHistoryType):
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
-              <span class="chart-title">联动K线图</span>
+              <span class="chart-title">图表</span>
           </div>
       """, unsafe_allow_html=True)
 
-    # 创建各个独立的图表
     # 1. 原始K线图
     kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
 
     # 2. 带形态的K线图
-    kline_pattern = ChartBuilder.create_kline_chart(
-        dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers
-    )
+    kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
 
     # 3. 成交量图
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)

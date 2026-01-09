@@ -1237,9 +1237,6 @@ class ChartBuilder:
         Returns:
             Grid: 包含所有联动图表的Grid对象
         """
-        if not charts_config or len(charts_config) == 0:
-            raise ValueError("charts_config 不能为空")
-
         # 创建Grid
         grid = Grid(init_opts=opts.InitOpts(
             width="100%",
@@ -1248,7 +1245,6 @@ class ChartBuilder:
             theme="white",
             bg_color="white"
         ))
-
         # 添加所有图表到Grid
         for idx, config in enumerate(charts_config):
             chart = config.get("chart")
@@ -1258,31 +1254,36 @@ class ChartBuilder:
             if chart is None:
                 continue
 
-            # 设置图表的 grid_index
-            # 注意：需要在添加到 Grid 之前设置 xaxis 和 yaxis 的 grid_index
-            chart.set_global_opts(
-                xaxis_opts=opts.AxisOpts(
-                    type_="category",
-                    grid_index=idx,
-                    axislabel_opts=opts.LabelOpts(
-                        is_show=(idx == len(charts_config) - 1)  # 只在最后一个图表显示x轴标签
-                    )
-                ),
-                yaxis_opts=opts.AxisOpts(
-                    is_scale=True,
-                    grid_index=idx,
-                )
-            )
+            # 获取图表原有的options，用于保留原有配置
+            chart_options = chart.options
 
-            # 如果有标题，设置标题位置
+            # 更新 xAxis 配置（保留原有配置，只添加 gridIndex）
+            if "xAxis" in chart_options:
+                for xaxis in chart_options["xAxis"]:
+                    xaxis["gridIndex"] = idx
+                    # 只在最后一个图表显示x轴标签
+                    if idx != len(charts_config) - 1:
+                        if "axisLabel" not in xaxis:
+                            xaxis["axisLabel"] = {}
+                        xaxis["axisLabel"]["show"] = False
+
+            # 更新 yAxis 配置（保留原有配置，只添加 gridIndex）
+            if "yAxis" in chart_options:
+                for yaxis in chart_options["yAxis"]:
+                    yaxis["gridIndex"] = idx
+
+            # 如果有标题，添加标题配置
             if title:
-                chart.set_global_opts(
-                    title_opts=opts.TitleOpts(
-                        title=title,
-                        pos_left="left",
-                        pos_top=grid_pos.get("pos_top", "0%")
-                    )
-                )
+                if "title" not in chart_options:
+                    chart_options["title"] = []
+                elif not isinstance(chart_options["title"], list):
+                    chart_options["title"] = [chart_options["title"]]
+
+                chart_options["title"].append({
+                    "text": title,
+                    "left": "left",
+                    "top": grid_pos.get("pos_top", "0%")
+                })
 
             # 添加到Grid
             grid.add(
