@@ -87,16 +87,6 @@ def show_kline_chart(stock, t: StockHistoryType):
     )
     df, dates, k_line_data, volumes, extra_lines= _build_stock_kline_chart_data(stock, t)
     candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
-    st.markdown("""
-          <div class="chart-header">
-              <span class="chart-icon">🔍</span>
-              <span class="chart-title">K线图</span>
-          </div>
-      """, unsafe_allow_html=True)
-    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
-    #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
-    # 显示K线图
-    streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart")
 
     # 转换形态数据用于图表显示
     pattern_markers = []
@@ -121,11 +111,22 @@ def show_kline_chart(stock, t: StockHistoryType):
             marker_data['window_bottom'] = pattern['window_bottom']
         pattern_markers.append(marker_data)
 
-    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
-    streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_pattern")
+    st.markdown("""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">联动K线图</span>
+          </div>
+      """, unsafe_allow_html=True)
 
-    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
-    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar")
+    # 创建联动图表
+    linked_chart = ChartBuilder.create_linked_kline_charts(
+        dates, k_line_data, df, volumes,
+        extra_lines=extra_lines,
+        candlestick_patterns=pattern_markers
+    )
+
+    # 显示联动图表
+    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="1400px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
 
 def show_kline_pattern_chart(stock, t: StockHistoryType):
     st.markdown(
