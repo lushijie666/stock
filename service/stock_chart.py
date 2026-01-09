@@ -118,12 +118,39 @@ def show_kline_chart(stock, t: StockHistoryType):
           </div>
       """, unsafe_allow_html=True)
 
-    # 创建联动图表
-    linked_chart = ChartBuilder.create_linked_kline_charts(
-        dates, k_line_data, df, volumes,
-        extra_lines=extra_lines,
-        candlestick_patterns=pattern_markers
+    # 创建各个独立的图表
+    # 1. 原始K线图
+    kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
+
+    # 2. 带形态的K线图
+    kline_pattern = ChartBuilder.create_kline_chart(
+        dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers
     )
+
+    # 3. 成交量图
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
+
+    # 配置图表联动
+    charts_config = [
+        {
+            "chart": kline_original,
+            "grid_pos": {"pos_top": "5%", "height": "28%"},
+            "title": "原始K线图"
+        },
+        {
+            "chart": kline_pattern,
+            "grid_pos": {"pos_top": "37%", "height": "28%"},
+            "title": "K线图（含形态）"
+        },
+        {
+            "chart": volume_bar,
+            "grid_pos": {"pos_top": "69%", "height": "26%"},
+            "title": "成交量"
+        }
+    ]
+
+    # 创建联动图表
+    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="1400px")
 
     # 显示联动图表
     streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="1400px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")

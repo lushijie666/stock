@@ -1207,216 +1207,103 @@ class ChartBuilder:
         return grid
 
     @staticmethod
-    def create_linked_kline_charts(dates, k_line_data, df, volumes, extra_lines=None, candlestick_patterns=None):
+    def create_linked_charts(charts_config, total_height="1400px"):
         """
-        创建联动的K线图组合，包括：
-        1. 原始K线图
-        2. 带形态标记的K线图
-        3. 成交量图
+        创建联动的图表组合（通用方法）
 
         所有图表共享同一个dataZoom，实现时间轴联动
 
         Args:
-            dates: 日期列表
-            k_line_data: K线数据
-            df: DataFrame数据
-            volumes: 成交量数据
-            extra_lines: 额外的线（支撑线、阻力线等）
-            candlestick_patterns: 蜡烛图形态标记
+            charts_config: 图表配置列表，每个配置包含：
+                - chart: pyecharts图表对象
+                - grid_pos: dict，包含 pos_top 和 height
+                - title: 可选，图表标题
+            total_height: Grid总高度，默认"1400px"
+
+        Example:
+            charts_config = [
+                {
+                    "chart": kline_chart,
+                    "grid_pos": {"pos_top": "5%", "height": "28%"},
+                    "title": "K线图"
+                },
+                {
+                    "chart": volume_chart,
+                    "grid_pos": {"pos_top": "37%", "height": "28%"},
+                    "title": "成交量"
+                }
+            ]
 
         Returns:
-            Grid: 包含三个联动图表的Grid对象
+            Grid: 包含所有联动图表的Grid对象
         """
-        df_json = df.to_json(orient='records')
+        if not charts_config or len(charts_config) == 0:
+            raise ValueError("charts_config 不能为空")
 
-        # 创建原始K线图
-        kline_original = (
-            Kline(init_opts=opts.InitOpts())
-            .add_xaxis(dates)
-            .add_yaxis(
-                "K线",
-                k_line_data,
-                itemstyle_opts=opts.ItemStyleOpts(
-                    color="#ef232a",
-                    color0="#14b143",
-                    border_color="#ef232a",
-                    border_color0="#14b143",
-                )
-            )
-        )
+        # 创建Grid
+        grid = Grid(init_opts=opts.InitOpts(
+            width="100%",
+            height=total_height,
+            animation_opts=opts.AnimationOpts(animation=False),
+            theme="white",
+            bg_color="white"
+        ))
 
-        # 添加额外的线（支撑线、阻力线等）
-        if extra_lines:
-            lines = Line()
-            lines.add_xaxis(dates)
-            for name, line_data in extra_lines.items():
-                values = line_data.get('values', [])
-                color = line_data.get('color', None)
-                if len(values) != len(dates):
-                    if len(values) < len(dates):
-                        values = values + [values[-1]] * (len(dates) - len(values))
-                    else:
-                        values = values[:len(dates)]
-                line_opts = opts.LineStyleOpts(type_="dashed", width=1)
-                if color:
-                    line_opts.color = color
-                lines.add_yaxis(
-                    name,
-                    values,
-                    is_smooth=False,
-                    label_opts=opts.LabelOpts(
-                        is_show=True,
-                        position="end",
-                        formatter="{c}",
-                        font_size=15,
-                        font_weight="bold",
-                        color=color if color else "#000"
-                    ),
-                    linestyle_opts=line_opts,
-                    itemstyle_opts=opts.ItemStyleOpts(color=color) if color else None,
-                    symbol="none"
-                )
-            kline_original = kline_original.overlap(lines)
+        # 添加所有图表到Grid
+        for idx, config in enumerate(charts_config):
+            chart = config.get("chart")
+            grid_pos = config.get("grid_pos", {})
+            title = config.get("title", "")
 
-        kline_original.set_global_opts(
-            title_opts=opts.TitleOpts(title="原始K线图", pos_left="left"),
-            xaxis_opts=opts.AxisOpts(
-                type_="category",
-                grid_index=0,
-                axislabel_opts=opts.LabelOpts(is_show=False)
-            ),
-            yaxis_opts=opts.AxisOpts(
-                is_scale=True,
-                grid_index=0,
-                position="left",
-                name="价格",
-                name_location="middle",
-                name_gap=60,
-                name_rotate=-90,
-            ),
-            legend_opts=opts.LegendOpts(is_show=True, pos_top="1%")
-        )
+            if chart is None:
+                continue
 
-        # 创建带形态的K线图
-        kline_pattern = ChartBuilder.create_kline_chart(
-            dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=candlestick_patterns
-        )
-        kline_pattern.set_global_opts(
-            title_opts=opts.TitleOpts(title="K线图（含形态）", pos_left="left"),
-            xaxis_opts=opts.AxisOpts(
-                type_="category",
-                grid_index=1,
-                axislabel_opts=opts.LabelOpts(is_show=False)
-            ),
-            yaxis_opts=opts.AxisOpts(
-                is_scale=True,
-                grid_index=1,
-                position="left",
-                name="价格",
-                name_location="middle",
-                name_gap=60,
-                name_rotate=-90,
-            ),
-            legend_opts=opts.LegendOpts(is_show=True, pos_top="34%")
-        )
-
-        # 创建成交量图
-        colors = ['#ef232a' if close > open else '#14b143'
-                  for open, close in zip(df['opening'], df['closing'])]
-        volume_bar = (
-            Bar()
-            .add_xaxis(dates)
-            .add_yaxis(
-                "成交量",
-                volumes,
-                label_opts=opts.LabelOpts(is_show=False),
-                itemstyle_opts=opts.ItemStyleOpts(
-                    color=JsCode(f"""
-                        function(params) {{
-                            var colorList = {str(colors)};
-                            return colorList[params.dataIndex];
-                        }}
-                    """),
-                )
-            )
-        )
-        volume_bar.set_global_opts(
-            title_opts=opts.TitleOpts(title="成交量", pos_left="left"),
-            xaxis_opts=opts.AxisOpts(
-                type_="category",
-                grid_index=2,
-                axislabel_opts=opts.LabelOpts(is_show=True)
-            ),
-            yaxis_opts=opts.AxisOpts(
-                is_scale=True,
-                grid_index=2,
-                position="left",
-                name="成交量(股)",
-                name_location="middle",
-                name_gap=60,
-                name_rotate=-90,
-                axislabel_opts=opts.LabelOpts(
-                    formatter=JsCode("""
-                        function(value) {
-                            if (value >= 100000000) {
-                                return (value / 100000000).toFixed(1) + '亿';
-                            } else if (value >= 10000) {
-                                return (value / 10000).toFixed(1) + '万';
-                            } else {
-                                return value;
-                            }
-                        }
-                    """)
+            # 设置图表的 grid_index
+            # 注意：需要在添加到 Grid 之前设置 xaxis 和 yaxis 的 grid_index
+            chart.set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    grid_index=idx,
+                    axislabel_opts=opts.LabelOpts(
+                        is_show=(idx == len(charts_config) - 1)  # 只在最后一个图表显示x轴标签
+                    )
                 ),
-            ),
-            legend_opts=opts.LegendOpts(is_show=True, pos_top="67%")
-        )
+                yaxis_opts=opts.AxisOpts(
+                    is_scale=True,
+                    grid_index=idx,
+                )
+            )
 
-        # 使用Grid组合三个图表，并设置联动的dataZoom
-        grid = (
-            Grid(init_opts=opts.InitOpts(
-                width="100%",
-                height="1400px",  # 增加总高度以容纳三个图表
-                animation_opts=opts.AnimationOpts(animation=False),
-                theme="white",
-                bg_color="white"
-            ))
-            .add(
-                kline_original,
+            # 如果有标题，设置标题位置
+            if title:
+                chart.set_global_opts(
+                    title_opts=opts.TitleOpts(
+                        title=title,
+                        pos_left="left",
+                        pos_top=grid_pos.get("pos_top", "0%")
+                    )
+                )
+
+            # 添加到Grid
+            grid.add(
+                chart,
                 grid_opts=opts.GridOpts(
                     pos_left="10%",
                     pos_right="10%",
-                    pos_top="5%",
-                    height="28%"
+                    pos_top=grid_pos.get("pos_top", "5%"),
+                    height=grid_pos.get("height", "30%")
                 ),
             )
-            .add(
-                kline_pattern,
-                grid_opts=opts.GridOpts(
-                    pos_left="10%",
-                    pos_right="10%",
-                    pos_top="37%",
-                    height="28%"
-                ),
-            )
-            .add(
-                volume_bar,
-                grid_opts=opts.GridOpts(
-                    pos_left="10%",
-                    pos_right="10%",
-                    pos_top="69%",
-                    height="26%"
-                ),
-            )
-        )
 
-        # 添加全局的 dataZoom 控制器，控制所有三个图表的 x 轴
-        # xaxis_index=[0, 1, 2] 表示控制所有三个图表的 x 轴
+        # 构建所有图表的索引列表
+        chart_indices = list(range(len(charts_config)))
+
+        # 添加全局的 dataZoom 控制器，控制所有图表的 x 轴
         grid.options.update({
             "dataZoom": [
                 {
                     "type": "slider",
-                    "xAxisIndex": [0, 1, 2],  # 控制所有三个图表
+                    "xAxisIndex": chart_indices,  # 控制所有图表
                     "start": 0,
                     "end": 100,
                     "bottom": "2%",
@@ -1424,7 +1311,7 @@ class ChartBuilder:
                 },
                 {
                     "type": "inside",
-                    "xAxisIndex": [0, 1, 2],  # 控制所有三个图表
+                    "xAxisIndex": chart_indices,  # 控制所有图表
                     "start": 0,
                     "end": 100,
                 }
