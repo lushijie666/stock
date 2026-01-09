@@ -1321,14 +1321,17 @@ class ChartBuilder:
                     "xAxisIndex": chart_indices,  # 控制所有图表
                     "start": 0,
                     "end": 100,
-                    "bottom": "2%",
-                    "height": 20,
-                },
-                {
-                    "type": "inside",
-                    "xAxisIndex": chart_indices,  # 控制所有图表
-                    "start": 0,
-                    "end": 100,
+                    "top": "1%",  # 移到顶部
+                    "height": 25,
+                    "handleSize": "110%",  # 增大滑块手柄大小，方便拖动
+                    "handleStyle": {
+                        "color": "#5470c6",
+                        "borderColor": "#5470c6"
+                    },
+                    "textStyle": {
+                        "color": "#333"
+                    },
+                    "borderColor": "#ccc"
                 }
             ],
             "tooltip": {
@@ -1336,6 +1339,24 @@ class ChartBuilder:
                 "axisPointer": {
                     "type": "cross",
                     "link": [{"xAxisIndex": "all"}]  # 十字准星联动
+                }
+            },
+            # 启用画框缩放（brushSelect）
+            "toolbox": {
+                "show": True,
+                "right": "5%",
+                "top": "1%",
+                "feature": {
+                    "dataZoom": {
+                        "yAxisIndex": False,  # 只对 x 轴进行缩放
+                        "title": {
+                            "zoom": "区域缩放",
+                            "back": "还原"
+                        }
+                    },
+                    "restore": {
+                        "title": "重置"
+                    }
                 }
             }
         })

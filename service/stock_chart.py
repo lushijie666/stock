@@ -131,17 +131,17 @@ def show_kline_chart(stock, t: StockHistoryType):
     charts_config = [
         {
             "chart": kline_original,
-            "grid_pos": {"pos_top": "5%", "height": "28%"},
+            "grid_pos": {"pos_top": "8%", "height": "28%"},  # 从5%改为8%，给顶部滑动条留空间
             "title": "原始K线图"
         },
         {
             "chart": kline_pattern,
-            "grid_pos": {"pos_top": "37%", "height": "28%"},
+            "grid_pos": {"pos_top": "40%", "height": "28%"},  # 从37%改为40%
             "title": "K线图（含形态）"
         },
         {
             "chart": volume_bar,
-            "grid_pos": {"pos_top": "69%", "height": "26%"},
+            "grid_pos": {"pos_top": "72%", "height": "25%"},  # 从69%改为72%
             "title": "成交量"
         }
     ]
