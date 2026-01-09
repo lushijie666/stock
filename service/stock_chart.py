@@ -69,7 +69,6 @@ def show_page(stock, t: StockHistoryType):
         _show_strategy_config(stock, t)
     chart_handlers = {
         "K线图": lambda: show_kline_chart(stock, t),
-        "K线图形态": lambda: show_kline_pattern_chart(stock, t),
         "K线图策略": lambda: show_kline_strategy_chart(stock, t, selected_strategies),
         "K线图处理": lambda: show_kline_process_chart(stock, t),
         "买卖点分析": lambda: show_trade_points_chart(stock, t, selected_strategies),
@@ -87,6 +86,7 @@ def show_kline_chart(stock, t: StockHistoryType):
         unsafe_allow_html=True
     )
     df, dates, k_line_data, volumes, extra_lines= _build_stock_kline_chart_data(stock, t)
+    candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
@@ -97,13 +97,33 @@ def show_kline_chart(stock, t: StockHistoryType):
     #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
     # 显示K线图
     streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart")
-    # 显示成交量
-    st.markdown(f"""
-                     <div class="chart-header">
-                         <span class="chart-icon">🔍</span>
-                         <span class="chart-title">成交量</span>
-                     </div>
-                 """, unsafe_allow_html=True)
+
+    # 转换形态数据用于图表显示
+    pattern_markers = []
+    for pattern in candlestick_patterns:
+        pattern_type = pattern['pattern_type']
+        marker_data = {
+            'date': format_date_by_type(pattern['date'], t),
+            'value': pattern['price'],
+            'type': pattern_type.code,
+            'name': pattern_type.text,
+            'icon': pattern_type.icon,
+            'color': pattern_type.color,
+            'offset': pattern_type.offset,
+            'description': pattern['description']
+        }
+        if 'start_index' in pattern and 'end_index' in pattern:
+            marker_data['start_index'] = pattern['start_index']
+            marker_data['end_index'] = pattern['end_index']
+        if 'window_top' in pattern:
+            marker_data['window_top'] = pattern['window_top']
+        if 'window_bottom' in pattern:
+            marker_data['window_bottom'] = pattern['window_bottom']
+        pattern_markers.append(marker_data)
+
+    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
+    streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_pattern")
+
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
     streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px",key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar")
 
