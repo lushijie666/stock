@@ -1263,9 +1263,23 @@ class ChartBuilder:
                     xaxis["gridIndex"] = idx
                     # 只在最后一个图表显示x轴标签
                     if idx != len(charts_config) - 1:
-                        if "axisLabel" not in xaxis:
-                            xaxis["axisLabel"] = {}
-                        xaxis["axisLabel"]["show"] = False
+                        # 直接设置 axisLabel.show 为 False
+                        if "axisLabel" not in xaxis or xaxis["axisLabel"] is None:
+                            xaxis["axisLabel"] = {"show": False}
+                        else:
+                            # 如果已有 axisLabel，确保它是字典格式
+                            if not isinstance(xaxis["axisLabel"], dict):
+                                # 转换对象为字典
+                                try:
+                                    # 尝试获取对象的 opts 属性
+                                    if hasattr(xaxis["axisLabel"], "opts"):
+                                        xaxis["axisLabel"] = xaxis["axisLabel"].opts
+                                    else:
+                                        xaxis["axisLabel"] = {}
+                                except:
+                                    xaxis["axisLabel"] = {}
+                            # 设置 show 为 False
+                            xaxis["axisLabel"]["show"] = False
 
             # 更新 yAxis 配置（保留原有配置，只添加 gridIndex）
             if "yAxis" in chart_options:
