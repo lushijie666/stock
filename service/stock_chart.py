@@ -118,13 +118,17 @@ def show_kline_chart(stock, t: StockHistoryType):
           </div>
       """, unsafe_allow_html=True)
 
-    # 1. 原始K线图
+    # 1. 原始K线图（禁用tooltip避免重复）
     kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
+    # 禁用第一个K线图的tooltip
+    kline_original.set_global_opts(
+        tooltip_opts=opts.TooltipOpts(is_show=False)
+    )
 
-    # 2. 带形态的K线图
+    # 2. 带形态的K线图（保留tooltip）
     kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
 
-    # 3. 成交量图
+    # 3. 成交量图（保留tooltip）
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
 
     # 配置图表联动
