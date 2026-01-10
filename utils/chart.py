@@ -1122,6 +1122,7 @@ class ChartBuilder:
                             var dfData = {df_json};
                             var result = '<div style="padding:2px; width:200px;"><strong>' + params[0].axisValue + '</strong><br/>';
                             params.forEach(function(item) {{
+                                console.log(item);
                                 if (item.seriesName === '成交量') {{
                                     var index = item.dataIndex;
                                     var currentData = dfData[index];
@@ -1261,30 +1262,27 @@ class ChartBuilder:
             if "xAxis" in chart_options:
                 for xaxis in chart_options["xAxis"]:
                     xaxis["gridIndex"] = idx
-                    # 只在最后一个图表显示x轴标签
-                    if idx != len(charts_config) - 1:
-                        # 直接设置 axisLabel.show 为 False
-                        if "axisLabel" not in xaxis or xaxis["axisLabel"] is None:
-                            xaxis["axisLabel"] = {"show": False}
-                        else:
-                            # 如果已有 axisLabel，确保它是字典格式
-                            if not isinstance(xaxis["axisLabel"], dict):
-                                # 转换对象为字典
-                                try:
-                                    # 尝试获取对象的 opts 属性
-                                    if hasattr(xaxis["axisLabel"], "opts"):
-                                        xaxis["axisLabel"] = xaxis["axisLabel"].opts
-                                    else:
-                                        xaxis["axisLabel"] = {}
-                                except:
-                                    xaxis["axisLabel"] = {}
-                            # 设置 show 为 False
-                            xaxis["axisLabel"]["show"] = False
+                    # 所有图表都显示x轴标签（只是最后一个会完整显示）
+                    # 不隐藏，让每个图表都能看到日期
 
             # 更新 yAxis 配置（保留原有配置，只添加 gridIndex）
             if "yAxis" in chart_options:
                 for yaxis in chart_options["yAxis"]:
                     yaxis["gridIndex"] = idx
+
+            # 调整图例位置，避免重叠
+            if "legend" in chart_options:
+                for legend in chart_options["legend"] if isinstance(chart_options["legend"], list) else [chart_options["legend"]]:
+                    # 根据图表索引调整图例的垂直位置
+                    if idx == 0:
+                        legend["top"] = "9%"  # 第一个图表的图例
+                    elif idx == 1:
+                        legend["top"] = "41%"  # 第二个图表的图例
+                    elif idx == 2:
+                        legend["top"] = "73%"  # 第三个图表的图例
+                    else:
+                        # 如果有更多图表，按比例计算
+                        legend["top"] = f"{int(grid_pos.get('pos_top', '0%').rstrip('%')) + 1}%"
 
             # 如果有标题，添加标题配置
             if title:
@@ -1334,12 +1332,9 @@ class ChartBuilder:
                     "borderColor": "#ccc"
                 }
             ],
-            "tooltip": {
-                "trigger": "axis",
-                "axisPointer": {
-                    "type": "cross",
-                    "link": [{"xAxisIndex": "all"}]  # 十字准星联动
-                }
+            # 不设置全局 tooltip，让每个图表使用自己的 tooltip 配置（保留原有的 formatter）
+            "axisPointer": {
+                "link": [{"xAxisIndex": "all"}]  # 十字准星联动
             },
             # 启用画框缩放（brushSelect）
             "toolbox": {
