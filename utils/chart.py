@@ -991,18 +991,12 @@ class ChartBuilder:
                                 var change = parseFloat(currentData.change).toFixed(2) + '%';
                                 var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
 
-                                result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
                                 result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
                                 result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
                                 result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
                                 result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
-                               
-                                result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedTurnoverCount + '</span><br/>';
-                                result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedTurnoverShouCount + '</span><br/>';
-                                result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
-
+                                result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
                                 result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
-                                result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
                             }}
                         }});
 
@@ -1309,14 +1303,9 @@ class ChartBuilder:
                     "borderColor": "#ccc"
                 }
             ],
-            # 配置全局 tooltip 但不覆盖单个图表的 formatter
-            "tooltip": {
-                "trigger": "axis",
-                "axisPointer": {
-                    "type": "cross",
-                    "link": [{"xAxisIndex": "all"}]  # 十字准星联动
-                },
-                "confine": True  # 限制在图表区域内
+            # 配置全局 axisPointer 联动，但不配置全局 tooltip 以保留各图表的 formatter
+            "axisPointer": {
+                "link": [{"xAxisIndex": "all"}]  # 十字准星联动
             },
         })
 
