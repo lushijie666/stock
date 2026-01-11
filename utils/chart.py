@@ -162,7 +162,6 @@ class ChartBuilder:
         if ma_lines:
             lines = Line()
             lines.add_xaxis(dates)
-
             # 为不同周期的均线设置不同颜色
             ma_colors = {
                 'MA5': '#39afe6',   # 蓝色 - 短期
@@ -173,15 +172,14 @@ class ChartBuilder:
                 'MA120': '#636e72', # 灰色 - 长期
                 'MA250': '#2d3436'  # 深灰 - 长期
             }
-
             for name, values in ma_lines.items():
                 color = ma_colors.get(name, '#808080')  # 默认灰色
                 lines.add_yaxis(
                     name,
                     values,
                     is_smooth=True,
-                    label_opts=opts.LabelOpts(is_show=False),  # 不显示标签
-                    linestyle_opts=opts.LineStyleOpts(width=1.5, color=color),
+                    label_opts=opts.LabelOpts(is_show=False),
+                    linestyle_opts=opts.LineStyleOpts(width=1, color=color),
                     itemstyle_opts=opts.ItemStyleOpts(color=color)
                 )
             kline = kline.overlap(lines)
@@ -1205,6 +1203,93 @@ class ChartBuilder:
             )
         )
         return grid
+
+    @staticmethod
+    def create_rsi_chart(dates: list, rsi_data: dict):
+        """
+        创建RSI指标图表
+        Args:
+            dates: 日期列表
+            rsi_data: RSI数据字典，格式: {'RSI6': [...], 'RSI12': [...], 'RSI24': [...]}
+        """
+        line = Line()
+        line.add_xaxis(dates)
+
+        # RSI颜色配置
+        rsi_colors = {
+            'RSI6': '#FF6B6B',   # 红色 - 短期
+            'RSI12': '#4ECDC4',  # 青色 - 中期
+            'RSI24': '#95E1D3'   # 浅绿 - 长期
+        }
+
+        # 添加RSI线
+        for name, values in rsi_data.items():
+            color = rsi_colors.get(name, '#808080')
+            line.add_yaxis(
+                series_name=name,
+                y_axis=values,
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(width=2, color=color),
+                itemstyle_opts=opts.ItemStyleOpts(color=color),
+                label_opts=opts.LabelOpts(is_show=False),
+                symbol="none"
+            )
+
+        # 设置全局选项
+        line.set_global_opts(
+            title_opts=opts.TitleOpts(title="RSI指标"),
+            legend_opts=opts.LegendOpts(
+                pos_top="5%",
+                pos_left="right"
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="axis",
+                axis_pointer_type="cross"
+            ),
+            xaxis_opts=opts.AxisOpts(
+                type_="category",
+                boundary_gap=False,
+                axislabel_opts=opts.LabelOpts(color="#000000")
+            ),
+            yaxis_opts=opts.AxisOpts(
+                min_=0,
+                max_=100,
+                splitline_opts=opts.SplitLineOpts(
+                    is_show=True,
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")
+                ),
+                axislabel_opts=opts.LabelOpts(color="#000000")
+            ),
+            visualmap_opts=opts.VisualMapOpts(
+                is_show=False,
+                dimension=1,
+                series_index=0,
+                pieces=[
+                    {"min": 0, "max": 20, "color": "#14b143"},    # 超卖区
+                    {"min": 20, "max": 80, "color": "#666666"},   # 正常区
+                    {"min": 80, "max": 100, "color": "#ef232a"}   # 超买区
+                ]
+            )
+        )
+
+        # 添加超买超卖线（辅助线）
+        line.set_series_opts(
+            markline_opts=opts.MarkLineOpts(
+                data=[
+                    opts.MarkLineItem(y=80, name="超买线"),
+                    opts.MarkLineItem(y=50, name="中线"),
+                    opts.MarkLineItem(y=20, name="超卖线")
+                ],
+                linestyle_opts=opts.LineStyleOpts(
+                    type_="dashed",
+                    color="#999",
+                    width=1
+                ),
+                label_opts=opts.LabelOpts(position="end")
+            )
+        )
+
+        return line
 
     @staticmethod
     def create_linked_charts(charts_config, total_height="1400px"):

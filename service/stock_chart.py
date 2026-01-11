@@ -84,7 +84,7 @@ def show_kline_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-    df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_kline_chart_data(stock, t)
+    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_kline_chart_data(stock, t)
     candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
 
     # 转换形态数据用于图表显示
@@ -127,32 +127,66 @@ def show_kline_chart(stock, t: StockHistoryType):
     # 3. 成交量图
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
 
+    # 4. MACD图表
+    macd_chart = None
+    if macd_data and 'dif' in macd_data:
+        macd_chart = ChartBuilder.create_macd_chart(
+            dates,
+            macd_data['dif'],
+            macd_data['dea'],
+            macd_data['macd']
+        )
+
+    # 5. RSI图表
+    rsi_chart = None
+    if rsi_data:
+        rsi_chart = ChartBuilder.create_rsi_chart(dates, rsi_data)
+
     # 配置图表联动
     charts_config = [
         {
             "chart": kline_original,
-            "grid_pos": {"pos_top": "8%", "height": "28%"},
+            "grid_pos": {"pos_top": "2%", "height": "18%"},
             "title": "原始K线图",
             "show_tooltip": False
         },
         {
             "chart": kline_pattern,
-            "grid_pos": {"pos_top": "40%", "height": "28%"},
+            "grid_pos": {"pos_top": "22%", "height": "18%"},
             "title": "K线图（含形态）",
-            "show_tooltip": True  # 显示tooltip
+            "show_tooltip": True
         },
         {
             "chart": volume_bar,
-            "grid_pos": {"pos_top": "72%", "height": "25%"},
+            "grid_pos": {"pos_top": "42%", "height": "15%"},
             "title": "成交量",
-            "show_tooltip": True  # 显示tooltip
+            "show_tooltip": True
         }
     ]
+
+    # 添加MACD图表（如果有数据）
+    if macd_chart:
+        charts_config.append({
+            "chart": macd_chart,
+            "grid_pos": {"pos_top": "59%", "height": "18%"},
+            "title": "MACD",
+            "show_tooltip": True
+        })
+
+    # 添加RSI图表（如果有数据）
+    if rsi_chart:
+        charts_config.append({
+            "chart": rsi_chart,
+            "grid_pos": {"pos_top": "79%", "height": "18%"},
+            "title": "RSI",
+            "show_tooltip": True
+        })
+
     # 创建联动图表
-    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="1400px")
+    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="1800px")
 
     # 显示联动图表
-    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="1400px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
+    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="1800px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
 
 def show_kline_pattern_chart(stock, t: StockHistoryType):
     st.markdown(
@@ -163,7 +197,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-    df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_kline_chart_data(stock, t)
+    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_kline_chart_data(stock, t)
     candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
 
     # 转换形态数据用于图表显示
@@ -1480,8 +1514,6 @@ def _build_stock_kline_chart_data(stock, t: StockHistoryType):
             'values': [min_lowest] * len(dates),  # 支撑线
             'color': '#14b143'  # 绿色
         }
-
-    # 计算移动平均线（参考《日本蜡烛图技术》）
     ma_lines = {}
     if len(df) > 0:
         # 短期均线
@@ -1498,7 +1530,48 @@ def _build_stock_kline_chart_data(stock, t: StockHistoryType):
         if len(df) >= 60:
             ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
 
-    return df, dates, k_line_data, volumes, extra_lines, ma_lines
+    # 计算MACD指标
+    macd_data = {}
+    if len(df) > 0:
+        # 计算EMA
+        ema_12 = df['closing'].ewm(span=12, adjust=False).mean()
+        ema_26 = df['closing'].ewm(span=26, adjust=False).mean()
+
+        # DIF = EMA(12) - EMA(26)
+        dif = ema_12 - ema_26
+
+        # DEA = EMA(DIF, 9)
+        dea = dif.ewm(span=9, adjust=False).mean()
+
+        # MACD = (DIF - DEA) * 2
+        macd = (dif - dea) * 2
+
+        macd_data = {
+            'dif': dif.round(3).tolist(),
+            'dea': dea.round(3).tolist(),
+            'macd': macd.round(3).tolist()
+        }
+
+    # 计算RSI指标
+    rsi_data = {}
+    if len(df) > 0:
+        # 计算价格变动
+        delta = df['closing'].diff()
+
+        # 分离上涨和下跌
+        gain = delta.where(delta > 0, 0)
+        loss = -delta.where(delta < 0, 0)
+
+        # 计算RSI(6), RSI(12), RSI(24)
+        for period in [6, 12, 24]:
+            avg_gain = gain.rolling(window=period, min_periods=1).mean()
+            avg_loss = loss.rolling(window=period, min_periods=1).mean()
+
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
+            rsi_data[f'RSI{period}'] = rsi.round(2).tolist()
+
+    return df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data
 
 def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
     model = get_history_model(t)
