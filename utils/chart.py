@@ -988,14 +988,14 @@ class ChartBuilder:
 
                         // 按固定顺序显示：先显示K线价格信息，再显示成交量信息
                         if (klineData) {{
-                            var index = klineData.dataIndex;
-                            var currentData = dfData[index];
-                            var opening = parseFloat(currentData.opening).toFixed(2);
-                            var closing = parseFloat(currentData.closing).toFixed(2);
-                            var lowest = parseFloat(currentData.lowest).toFixed(2);
-                            var highest = parseFloat(currentData.highest).toFixed(2);
-                            var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
-                            var change = parseFloat(currentData.change).toFixed(2) + '%';
+                            var klineIndex = klineData.dataIndex;
+                            var klineCurrentData = dfData[klineIndex];
+                            var opening = parseFloat(klineCurrentData.opening).toFixed(2);
+                            var closing = parseFloat(klineCurrentData.closing).toFixed(2);
+                            var lowest = parseFloat(klineCurrentData.lowest).toFixed(2);
+                            var highest = parseFloat(klineCurrentData.highest).toFixed(2);
+                            var changeAmount = parseFloat(klineCurrentData.change_amount).toFixed(2);
+                            var change = parseFloat(klineCurrentData.change).toFixed(2) + '%';
 
                             result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
                             result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
@@ -1006,14 +1006,14 @@ class ChartBuilder:
                         }}
 
                         if (volumeData) {{
-                            var index = volumeData.dataIndex;
-                            var currentData = dfData[index];
+                            var volumeIndex = volumeData.dataIndex;
+                            var volumeCurrentData = dfData[volumeIndex];
                             var value = volumeData.value;
                             var shouValue = (value / 100).toFixed(0);
                             var formattedValue = formatValue(value);
                             var formattedShou = formatValue(Number(shouValue));
-                            var formattedTurnover = formatValue(currentData.turnover_amount);
-                            var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
+                            var formattedTurnover = formatValue(volumeCurrentData.turnover_amount);
+                            var turnoverRatio = parseFloat(volumeCurrentData.turnover_ratio).toFixed(2) + '%';
 
                             result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
                             result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
