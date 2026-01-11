@@ -14,7 +14,7 @@ from enums.patterns import Patterns
 from utils.chart import ChartBuilder
 from utils.convert import format_dates, format_dates_series, format_date_by_type, format_dates_signals, format_pattern_text
 from utils.signal import calculate_all_signals
-from utils.strategy import calculate_macd, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
+from utils.strategy import calculate_macd, calculate_rsi, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
     generate_trading_advice, calculate_strategy_performance, calculate_position_and_cash_values
 from utils.k_line_processor import KLineProcessor
 from utils.candlestick_pattern_detector import CandlestickPatternDetector
@@ -1536,46 +1536,22 @@ def _build_stock_kline_chart_data(stock, t: StockHistoryType):
         if len(df) >= 60:
             ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
 
-    # 计算MACD指标
+    # 计算MACD指标 - 使用统一的strategy.py中的函数
     macd_data = {}
     if len(df) > 0:
-        # 计算EMA
-        ema_12 = df['closing'].ewm(span=12, adjust=False).mean()
-        ema_26 = df['closing'].ewm(span=26, adjust=False).mean()
-
-        # DIF = EMA(12) - EMA(26)
-        dif = ema_12 - ema_26
-
-        # DEA = EMA(DIF, 9)
-        dea = dif.ewm(span=9, adjust=False).mean()
-
-        # MACD = (DIF - DEA) * 2
-        macd = (dif - dea) * 2
-
+        macd_df = calculate_macd(df)
         macd_data = {
-            'dif': dif.round(3).tolist(),
-            'dea': dea.round(3).tolist(),
-            'macd': macd.round(3).tolist()
+            'dif': macd_df['DIFF'].round(3).tolist(),
+            'dea': macd_df['DEA'].round(3).tolist(),
+            'macd': macd_df['MACD_hist'].round(3).tolist()
         }
 
-    # 计算RSI指标
+    # 计算RSI指标 - 使用统一的strategy.py中的函数
     rsi_data = {}
     if len(df) > 0:
-        # 计算价格变动
-        delta = df['closing'].diff()
-
-        # 分离上涨和下跌
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-
-        # 计算RSI(6), RSI(12), RSI(24)
-        for period in [6, 12, 24]:
-            avg_gain = gain.rolling(window=period, min_periods=1).mean()
-            avg_loss = loss.rolling(window=period, min_periods=1).mean()
-
-            rs = avg_gain / avg_loss
-            rsi = 100 - (100 / (1 + rs))
-            rsi_data[f'RSI{period}'] = rsi.round(2).tolist()
+        rsi_df = calculate_rsi(df, periods=[6, 12, 24])
+        for col in rsi_df.columns:
+            rsi_data[col] = rsi_df[col].tolist()
 
     return df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data
 

@@ -225,13 +225,53 @@ class CandlestickStrategy(BaseStrategy):
 
 
 def calculate_macd(df: pd.DataFrame, fast_period=12, slow_period=26, signal_period=9):
+    """
+    计算MACD指标
+    Args:
+        df: 包含'closing'列的DataFrame
+        fast_period: 快速EMA周期，默认12
+        slow_period: 慢速EMA周期，默认26
+        signal_period: 信号线(DEA)周期，默认9
+    Returns:
+        DataFrame，包含 DIFF, DEA, MACD_hist 列
+    """
     df = df.copy()
     df['EMA12'] = df['closing'].ewm(span=fast_period, adjust=False).mean()
     df['EMA26'] = df['closing'].ewm(span=slow_period, adjust=False).mean()
     df['DIFF'] = df['EMA12'] - df['EMA26']
     df['DEA'] = df['DIFF'].ewm(span=signal_period, adjust=False).mean()
-    df['MACD_hist'] = df['DIFF'] - df['DEA']
+    df['MACD_hist'] = df['DIFF'] - df['DEA']  # 标准MACD柱状图
     return df[['DIFF', 'DEA', 'MACD_hist']]
+
+def calculate_rsi(df: pd.DataFrame, periods=[6, 12, 24]):
+    """
+    计算RSI指标
+    Args:
+        df: 包含'closing'列的DataFrame
+        periods: RSI周期列表，默认[6, 12, 24]
+    Returns:
+        DataFrame，包含 RSI6, RSI12, RSI24 等列
+    """
+    df = df.copy()
+
+    # 计算价格变动
+    delta = df['closing'].diff()
+
+    # 分离上涨和下跌
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    # 计算不同周期的RSI
+    rsi_df = pd.DataFrame()
+    for period in periods:
+        avg_gain = gain.rolling(window=period, min_periods=1).mean()
+        avg_loss = loss.rolling(window=period, min_periods=1).mean()
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        rsi_df[f'RSI{period}'] = rsi.round(2)
+
+    return rsi_df
 
 def calculate_macd_signals(df):
     # 计算 MACD
