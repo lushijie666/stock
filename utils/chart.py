@@ -997,6 +997,21 @@ class ChartBuilder:
                                 result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
                                 result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
                                 result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                            }} else if (item.seriesName === '成交量') {{
+                                // 处理成交量series的tooltip
+                                var index = item.dataIndex;
+                                var currentData = dfData[index];
+                                var value = item.value;
+                                var shouValue = (value / 100).toFixed(0);
+                                var formattedValue = formatValue(value);
+                                var formattedShou = formatValue(Number(shouValue));
+                                var formattedTurnover = formatValue(currentData.turnover_amount);
+                                var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
+
+                                result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
+                                result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
+                                result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
+                                result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
                             }}
                         }});
 
@@ -1249,26 +1264,16 @@ class ChartBuilder:
                     yaxis["gridIndex"] = idx
 
             # 处理 tooltip 显示配置
+            # 注意：不在这里修改tooltip，而是在Grid层面统一处理
             show_tooltip = config.get("show_tooltip", True)
+            # 将show_tooltip信息保存，稍后在Grid层面处理
             if not show_tooltip:
-                # 隐藏该图表的 tooltip
-                chart_options["tooltip"] = {"show": False}
-            else:
-                # 确保tooltip配置中有必要的参数，同时保留原有的formatter
-                if "tooltip" in chart_options:
-                    tooltip_config = chart_options["tooltip"]
-                    # 检查是否是dict类型，如果不是则转换
-                    if not isinstance(tooltip_config, dict):
-                        # 如果是TooltipOpts对象，已经有完整配置，跳过
-                        pass
-                    else:
-                        # 是dict，确保有trigger和axisPointer配置
-                        if "trigger" not in tooltip_config:
-                            tooltip_config["trigger"] = "axis"
-                        if "axisPointer" not in tooltip_config:
-                            tooltip_config["axisPointer"] = {"type": "cross"}
-                        # 添加confine限制tooltip在图表区域内
-                        tooltip_config["confine"] = True
+                # 标记该图表的series不显示tooltip
+                if "series" in chart_options:
+                    for series in chart_options["series"]:
+                        if isinstance(series, dict):
+                            series["tooltip"] = {"show": False}
+
 
             # 调整图例位置，避免重叠
             if "legend" in chart_options:
@@ -1319,9 +1324,9 @@ class ChartBuilder:
                     "borderColor": "#ccc"
                 }
             ],
-            # 只配置 axisPointer 联动，不配置全局 tooltip
+            # 配置 axisPointer 联动，让十字准星在所有图表间同步
             "axisPointer": {
-                "link": [{"xAxisIndex": "all"}]  # 十字准星联动
+                "link": [{"xAxisIndex": "all"}]
             },
         })
 
