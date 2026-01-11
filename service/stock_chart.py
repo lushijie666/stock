@@ -142,23 +142,23 @@ def show_kline_chart(stock, t: StockHistoryType):
     if rsi_data:
         rsi_chart = ChartBuilder.create_rsi_chart(dates, rsi_data)
 
-    # 配置图表联动
+    # 配置图表联动 - 重新调整布局
     charts_config = [
         {
             "chart": kline_original,
-            "grid_pos": {"pos_top": "2%", "height": "18%"},
+            "grid_pos": {"pos_top": "3%", "height": "15%"},
             "title": "原始K线图",
             "show_tooltip": False
         },
         {
             "chart": kline_pattern,
-            "grid_pos": {"pos_top": "22%", "height": "18%"},
+            "grid_pos": {"pos_top": "20%", "height": "15%"},
             "title": "K线图（含形态）",
             "show_tooltip": True
         },
         {
             "chart": volume_bar,
-            "grid_pos": {"pos_top": "42%", "height": "15%"},
+            "grid_pos": {"pos_top": "37%", "height": "12%"},
             "title": "成交量",
             "show_tooltip": True
         }
@@ -168,7 +168,7 @@ def show_kline_chart(stock, t: StockHistoryType):
     if macd_chart:
         charts_config.append({
             "chart": macd_chart,
-            "grid_pos": {"pos_top": "59%", "height": "18%"},
+            "grid_pos": {"pos_top": "51%", "height": "15%"},
             "title": "MACD",
             "show_tooltip": True
         })
@@ -177,16 +177,21 @@ def show_kline_chart(stock, t: StockHistoryType):
     if rsi_chart:
         charts_config.append({
             "chart": rsi_chart,
-            "grid_pos": {"pos_top": "79%", "height": "18%"},
+            "grid_pos": {"pos_top": "68%", "height": "15%"},
             "title": "RSI",
             "show_tooltip": True
         })
 
+    # 根据图表数量调整总高度
+    total_height = "1400px"
+    if len(charts_config) > 3:
+        total_height = "2000px"
+
     # 创建联动图表
-    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="1800px")
+    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height=total_height)
 
     # 显示联动图表
-    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="1800px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
+    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height=total_height, key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
 
 def show_kline_pattern_chart(stock, t: StockHistoryType):
     st.markdown(
