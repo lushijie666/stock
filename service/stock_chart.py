@@ -164,29 +164,30 @@ def show_kline_chart(stock, t: StockHistoryType):
         }
     ]
 
+    # 暂时注释MACD和RSI以调试K线颜色问题
     # 添加MACD图表（如果有数据）
-    if macd_chart:
-        charts_config.append({
-            "chart": macd_chart,
-            "grid_pos": {"pos_top": "51%", "height": "15%"},
-            "title": "MACD",
-            "show_tooltip": True
-        })
+    # if macd_chart:
+    #     charts_config.append({
+    #         "chart": macd_chart,
+    #         "grid_pos": {"pos_top": "51%", "height": "15%"},
+    #         "title": "MACD",
+    #         "show_tooltip": True
+    #     })
 
-    # 添加RSI图表（如果有数据）
-    if rsi_chart:
-        charts_config.append({
-            "chart": rsi_chart,
-            "grid_pos": {"pos_top": "68%", "height": "15%"},
-            "title": "RSI",
-            "show_tooltip": True
-        })
+    # # 添加RSI图表（如果有数据）
+    # if rsi_chart:
+    #     charts_config.append({
+    #         "chart": rsi_chart,
+    #         "grid_pos": {"pos_top": "68%", "height": "15%"},
+    #         "title": "RSI",
+    #         "show_tooltip": True
+    #     })
 
     # 创建联动图表
-    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="2000px")
+    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="1400px")
 
     # 显示联动图表
-    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="2000px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
+    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="1400px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
 
 def show_kline_pattern_chart(stock, t: StockHistoryType):
     st.markdown(

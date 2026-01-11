@@ -4,6 +4,7 @@ from pyecharts.charts import Pie, Kline, Bar, Grid, Line, Scatter
 from pyecharts import options as opts
 from pyecharts.commons.utils import JsCode
 import pandas as pd
+import copy
 
 from enums.candlestick_pattern import CandlestickPattern
 from enums.patterns import Patterns
@@ -1338,7 +1339,7 @@ class ChartBuilder:
             if chart is None:
                 continue
 
-            # 获取图表原有的options，用于保留原有配置
+            # 直接修改图表的options（不使用深拷贝，因为我们需要修改原对象）
             chart_options = chart.options
 
             # 更新 xAxis 配置（保留原有配置，只添加 gridIndex）
