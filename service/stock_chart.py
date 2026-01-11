@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import func
 import streamlit_echarts
+from pyecharts import options as opts
 
 from enums.candlestick_pattern import CandlestickPattern
 from enums.strategy import StrategyType, FusionStrategyModel
