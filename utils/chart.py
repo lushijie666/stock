@@ -974,38 +974,52 @@ class ChartBuilder:
                         var dfData = {df_json};
                         var currentDate = params[0].axisValue;
                         var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
+
+                        // 先找到K线和成交量的数据
+                        var klineData = null;
+                        var volumeData = null;
                         params.forEach(function(item) {{
                             if (item.seriesName === 'K线') {{
-                                var index = item.dataIndex;
-                                var currentData = dfData[index];
-                                var opening = parseFloat(currentData.opening).toFixed(2);
-                                var closing = parseFloat(currentData.closing).toFixed(2);
-                                var lowest = parseFloat(currentData.lowest).toFixed(2);
-                                var highest = parseFloat(currentData.highest).toFixed(2);
-                                var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
-                                var change = parseFloat(currentData.change).toFixed(2) + '%';
-                                result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
-                                result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
-                                result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
-                                result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
-                                result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
-                                result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                                klineData = item;
                             }} else if (item.seriesName === '成交量') {{
-                                var index = item.dataIndex;
-                                var currentData = dfData[index];
-                                var value = item.value;
-                                var shouValue = (value / 100).toFixed(0);
-                                var formattedValue = formatValue(value);
-                                var formattedShou = formatValue(Number(shouValue));
-                                var formattedTurnover = formatValue(currentData.turnover_amount);
-                                var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
-
-                                result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
-                                result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
-                                result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
-                                result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
+                                volumeData = item;
                             }}
                         }});
+
+                        // 按固定顺序显示：先显示K线价格信息，再显示成交量信息
+                        if (klineData) {{
+                            var index = klineData.dataIndex;
+                            var currentData = dfData[index];
+                            var opening = parseFloat(currentData.opening).toFixed(2);
+                            var closing = parseFloat(currentData.closing).toFixed(2);
+                            var lowest = parseFloat(currentData.lowest).toFixed(2);
+                            var highest = parseFloat(currentData.highest).toFixed(2);
+                            var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
+                            var change = parseFloat(currentData.change).toFixed(2) + '%';
+
+                            result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
+                            result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
+                            result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
+                            result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
+                            result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
+                            result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                        }}
+
+                        if (volumeData) {{
+                            var index = volumeData.dataIndex;
+                            var currentData = dfData[index];
+                            var value = volumeData.value;
+                            var shouValue = (value / 100).toFixed(0);
+                            var formattedValue = formatValue(value);
+                            var formattedShou = formatValue(Number(shouValue));
+                            var formattedTurnover = formatValue(currentData.turnover_amount);
+                            var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
+
+                            result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
+                            result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
+                            result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
+                            result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
+                        }}
 
                         result += '</div>';
                         return result;
