@@ -2165,76 +2165,29 @@ class ChartBuilder:
         # 合并图表
         overlap = bar.overlap(line)
 
-        # 设置全局选项（最简化可靠配置）
+        # 设置全局选项（简化配置，适配联动）
         overlap.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
-                pos_top="45%",
-                pos_left="right",
-                orient="vertical",  # 改为垂直排列
-                inactive_color="#ccc"
-
+                pos_top="5%",
+                pos_left="right"
             ),
             tooltip_opts=opts.TooltipOpts(
                 trigger="axis",
-                axis_pointer_type="cross",
-                formatter=JsCode("""
-                    function(params) {
-                        if (!params || params.length === 0) return '';
-                        let result = '';
-                        if (params[0].axisValue) {
-                            result = params[0].axisValue + '<br/>';
-                        }
-                        params.forEach(item => {
-                            if (item) {
-                                const value = (item.value !== undefined && item.value !== null) ? item.value : '-';
-                                const color = item.color || '#666';
-                                const seriesName = item.seriesName || '';
-                                result += `
-                                <span style="display:inline-block;
-                                            margin-right:5px;
-                                            width:10px;
-                                            height:10px;
-                                            background-color:${color}"></span>
-                                ${seriesName}: <b>${typeof value === 'number' ? value.toFixed(4) : value}</b><br/>`;
-                            }
-                        });
-                        return result;
-                    }
-                """)
-            ),
-            datazoom_opts=opts.DataZoomOpts(is_show=True,
-                    type_="slider",
-                    pos_top="0%",
-                    pos_left="10%",  # 左侧边距
-                    pos_right="10%",  # 右侧边距
-                    xaxis_index=[0, 1],
-                    range_start=0,
-                    range_end=100,
+                axis_pointer_type="cross"
             ),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
-                is_scale=True,
                 boundary_gap=False,
-                axisline_opts=opts.AxisLineOpts(
-                    is_on_zero=False,
-                    linestyle_opts=opts.LineStyleOpts(color="#666666")  # 轴线颜色改为深灰
-                ),
-                splitline_opts=opts.SplitLineOpts(
-                    is_show=True,
-                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
-                ),
-                axislabel_opts=opts.LabelOpts(color="#000000"),  # 轴标签文字改为黑色
-                min_="dataMin",
-                max_="dataMax"
+                axislabel_opts=opts.LabelOpts(color="#000000")
             ),
             yaxis_opts=opts.AxisOpts(
                 is_scale=True,
                 splitline_opts=opts.SplitLineOpts(
                     is_show=True,
-                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")  # 分割线改为浅灰
+                    linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")
                 ),
-                axislabel_opts=opts.LabelOpts(color="#000000")  # 轴标签文字改为黑色
+                axislabel_opts=opts.LabelOpts(color="#000000")
             ),
         )
 
@@ -2249,15 +2202,4 @@ class ChartBuilder:
             )
         )
 
-        # 创建Grid布局（简化）
-        grid = Grid(init_opts=opts.InitOpts(width="100%", height="600px"))
-        grid.add(
-            overlap,
-            grid_opts=opts.GridOpts(
-                pos_left="10%",
-                pos_right="10%",
-                pos_top="20%",
-                pos_bottom="16%"
-            )
-        )
-        return grid
+        return overlap
