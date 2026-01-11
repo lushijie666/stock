@@ -1238,7 +1238,7 @@ class ChartBuilder:
 
         # 设置全局选项
         line.set_global_opts(
-            title_opts=opts.TitleOpts(title="RSI指标"),
+            title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
                 pos_top="5%",
                 pos_left="right"
@@ -1260,17 +1260,8 @@ class ChartBuilder:
                     linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")
                 ),
                 axislabel_opts=opts.LabelOpts(color="#000000")
-            ),
-            visualmap_opts=opts.VisualMapOpts(
-                is_show=False,
-                dimension=1,
-                series_index=0,
-                pieces=[
-                    {"min": 0, "max": 20, "color": "#14b143"},    # 超卖区
-                    {"min": 20, "max": 80, "color": "#666666"},   # 正常区
-                    {"min": 80, "max": 100, "color": "#ef232a"}   # 超买区
-                ]
             )
+            # 移除visualmap_opts，避免影响Grid中其他图表的颜色
         )
 
         # 添加超买超卖线（辅助线）

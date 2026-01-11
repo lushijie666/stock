@@ -164,7 +164,6 @@ def show_kline_chart(stock, t: StockHistoryType):
         }
     ]
 
-    # 暂时注释MACD和RSI以调试K线颜色问题
     # 添加MACD图表（如果有数据）
     if macd_chart:
         charts_config.append({
@@ -174,17 +173,17 @@ def show_kline_chart(stock, t: StockHistoryType):
             "show_tooltip": True
         })
 
-    # # 添加RSI图表（如果有数据）- 暂时注释以测试
-    # if rsi_chart:
-    #     charts_config.append({
-    #         "chart": rsi_chart,
-    #         "grid_pos": {"pos_top": "68%", "height": "15%"},
-    #         "title": "RSI",
-    #         "show_tooltip": True
-    #     })
+    # 添加RSI图表（如果有数据）
+    if rsi_chart:
+        charts_config.append({
+            "chart": rsi_chart,
+            "grid_pos": {"pos_top": "68%", "height": "15%"},
+            "title": "RSI",
+            "show_tooltip": True
+        })
 
     # 创建联动图表
-    total_height = "1400px" if len(charts_config) <= 3 else "1800px"
+    total_height = "1400px" if len(charts_config) <= 3 else "2000px"
     linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height=total_height)
 
     # 显示联动图表
