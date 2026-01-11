@@ -917,10 +917,9 @@ class ChartBuilder:
             ),
             legend_opts=opts.LegendOpts(
                 type_="scroll",
-                pos_top="5%",
-                pos_left="2%",
-                orient="horizontal",  # 水平排列
-                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
+                pos_left="right",
+                orient="vertical",  # 垂直排列
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
             ),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
@@ -1053,10 +1052,9 @@ class ChartBuilder:
                 title_opts=opts.TitleOpts(title=""),
                 legend_opts=opts.LegendOpts(
                     type_="scroll",
-                    pos_top="5%",
-                    pos_left="2%",
-                    orient="horizontal",
-                    textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
+                    pos_left="right",
+                    orient="vertical",
+                    textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
                 ),
                 xaxis_opts=opts.AxisOpts(
                     type_="category",
@@ -1240,10 +1238,9 @@ class ChartBuilder:
         line.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
-                pos_top="5%",
-                pos_left="2%",
-                orient="horizontal",
-                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
+                pos_left="right",
+                orient="vertical",
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
             ),
             tooltip_opts=opts.TooltipOpts(
                 trigger="axis",
@@ -1359,7 +1356,16 @@ class ChartBuilder:
                             series["tooltip"] = {"show": False}
 
 
-            # 图例位置已在各图表中统一设置为水平居中，这里不再调整
+            # 调整图例位置，根据图表在Grid中的位置设置图例的垂直位置
+            if "legend" in chart_options:
+                for legend in chart_options["legend"] if isinstance(chart_options["legend"], list) else [chart_options["legend"]]:
+                    # 根据图表的pos_top设置图例位置，让图例显示在对应图表的右侧区域
+                    pos_top_value = grid_pos.get("pos_top", "5%")
+                    if isinstance(pos_top_value, str) and pos_top_value.endswith("%"):
+                        top_percent = int(pos_top_value.rstrip("%"))
+                        legend["top"] = f"{top_percent + 2}%"
+                    else:
+                        legend["top"] = "5%"
 
             # 添加到Grid
             grid.add(
@@ -2137,10 +2143,9 @@ class ChartBuilder:
         overlap.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
-                pos_top="5%",
-                pos_left="2%",
-                orient="horizontal",
-                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
+                pos_left="right",
+                orient="vertical",
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
             ),
             tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="cross"),
             xaxis_opts=opts.AxisOpts(
