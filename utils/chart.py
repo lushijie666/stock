@@ -2108,74 +2108,56 @@ class ChartBuilder:
     @staticmethod
     def create_macd_chart(dates: list, diff: list, dea: list, hist: list,
                           fast_period=12, slow_period=26, signal_period=9):
-        # 计算Y轴范围
-        y_min = min(min(diff or [0]), min(dea or [0]), min(hist or [0])) * 1.1
-        y_max = max(max(diff or [0]), max(dea or [0]), max(hist or [0])) * 1.1
-
-        # 创建柱状图（简化颜色设置）
-        bar = (
-            Bar()
-            .add_xaxis(dates)
-            .add_yaxis(
-                series_name="MACD",
-                y_axis=hist,
-                itemstyle_opts=opts.ItemStyleOpts(
-                    color=JsCode("""
-                        function(params) {
-                            if (params && params.value !== undefined) {
-                                return params.value > 0 ? '#ef232a	' : '#14b143';
-                            }
-                            return '#14b143';
+        # 创建柱状图（简化，使用单一Y轴）
+        bar = Bar()
+        bar.add_xaxis(dates)
+        bar.add_yaxis(
+            series_name="MACD",
+            y_axis=hist,
+            itemstyle_opts=opts.ItemStyleOpts(
+                color=JsCode("""
+                    function(params) {
+                        if (params && params.value !== undefined) {
+                            return params.value > 0 ? '#ef232a' : '#14b143';
                         }
-                    """)
-                ),
-                bar_width='40%',
-                yaxis_index=0,
-                z_level=2,
-                label_opts=opts.LabelOpts(is_show=False)
-            )
+                        return '#14b143';
+                    }
+                """)
+            ),
+            bar_width='40%',
+            label_opts=opts.LabelOpts(is_show=False)
         )
 
-        # 创建线图（简化配置）
-        line = (
-            Line()
-            .add_xaxis(dates)
-            .add_yaxis(
-                series_name="DIFF",
-                y_axis=diff,
-                is_smooth=True,
-                linestyle_opts=opts.LineStyleOpts(width=3),
-                symbol="none",
-                yaxis_index=1,
-                z_level=1,
-                label_opts=opts.LabelOpts(is_show=False)
-            )
-            .add_yaxis(
-                series_name="DEA",
-                y_axis=dea,
-                is_smooth=True,
-                linestyle_opts=opts.LineStyleOpts(width=3),
-                symbol="none",
-                yaxis_index=1,
-                z_level=1,
-                label_opts=opts.LabelOpts(is_show=False)
-            )
+        # 创建线图（简化，使用单一Y轴）
+        line = Line()
+        line.add_xaxis(dates)
+        line.add_yaxis(
+            series_name="DIFF",
+            y_axis=diff,
+            is_smooth=True,
+            linestyle_opts=opts.LineStyleOpts(width=2, color='#FF6B6B'),
+            itemstyle_opts=opts.ItemStyleOpts(color='#FF6B6B'),
+            symbol="none",
+            label_opts=opts.LabelOpts(is_show=False)
+        )
+        line.add_yaxis(
+            series_name="DEA",
+            y_axis=dea,
+            is_smooth=True,
+            linestyle_opts=opts.LineStyleOpts(width=2, color='#4ECDC4'),
+            itemstyle_opts=opts.ItemStyleOpts(color='#4ECDC4'),
+            symbol="none",
+            label_opts=opts.LabelOpts(is_show=False)
         )
 
         # 合并图表
         overlap = bar.overlap(line)
 
-        # 设置全局选项（简化配置，适配联动）
+        # 设置全局选项（使用单一Y轴，简化配置）
         overlap.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
-            legend_opts=opts.LegendOpts(
-                pos_top="5%",
-                pos_left="right"
-            ),
-            tooltip_opts=opts.TooltipOpts(
-                trigger="axis",
-                axis_pointer_type="cross"
-            ),
+            legend_opts=opts.LegendOpts(pos_top="5%", pos_left="right"),
+            tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="cross"),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
                 boundary_gap=False,
@@ -2188,17 +2170,6 @@ class ChartBuilder:
                     linestyle_opts=opts.LineStyleOpts(color="#EEEEEE")
                 ),
                 axislabel_opts=opts.LabelOpts(color="#000000")
-            ),
-        )
-
-        # 添加第二个Y轴
-        overlap.extend_axis(
-            yaxis=opts.AxisOpts(
-                name="DIFF/DEA",
-                position="right",
-                min_=y_min,
-                max_=y_max,
-                axisline_opts=opts.AxisLineOpts(linestyle_opts=opts.LineStyleOpts(color="#666"))
             )
         )
 
