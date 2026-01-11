@@ -1251,8 +1251,19 @@ class ChartBuilder:
             # 处理 tooltip 显示配置
             show_tooltip = config.get("show_tooltip", True)
             if not show_tooltip:
-                # 隐藏该图表的 tooltip，但不影响 formatter
+                # 隐藏该图表的 tooltip
                 chart_options["tooltip"] = {"show": False}
+            else:
+                # 确保tooltip配置中有必要的参数，同时保留原有的formatter
+                if "tooltip" in chart_options:
+                    tooltip_config = chart_options["tooltip"]
+                    # 确保有trigger和axisPointer配置
+                    if "trigger" not in tooltip_config:
+                        tooltip_config["trigger"] = "axis"
+                    if "axisPointer" not in tooltip_config:
+                        tooltip_config["axisPointer"] = {"type": "cross"}
+                    # 添加confine限制tooltip在图表区域内
+                    tooltip_config["confine"] = True
 
             # 调整图例位置，避免重叠
             if "legend" in chart_options:
@@ -1303,7 +1314,7 @@ class ChartBuilder:
                     "borderColor": "#ccc"
                 }
             ],
-            # 配置全局 axisPointer 联动，但不配置全局 tooltip 以保留各图表的 formatter
+            # 只配置 axisPointer 联动，不配置全局 tooltip
             "axisPointer": {
                 "link": [{"xAxisIndex": "all"}]  # 十字准星联动
             },
