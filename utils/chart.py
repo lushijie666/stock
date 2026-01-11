@@ -978,19 +978,12 @@ class ChartBuilder:
                             if (item.seriesName === 'K线') {{
                                 var index = item.dataIndex;
                                 var currentData = dfData[index];
-                                var turnoverCount = currentData.turnover_count;
-                                var turnoverShouCount = (turnoverCount / 100).toFixed(0);
-                                var formattedTurnoverCount = formatValue(turnoverCount);
-                                var formattedTurnoverShouCount = formatValue(Number(turnoverShouCount));
-                                var formattedTurnover = formatValue(currentData.turnover_amount);
                                 var opening = parseFloat(currentData.opening).toFixed(2);
                                 var closing = parseFloat(currentData.closing).toFixed(2);
                                 var lowest = parseFloat(currentData.lowest).toFixed(2);
                                 var highest = parseFloat(currentData.highest).toFixed(2);
                                 var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
                                 var change = parseFloat(currentData.change).toFixed(2) + '%';
-                                var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
-
                                 result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
                                 result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
                                 result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
@@ -998,7 +991,6 @@ class ChartBuilder:
                                 result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
                                 result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
                             }} else if (item.seriesName === '成交量') {{
-                                // 处理成交量series的tooltip
                                 var index = item.dataIndex;
                                 var currentData = dfData[index];
                                 var value = item.value;
@@ -1243,7 +1235,6 @@ class ChartBuilder:
         for idx, config in enumerate(charts_config):
             chart = config.get("chart")
             grid_pos = config.get("grid_pos", {})
-            title = config.get("title", "")
 
             if chart is None:
                 continue
