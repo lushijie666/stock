@@ -182,16 +182,11 @@ def show_kline_chart(stock, t: StockHistoryType):
             "show_tooltip": True
         })
 
-    # 根据图表数量调整总高度
-    total_height = "1400px"
-    if len(charts_config) > 3:
-        total_height = "2000px"
-
     # 创建联动图表
-    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height=total_height)
+    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="2000px")
 
     # 显示联动图表
-    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height=total_height, key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
+    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height="2000px", key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
 
 def show_kline_pattern_chart(stock, t: StockHistoryType):
     st.markdown(

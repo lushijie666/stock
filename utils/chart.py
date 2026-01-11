@@ -2135,8 +2135,7 @@ class ChartBuilder:
             series_name="DIFF",
             y_axis=diff,
             is_smooth=True,
-            linestyle_opts=opts.LineStyleOpts(width=2, color='#FF6B6B'),
-            itemstyle_opts=opts.ItemStyleOpts(color='#FF6B6B'),
+            linestyle_opts=opts.LineStyleOpts(width=2),
             symbol="none",
             label_opts=opts.LabelOpts(is_show=False)
         )
@@ -2144,8 +2143,7 @@ class ChartBuilder:
             series_name="DEA",
             y_axis=dea,
             is_smooth=True,
-            linestyle_opts=opts.LineStyleOpts(width=2, color='#4ECDC4'),
-            itemstyle_opts=opts.ItemStyleOpts(color='#4ECDC4'),
+            linestyle_opts=opts.LineStyleOpts(width=2),
             symbol="none",
             label_opts=opts.LabelOpts(is_show=False)
         )
