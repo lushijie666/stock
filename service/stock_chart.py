@@ -14,7 +14,7 @@ from enums.patterns import Patterns
 from utils.chart import ChartBuilder
 from utils.convert import format_dates, format_dates_series, format_date_by_type, format_dates_signals, format_pattern_text
 from utils.signal import calculate_all_signals
-from utils.strategy import calculate_macd, calculate_rsi, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
+from utils.strategy import calculate_macd, calculate_multi_period_rsi, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
     generate_trading_advice, calculate_strategy_performance, calculate_position_and_cash_values
 from utils.k_line_processor import KLineProcessor
 from utils.candlestick_pattern_detector import CandlestickPatternDetector
@@ -1549,7 +1549,7 @@ def _build_stock_kline_chart_data(stock, t: StockHistoryType):
     # 计算RSI指标 - 使用统一的strategy.py中的函数
     rsi_data = {}
     if len(df) > 0:
-        rsi_df = calculate_rsi(df, periods=[6, 12, 24])
+        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
         for col in rsi_df.columns:
             rsi_data[col] = rsi_df[col].tolist()
 

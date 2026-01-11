@@ -243,14 +243,14 @@ def calculate_macd(df: pd.DataFrame, fast_period=12, slow_period=26, signal_peri
     df['MACD_hist'] = (df['DIFF'] - df['DEA']).round(3)  # 标准MACD柱状图
     return df[['DIFF', 'DEA', 'MACD_hist']]
 
-def calculate_rsi(df: pd.DataFrame, periods=[6, 12, 24]):
+def calculate_multi_period_rsi(df: pd.DataFrame, periods=[6, 12, 24]):
     """
-    计算RSI指标
+    计算多周期RSI指标（用于图表显示）
     Args:
         df: 包含'closing'列的DataFrame
         periods: RSI周期列表，默认[6, 12, 24]
     Returns:
-        DataFrame，包含 RSI6, RSI12, RSI24 等列
+        DataFrame，包含 RSI6, RSI12, RSI24 等列（已四舍五入到2位小数）
     """
     df = df.copy()
 
@@ -272,6 +272,22 @@ def calculate_rsi(df: pd.DataFrame, periods=[6, 12, 24]):
         rsi_df[f'RSI{period}'] = rsi.round(2)
 
     return rsi_df
+
+def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """
+    计算RSI（相对强弱指标）
+
+    RSI = 100 - (100 / (1 + RS))
+    其中 RS = 平均涨幅 / 平均跌幅
+    """
+    delta = df['closing'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
 
 def calculate_macd_signals(df):
     # 计算 MACD
