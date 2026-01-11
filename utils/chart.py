@@ -971,54 +971,36 @@ class ChartBuilder:
                                 return value.toLocaleString();
                             }}
                         }}
+
                         var dfData = {df_json};
                         var currentDate = params[0].axisValue;
                         var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
 
-                        // 先找到K线和成交量的数据
-                        var klineData = null;
-                        var volumeData = null;
-                        params.forEach(function(item) {{
-                            if (item.seriesName === 'K线') {{
-                                klineData = item;
-                            }} else if (item.seriesName === '成交量') {{
-                                volumeData = item;
-                            }}
-                        }});
+                        // 按固定顺序：先找K线，再找成交量
+                        var klineItem = params.find(function(p) {{ return p.seriesName === 'K线'; }});
+                        var volumeItem = params.find(function(p) {{ return p.seriesName === '成交量'; }});
 
-                        // 按固定顺序显示：先显示K线价格信息，再显示成交量信息
-                        if (klineData) {{
-                            var klineIndex = klineData.dataIndex;
-                            var klineCurrentData = dfData[klineIndex];
-                            var opening = parseFloat(klineCurrentData.opening).toFixed(2);
-                            var closing = parseFloat(klineCurrentData.closing).toFixed(2);
-                            var lowest = parseFloat(klineCurrentData.lowest).toFixed(2);
-                            var highest = parseFloat(klineCurrentData.highest).toFixed(2);
-                            var changeAmount = parseFloat(klineCurrentData.change_amount).toFixed(2);
-                            var change = parseFloat(klineCurrentData.change).toFixed(2) + '%';
-
-                            result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
-                            result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
-                            result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
-                            result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
-                            result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
-                            result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                        // 先显示K线价格信息
+                        if (klineItem) {{
+                            var idx = klineItem.dataIndex;
+                            var data = dfData[idx];
+                            result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.opening).toFixed(2) + '</span><br/>';
+                            result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.closing).toFixed(2) + '</span><br/>';
+                            result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.lowest).toFixed(2) + '</span><br/>';
+                            result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.highest).toFixed(2) + '</span><br/>';
+                            result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.change_amount).toFixed(2) + '</span><br/>';
+                            result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.change).toFixed(2) + '%</span><br/>';
                         }}
 
-                        if (volumeData) {{
-                            var volumeIndex = volumeData.dataIndex;
-                            var volumeCurrentData = dfData[volumeIndex];
-                            var value = volumeData.value;
-                            var shouValue = (value / 100).toFixed(0);
-                            var formattedValue = formatValue(value);
-                            var formattedShou = formatValue(Number(shouValue));
-                            var formattedTurnover = formatValue(volumeCurrentData.turnover_amount);
-                            var turnoverRatio = parseFloat(volumeCurrentData.turnover_ratio).toFixed(2) + '%';
-
-                            result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
-                            result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
-                            result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
-                            result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
+                        // 再显示成交量信息
+                        if (volumeItem) {{
+                            var idx = volumeItem.dataIndex;
+                            var data = dfData[idx];
+                            var val = volumeItem.value;
+                            result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formatValue(val) + '</span><br/>';
+                            result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formatValue(val / 100) + '</span><br/>';
+                            result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formatValue(data.turnover_amount) + '</span><br/>';
+                            result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.turnover_ratio).toFixed(2) + '%</span><br/>';
                         }}
 
                         result += '</div>';
