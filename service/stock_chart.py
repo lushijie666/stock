@@ -119,14 +119,14 @@ def show_kline_chart(stock, t: StockHistoryType):
           </div>
       """, unsafe_allow_html=True)
 
-    # 1. 原始K线图（禁用tooltip避免重复）
+    # 创建各个独立的图表
+    # 1. 原始K线图（修改 tooltip 只显示简化信息）
     kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
-    # 禁用第一个K线图的tooltip
-    kline_original.set_global_opts(
-        tooltip_opts=opts.TooltipOpts(is_show=False)
-    )
+    # 修改第一个K线图的tooltip，使其只在鼠标直接悬停时显示
+    if "tooltip" in kline_original.options:
+        kline_original.options["tooltip"]["show"] = False  # 隐藏第一个图表的tooltip
 
-    # 2. 带形态的K线图（保留tooltip）
+    # 2. 带形态的K线图（保留完整tooltip）
     kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
 
     # 3. 成交量图（保留tooltip）

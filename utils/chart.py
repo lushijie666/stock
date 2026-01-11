@@ -1316,9 +1316,14 @@ class ChartBuilder:
                     "borderColor": "#ccc"
                 }
             ],
-            # 不设置全局 tooltip，让每个图表使用自己的 tooltip 配置（保留原有的 formatter）
-            "axisPointer": {
-                "link": [{"xAxisIndex": "all"}]  # 十字准星联动
+            # 配置全局 tooltip 但不覆盖单个图表的 formatter
+            "tooltip": {
+                "trigger": "axis",
+                "axisPointer": {
+                    "type": "cross",
+                    "link": [{"xAxisIndex": "all"}]  # 十字准星联动
+                },
+                "confine": True  # 限制在图表区域内
             },
             # 启用画框缩放（brushSelect）
             "toolbox": {
