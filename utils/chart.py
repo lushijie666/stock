@@ -1257,13 +1257,18 @@ class ChartBuilder:
                 # 确保tooltip配置中有必要的参数，同时保留原有的formatter
                 if "tooltip" in chart_options:
                     tooltip_config = chart_options["tooltip"]
-                    # 确保有trigger和axisPointer配置
-                    if "trigger" not in tooltip_config:
-                        tooltip_config["trigger"] = "axis"
-                    if "axisPointer" not in tooltip_config:
-                        tooltip_config["axisPointer"] = {"type": "cross"}
-                    # 添加confine限制tooltip在图表区域内
-                    tooltip_config["confine"] = True
+                    # 检查是否是dict类型，如果不是则转换
+                    if not isinstance(tooltip_config, dict):
+                        # 如果是TooltipOpts对象，已经有完整配置，跳过
+                        pass
+                    else:
+                        # 是dict，确保有trigger和axisPointer配置
+                        if "trigger" not in tooltip_config:
+                            tooltip_config["trigger"] = "axis"
+                        if "axisPointer" not in tooltip_config:
+                            tooltip_config["axisPointer"] = {"type": "cross"}
+                        # 添加confine限制tooltip在图表区域内
+                        tooltip_config["confine"] = True
 
             # 调整图例位置，避免重叠
             if "legend" in chart_options:
