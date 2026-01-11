@@ -148,19 +148,22 @@ def show_kline_chart(stock, t: StockHistoryType):
             "chart": kline_original,
             "grid_pos": {"pos_top": "3%", "height": "15%"},
             "title": "原始K线图",
-            "show_tooltip": False
+            "show_tooltip": False,
+            "legend_height": "13%"  # 图例区域高度，防止溢出到下一个图表
         },
         {
             "chart": kline_pattern,
             "grid_pos": {"pos_top": "20%", "height": "15%"},
             "title": "K线图（含形态）",
-            "show_tooltip": True
+            "show_tooltip": True,
+            "legend_height": "13%"
         },
         {
             "chart": volume_bar,
             "grid_pos": {"pos_top": "37%", "height": "12%"},
             "title": "成交量",
-            "show_tooltip": True
+            "show_tooltip": True,
+            "legend_height": "10%"
         }
     ]
 
@@ -168,18 +171,20 @@ def show_kline_chart(stock, t: StockHistoryType):
     if macd_chart:
         charts_config.append({
             "chart": macd_chart,
-            "grid_pos": {"pos_top": "51%", "height": "15%"},
+            "grid_pos": {"pos_top": "53%", "height": "15%"},
             "title": "MACD",
-            "show_tooltip": True
+            "show_tooltip": True,
+            "legend_height": "13%"
         })
 
     # 添加RSI图表（如果有数据）
     if rsi_chart:
         charts_config.append({
             "chart": rsi_chart,
-            "grid_pos": {"pos_top": "68%", "height": "15%"},
+            "grid_pos": {"pos_top": "72%", "height": "15%"},
             "title": "RSI",
-            "show_tooltip": True
+            "show_tooltip": True,
+            "legend_height": "13%"
         })
 
     # 创建联动图表

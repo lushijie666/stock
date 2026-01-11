@@ -1358,6 +1358,7 @@ class ChartBuilder:
 
             # 调整图例位置，根据图表在Grid中的位置设置图例的垂直位置
             if "legend" in chart_options:
+                legend_height = config.get("legend_height", None)
                 for legend in chart_options["legend"] if isinstance(chart_options["legend"], list) else [chart_options["legend"]]:
                     # 根据图表的pos_top设置图例位置，让图例显示在对应图表的右侧区域
                     pos_top_value = grid_pos.get("pos_top", "5%")
@@ -1366,6 +1367,12 @@ class ChartBuilder:
                         legend["top"] = f"{top_percent + 2}%"
                     else:
                         legend["top"] = "5%"
+
+                    # 如果指定了图例高度，设置高度限制并启用滚动
+                    if legend_height:
+                        legend["height"] = legend_height
+                        legend["type"] = "scroll"  # 启用滚动
+                        legend["pageButtonPosition"] = "end"  # 翻页按钮位置
 
             # 添加到Grid
             grid.add(
