@@ -917,10 +917,10 @@ class ChartBuilder:
             ),
             legend_opts=opts.LegendOpts(
                 type_="scroll",
-                pos_top="30%",
-                pos_left="right",
-                orient="vertical",  # 改为垂直排列
-                textstyle_opts=opts.TextStyleOpts(color="#000000")
+                pos_top="2%",
+                pos_left="center",
+                orient="horizontal",  # 水平排列
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
             ),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
@@ -1053,10 +1053,10 @@ class ChartBuilder:
                 title_opts=opts.TitleOpts(title=""),
                 legend_opts=opts.LegendOpts(
                     type_="scroll",
-                    pos_top="50%",
-                    pos_left="right",
-                    orient="vertical",
-                    textstyle_opts=opts.TextStyleOpts(color="#000000")
+                    pos_top="2%",
+                    pos_left="center",
+                    orient="horizontal",
+                    textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
                 ),
                 xaxis_opts=opts.AxisOpts(
                     type_="category",
@@ -1216,11 +1216,11 @@ class ChartBuilder:
         line = Line()
         line.add_xaxis(dates)
 
-        # RSI颜色配置
+        # RSI颜色配置 - 使用更容易区分的颜色
         rsi_colors = {
             'RSI6': '#FF6B6B',   # 红色 - 短期
-            'RSI12': '#4ECDC4',  # 青色 - 中期
-            'RSI24': '#95E1D3'   # 浅绿 - 长期
+            'RSI12': '#FFA500',  # 橙色 - 中期
+            'RSI24': '#9370DB'   # 紫色 - 长期
         }
 
         # 添加RSI线
@@ -1240,8 +1240,10 @@ class ChartBuilder:
         line.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
-                pos_top="5%",
-                pos_left="right"
+                pos_top="2%",
+                pos_left="center",
+                orient="horizontal",
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
             ),
             tooltip_opts=opts.TooltipOpts(
                 trigger="axis",
@@ -1357,19 +1359,7 @@ class ChartBuilder:
                             series["tooltip"] = {"show": False}
 
 
-            # 调整图例位置，避免重叠
-            if "legend" in chart_options:
-                for legend in chart_options["legend"] if isinstance(chart_options["legend"], list) else [chart_options["legend"]]:
-                    # 根据图表索引调整图例的垂直位置
-                    if idx == 0:
-                        legend["top"] = "10%"  # 第一个图表的图例
-                    elif idx == 1:
-                        legend["top"] = "40%"  # 第二个图表的图例
-                    elif idx == 2:
-                        legend["top"] = "85%"  # 第三个图表的图例
-                    else:
-                        # 如果有更多图表，按比例计算
-                        legend["top"] = f"{int(grid_pos.get('pos_top', '0%').rstrip('%')) + 1}%"
+            # 图例位置已在各图表中统一设置为水平居中，这里不再调整
 
             # 添加到Grid
             grid.add(
@@ -2146,7 +2136,12 @@ class ChartBuilder:
         # 设置全局选项（使用单一Y轴，简化配置）
         overlap.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
-            legend_opts=opts.LegendOpts(pos_top="5%", pos_left="right"),
+            legend_opts=opts.LegendOpts(
+                pos_top="2%",
+                pos_left="center",
+                orient="horizontal",
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
+            ),
             tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="cross"),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
