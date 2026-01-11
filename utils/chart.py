@@ -917,10 +917,10 @@ class ChartBuilder:
             ),
             legend_opts=opts.LegendOpts(
                 type_="scroll",
-                pos_top="2%",
-                pos_left="center",
+                pos_top="5%",
+                pos_left="2%",
                 orient="horizontal",  # 水平排列
-                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
             ),
             xaxis_opts=opts.AxisOpts(
                 type_="category",
@@ -1053,10 +1053,10 @@ class ChartBuilder:
                 title_opts=opts.TitleOpts(title=""),
                 legend_opts=opts.LegendOpts(
                     type_="scroll",
-                    pos_top="2%",
-                    pos_left="center",
+                    pos_top="5%",
+                    pos_left="2%",
                     orient="horizontal",
-                    textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
+                    textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
                 ),
                 xaxis_opts=opts.AxisOpts(
                     type_="category",
@@ -1240,10 +1240,10 @@ class ChartBuilder:
         line.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
-                pos_top="2%",
-                pos_left="center",
+                pos_top="5%",
+                pos_left="2%",
                 orient="horizontal",
-                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
             ),
             tooltip_opts=opts.TooltipOpts(
                 trigger="axis",
@@ -2137,10 +2137,10 @@ class ChartBuilder:
         overlap.set_global_opts(
             title_opts=opts.TitleOpts(title=""),
             legend_opts=opts.LegendOpts(
-                pos_top="2%",
-                pos_left="center",
+                pos_top="5%",
+                pos_left="2%",
                 orient="horizontal",
-                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=10)
+                textstyle_opts=opts.TextStyleOpts(color="#000000", font_size=9)
             ),
             tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="cross"),
             xaxis_opts=opts.AxisOpts(
