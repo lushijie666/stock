@@ -1362,9 +1362,17 @@ class ChartBuilder:
                 for legend in chart_options["legend"] if isinstance(chart_options["legend"], list) else [chart_options["legend"]]:
                     # 根据图表的pos_top设置图例位置，让图例显示在对应图表的右侧区域
                     pos_top_value = grid_pos.get("pos_top", "5%")
-                    if isinstance(pos_top_value, str) and pos_top_value.endswith("%"):
-                        top_percent = int(pos_top_value.rstrip("%"))
-                        legend["top"] = f"{top_percent + 2}%"
+                    if isinstance(pos_top_value, str):
+                        if pos_top_value.endswith("%"):
+                            # 百分比值
+                            top_percent = int(pos_top_value.rstrip("%"))
+                            legend["top"] = f"{top_percent + 2}%"
+                        elif pos_top_value.endswith("px"):
+                            # 像素值
+                            top_pixels = int(pos_top_value.rstrip("px"))
+                            legend["top"] = f"{top_pixels + 20}px"
+                        else:
+                            legend["top"] = pos_top_value
                     else:
                         legend["top"] = "5%"
 
