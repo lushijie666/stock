@@ -233,14 +233,14 @@ def calculate_macd(df: pd.DataFrame, fast_period=12, slow_period=26, signal_peri
         slow_period: 慢速EMA周期，默认26
         signal_period: 信号线(DEA)周期，默认9
     Returns:
-        DataFrame，包含 DIFF, DEA, MACD_hist 列
+        DataFrame，包含 DIFF, DEA, MACD_hist 列（已四舍五入到3位小数）
     """
     df = df.copy()
     df['EMA12'] = df['closing'].ewm(span=fast_period, adjust=False).mean()
     df['EMA26'] = df['closing'].ewm(span=slow_period, adjust=False).mean()
-    df['DIFF'] = df['EMA12'] - df['EMA26']
-    df['DEA'] = df['DIFF'].ewm(span=signal_period, adjust=False).mean()
-    df['MACD_hist'] = df['DIFF'] - df['DEA']  # 标准MACD柱状图
+    df['DIFF'] = (df['EMA12'] - df['EMA26']).round(3)
+    df['DEA'] = df['DIFF'].ewm(span=signal_period, adjust=False).mean().round(3)
+    df['MACD_hist'] = (df['DIFF'] - df['DEA']).round(3)  # 标准MACD柱状图
     return df[['DIFF', 'DEA', 'MACD_hist']]
 
 def calculate_rsi(df: pd.DataFrame, periods=[6, 12, 24]):

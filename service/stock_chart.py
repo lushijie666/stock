@@ -1541,9 +1541,9 @@ def _build_stock_kline_chart_data(stock, t: StockHistoryType):
     if len(df) > 0:
         macd_df = calculate_macd(df)
         macd_data = {
-            'dif': macd_df['DIFF'].round(3).tolist(),
-            'dea': macd_df['DEA'].round(3).tolist(),
-            'macd': macd_df['MACD_hist'].round(3).tolist()
+            'dif': macd_df['DIFF'].tolist(),
+            'dea': macd_df['DEA'].tolist(),
+            'macd': macd_df['MACD_hist'].tolist()
         }
 
     # 计算RSI指标 - 使用统一的strategy.py中的函数
