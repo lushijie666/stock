@@ -4,7 +4,6 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import func
 import streamlit_echarts
-from pyecharts import options as opts
 
 from enums.candlestick_pattern import CandlestickPattern
 from enums.strategy import StrategyType, FusionStrategyModel
@@ -56,7 +55,7 @@ def show_detail(stock):
 def show_page(stock, t: StockHistoryType):
     chart_type = st.radio(
         "选择功能",
-        ["K线图", "K线图形态", "K线图策略", "K线图处理", "买卖点分析", "回测分析"],
+        ["K线图", "K线图策略", "买卖点分析", "回测分析"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_{t}_radio2",
         label_visibility="collapsed"
@@ -71,7 +70,6 @@ def show_page(stock, t: StockHistoryType):
     chart_handlers = {
         "K线图": lambda: show_kline_chart(stock, t),
         "K线图策略": lambda: show_kline_strategy_chart(stock, t, selected_strategies),
-        "K线图处理": lambda: show_kline_process_chart(stock, t),
         "买卖点分析": lambda: show_trade_points_chart(stock, t, selected_strategies),
         "回测分析": lambda: show_backtest_analysis(stock, t, selected_strategies)
     }
@@ -86,7 +84,7 @@ def show_kline_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-    df, dates, k_line_data, volumes, extra_lines= _build_stock_kline_chart_data(stock, t)
+    df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_kline_chart_data(stock, t)
     candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
 
     # 转换形态数据用于图表显示
@@ -120,11 +118,11 @@ def show_kline_chart(stock, t: StockHistoryType):
       """, unsafe_allow_html=True)
 
     # 创建各个独立的图表
-    # 1. 原始K线图
-    kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
+    # 1. 原始K线图（带移动平均线）
+    kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines)
 
-    # 2. 带形态的K线图
-    kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
+    # 2. 带形态的K线图（带移动平均线）
+    kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
 
     # 3. 成交量图
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
@@ -150,7 +148,6 @@ def show_kline_chart(stock, t: StockHistoryType):
             "show_tooltip": True  # 显示tooltip
         }
     ]
-
     # 创建联动图表
     linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height="1400px")
 
@@ -166,7 +163,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-    df, dates, k_line_data, volumes, extra_lines= _build_stock_kline_chart_data(stock, t)
+    df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_kline_chart_data(stock, t)
     candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
 
     # 转换形态数据用于图表显示
@@ -199,7 +196,7 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
               <span class="chart-title">K线图</span>
           </div>
       """, unsafe_allow_html=True)
-    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
+    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
     streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_pattern")
 
     # 显示成交量
@@ -1483,7 +1480,25 @@ def _build_stock_kline_chart_data(stock, t: StockHistoryType):
             'values': [min_lowest] * len(dates),  # 支撑线
             'color': '#14b143'  # 绿色
         }
-    return df, dates, k_line_data, volumes, extra_lines
+
+    # 计算移动平均线（参考《日本蜡烛图技术》）
+    ma_lines = {}
+    if len(df) > 0:
+        # 短期均线
+        if len(df) >= 5:
+            ma_lines['MA5'] = df['closing'].rolling(window=5, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 10:
+            ma_lines['MA10'] = df['closing'].rolling(window=10, min_periods=1).mean().round(2).tolist()
+        # 中期均线
+        if len(df) >= 20:
+            ma_lines['MA20'] = df['closing'].rolling(window=20, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 30:
+            ma_lines['MA30'] = df['closing'].rolling(window=30, min_periods=1).mean().round(2).tolist()
+        # 长期均线
+        if len(df) >= 60:
+            ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
+
+    return df, dates, k_line_data, volumes, extra_lines, ma_lines
 
 def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
     model = get_history_model(t)

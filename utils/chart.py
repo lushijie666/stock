@@ -163,12 +163,26 @@ class ChartBuilder:
             lines = Line()
             lines.add_xaxis(dates)
 
+            # 为不同周期的均线设置不同颜色
+            ma_colors = {
+                'MA5': '#39afe6',   # 蓝色 - 短期
+                'MA10': '#da6ee8',  # 紫色 - 短期
+                'MA20': '#00b894',  # 绿色 - 中期
+                'MA30': '#fdcb6e',  # 黄色 - 中期
+                'MA60': '#e17055',  # 橙色 - 长期
+                'MA120': '#636e72', # 灰色 - 长期
+                'MA250': '#2d3436'  # 深灰 - 长期
+            }
+
             for name, values in ma_lines.items():
+                color = ma_colors.get(name, '#808080')  # 默认灰色
                 lines.add_yaxis(
                     name,
                     values,
                     is_smooth=True,
                     label_opts=opts.LabelOpts(is_show=False),  # 不显示标签
+                    linestyle_opts=opts.LineStyleOpts(width=1.5, color=color),
+                    itemstyle_opts=opts.ItemStyleOpts(color=color)
                 )
             kline = kline.overlap(lines)
         # 添加额外的线（如支撑线、阻力线等）
