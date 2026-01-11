@@ -971,38 +971,51 @@ class ChartBuilder:
                                 return value.toLocaleString();
                             }}
                         }}
-
                         var dfData = {df_json};
                         var currentDate = params[0].axisValue;
                         var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
 
-                        // 按固定顺序：先找K线，再找成交量
-                        var klineItem = params.find(function(p) {{ return p.seriesName === 'K线'; }});
-                        var volumeItem = params.find(function(p) {{ return p.seriesName === '成交量'; }});
+                        // 分别收集K线和成交量的内容
+                        var klineContent = '';
+                        var volumeContent = '';
 
-                        // 先显示K线价格信息
-                        if (klineItem) {{
-                            var idx = klineItem.dataIndex;
-                            var data = dfData[idx];
-                            result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.opening).toFixed(2) + '</span><br/>';
-                            result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.closing).toFixed(2) + '</span><br/>';
-                            result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.lowest).toFixed(2) + '</span><br/>';
-                            result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.highest).toFixed(2) + '</span><br/>';
-                            result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.change_amount).toFixed(2) + '</span><br/>';
-                            result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.change).toFixed(2) + '%</span><br/>';
-                        }}
+                        params.forEach(function(item) {{
+                            if (item.seriesName === 'K线') {{
+                                var index = item.dataIndex;
+                                var currentData = dfData[index];
+                                var opening = parseFloat(currentData.opening).toFixed(2);
+                                var closing = parseFloat(currentData.closing).toFixed(2);
+                                var lowest = parseFloat(currentData.lowest).toFixed(2);
+                                var highest = parseFloat(currentData.highest).toFixed(2);
+                                var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
+                                var change = parseFloat(currentData.change).toFixed(2) + '%';
 
-                        // 再显示成交量信息
-                        if (volumeItem) {{
-                            var idx = volumeItem.dataIndex;
-                            var data = dfData[idx];
-                            var val = volumeItem.value;
-                            result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formatValue(val) + '</span><br/>';
-                            result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formatValue(val / 100) + '</span><br/>';
-                            result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formatValue(data.turnover_amount) + '</span><br/>';
-                            result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + parseFloat(data.turnover_ratio).toFixed(2) + '%</span><br/>';
-                        }}
+                                klineContent += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
+                                klineContent += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
+                                klineContent += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
+                                klineContent += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
+                                klineContent += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
+                                klineContent += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                            }} else if (item.seriesName === '成交量') {{
+                                var index = item.dataIndex;
+                                var currentData = dfData[index];
+                                var value = item.value;
+                                var shouValue = (value / 100).toFixed(0);
+                                var formattedValue = formatValue(value);
+                                var formattedShou = formatValue(Number(shouValue));
+                                var formattedTurnover = formatValue(currentData.turnover_amount);
+                                var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
 
+                                volumeContent += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
+                                volumeContent += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
+                                volumeContent += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
+                                volumeContent += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
+                            }}
+                        }});
+
+                        // 按固定顺序添加：先K线，后成交量
+                        result += klineContent;
+                        result += volumeContent;
                         result += '</div>';
                         return result;
                     }}
