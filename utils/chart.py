@@ -1,5 +1,5 @@
 from datetime import datetime, date  # 添加这行导入
-
+import streamlit as st
 from pyecharts.charts import Pie, Kline, Bar, Grid, Line, Scatter
 from pyecharts import options as opts
 from pyecharts.commons.utils import JsCode
@@ -1254,6 +1254,12 @@ class ChartBuilder:
                 for yaxis in chart_options["yAxis"]:
                     yaxis["gridIndex"] = idx
 
+            # 处理 tooltip 显示配置
+            show_tooltip = config.get("show_tooltip", True)
+            if not show_tooltip:
+                # 隐藏该图表的 tooltip，但不影响 formatter
+                chart_options["tooltip"] = {"show": False}
+
             # 调整图例位置，避免重叠
             if "legend" in chart_options:
                 for legend in chart_options["legend"] if isinstance(chart_options["legend"], list) else [chart_options["legend"]]:
@@ -1267,19 +1273,6 @@ class ChartBuilder:
                     else:
                         # 如果有更多图表，按比例计算
                         legend["top"] = f"{int(grid_pos.get('pos_top', '0%').rstrip('%')) + 1}%"
-
-            # 如果有标题，添加标题配置
-            if title:
-                if "title" not in chart_options:
-                    chart_options["title"] = []
-                elif not isinstance(chart_options["title"], list):
-                    chart_options["title"] = [chart_options["title"]]
-
-                chart_options["title"].append({
-                    "text": title,
-                    "left": "left",
-                    "top": grid_pos.get("pos_top", "0%")
-                })
 
             # 添加到Grid
             grid.add(
@@ -1325,24 +1318,6 @@ class ChartBuilder:
                 },
                 "confine": True  # 限制在图表区域内
             },
-            # 启用画框缩放（brushSelect）
-            "toolbox": {
-                "show": True,
-                "right": "5%",
-                "top": "1%",
-                "feature": {
-                    "dataZoom": {
-                        "yAxisIndex": False,  # 只对 x 轴进行缩放
-                        "title": {
-                            "zoom": "区域缩放",
-                            "back": "还原"
-                        }
-                    },
-                    "restore": {
-                        "title": "重置"
-                    }
-                }
-            }
         })
 
         return grid

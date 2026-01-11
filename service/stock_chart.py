@@ -120,35 +120,34 @@ def show_kline_chart(stock, t: StockHistoryType):
       """, unsafe_allow_html=True)
 
     # 创建各个独立的图表
-    # 1. 原始K线图（隐藏tooltip避免重复）
+    # 1. 原始K线图
     kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines)
-    # 直接修改 options 字典来隐藏 tooltip
-    if "tooltip" in kline_original.options:
-        # 将整个 tooltip 替换为隐藏配置
-        kline_original.options["tooltip"] = {"show": False}
 
-    # 2. 带形态的K线图（保留完整tooltip）
+    # 2. 带形态的K线图
     kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
 
-    # 3. 成交量图（保留tooltip）
+    # 3. 成交量图
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
 
     # 配置图表联动
     charts_config = [
         {
             "chart": kline_original,
-            "grid_pos": {"pos_top": "8%", "height": "28%"},  # 从5%改为8%，给顶部滑动条留空间
-            "title": "原始K线图"
+            "grid_pos": {"pos_top": "8%", "height": "28%"},
+            "title": "原始K线图",
+            "show_tooltip": False
         },
         {
             "chart": kline_pattern,
-            "grid_pos": {"pos_top": "40%", "height": "28%"},  # 从37%改为40%
-            "title": "K线图（含形态）"
+            "grid_pos": {"pos_top": "40%", "height": "28%"},
+            "title": "K线图（含形态）",
+            "show_tooltip": True  # 显示tooltip
         },
         {
             "chart": volume_bar,
-            "grid_pos": {"pos_top": "72%", "height": "25%"},  # 从69%改为72%
-            "title": "成交量"
+            "grid_pos": {"pos_top": "72%", "height": "25%"},
+            "title": "成交量",
+            "show_tooltip": True  # 显示tooltip
         }
     ]
 
