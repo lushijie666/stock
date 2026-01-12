@@ -17,6 +17,8 @@ from utils.candlestick_pattern_detector import CandlestickPatternDetector
 
 from utils.db import get_db_session
 from utils.session import get_session_key, SessionKeys
+from utils.trading_signal_analyzer import TradingSignalAnalyzer
+from utils.trading_analysis_ui import render_trading_analysis_ui
 
 KEY_PREFIX = "stock_chart"
 
@@ -56,7 +58,7 @@ def show_page(stock, t: StockHistoryType):
     )
     chart_handlers = {
         "图表": lambda: show_chart(stock, t),
-        "买卖点分析": lambda: show_chart(stock, t),
+        "买卖点分析": lambda: show_trading_analysis(stock, t),
         "回测分析": lambda: show_chart(stock, t)
     }
     chart_handlers.get(chart_type, lambda: None)()
@@ -198,6 +200,86 @@ def show_chart(stock, t: StockHistoryType):
 
     # 显示形态表格
     _build_stock_patterns_tables(t, df, candlestick_patterns)
+
+
+def show_trading_analysis(stock, t: StockHistoryType):
+    """
+    显示买卖点分析页面
+    """
+    st.markdown(
+        f"""
+               <div class="table-header">
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 买卖点分析</div>
+               </div>
+               """,
+        unsafe_allow_html=True
+    )
+
+    # 获取股票数据
+    df = _get_stock_history_data(stock, t)
+
+    if len(df) < 60:
+        st.warning("数据不足60个周期，无法进行买卖点分析（需要至少60个数据点来计算指标）")
+        return
+
+    # 创建分析器
+    try:
+        with st.spinner("正在分析买卖点..."):
+            analyzer = TradingSignalAnalyzer(df)
+            signals = analyzer.analyze()
+
+        st.markdown("""
+            <div class="chart-header">
+                <span class="chart-icon">🎯</span>
+                <span class="chart-title">买卖点分析</span>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # 显示策略说明
+        with st.expander("📖 分析策略说明", expanded=False):
+            st.markdown("""
+            ### 四层级买卖点分析体系
+
+            本分析系统采用多层级指标体系，严格筛选高质量交易信号：
+
+            #### ① 市场状态判定（MACD + RSI）
+            - **MACD在0轴上方** → 只考虑做多
+            - **MACD在0轴下方** → 只考虑做空
+            - **MACD贴着0轴来回** → 震荡，不交易
+            - **RSI > 55** → 多头趋势
+            - **RSI < 45** → 空头趋势
+            - **45-55** → 震荡
+
+            #### ② 关键区域识别（K线形态 + 结构位置）
+            寻找关键的支撑/阻力位：
+            - 均线支撑/阻力（MA5/10/20/60）
+            - 前期高低点
+            - 重要K线形态出现的位置
+
+            #### ③ 入场触发验证（K线形态 + 成交量）
+            验证信号的有效性：
+            - K线形态必须与方向一致
+            - 成交量必须放大（≥1.3倍5日均量）
+            - 重要形态：吞没、启明星/黄昏星、锤子线、流星线等
+
+            #### ④ 风险过滤（RSI背离 + 成交量）
+            识别潜在风险：
+            - **顶背离**：价格创新高，RSI不创新高 → 做多风险
+            - **底背离**：价格创新低，RSI不创新低 → 做空风险
+            - 成交量衰减 → 警惕反转
+
+            ### 核心原则
+            > 在 MACD 与 RSI 同向的趋势中，只在关键结构位，出现放量的 K 线反转形态时入场；
+            > 当 RSI 背离且量能衰减时退出。
+            """)
+
+        # 渲染分析结果UI
+        render_trading_analysis_ui(signals, df, analyzer)
+
+    except Exception as e:
+        st.error(f"分析过程中出现错误: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
 
 
 def _build_stock_chart_data(stock, t: StockHistoryType):
