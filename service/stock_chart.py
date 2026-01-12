@@ -4,25 +4,19 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import func
 import streamlit_echarts
-
+from typing import List, Dict
 from enums.candlestick_pattern import CandlestickPattern
-from enums.strategy import StrategyType, FusionStrategyModel
 from models.stock import Stock
 from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
-from enums.patterns import Patterns
 from utils.chart import ChartBuilder
-from utils.convert import format_dates, format_dates_series, format_date_by_type, format_dates_signals, format_pattern_text
-from utils.signal import calculate_all_signals
-from utils.strategy import calculate_macd, calculate_multi_period_rsi, backtest_strategy, calculate_strategy_metrics, calculate_risk_metrics, \
-    generate_trading_advice, calculate_strategy_performance, calculate_position_and_cash_values
-from utils.k_line_processor import KLineProcessor
+from utils.convert import format_dates, format_date_by_type
+from utils.strategy import calculate_macd, calculate_multi_period_rsi
 from utils.candlestick_pattern_detector import CandlestickPatternDetector
 
 
 from utils.db import get_db_session
-from utils.session import get_session_key, SessionKeys, get_date_range
-from utils.uuid import generate_key
+from utils.session import get_session_key, SessionKeys
 
 KEY_PREFIX = "stock_chart"
 
@@ -55,38 +49,43 @@ def show_detail(stock):
 def show_page(stock, t: StockHistoryType):
     chart_type = st.radio(
         "选择功能",
-        ["K线图", "K线图策略", "买卖点分析", "回测分析"],
+        ["图表", "买卖点分析", "回测分析"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_{t}_radio2",
         label_visibility="collapsed"
     )
-    selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
-    if selected_strategy_key not in st.session_state:
-        st.session_state[selected_strategy_key] = StrategyType.get_default_strategies_by_type(t)
-    selected_strategies = st.session_state.get(selected_strategy_key, [])
-    strategy_required = chart_type in ["K线图策略", "买卖点分析", "回测分析"]
-    if strategy_required:
-        _show_strategy_config(stock, t)
     chart_handlers = {
-        "K线图": lambda: show_kline_chart(stock, t),
-        "K线图策略": lambda: show_kline_strategy_chart(stock, t, selected_strategies),
-        "买卖点分析": lambda: show_trade_points_chart(stock, t, selected_strategies),
-        "回测分析": lambda: show_backtest_analysis(stock, t, selected_strategies)
+        "图表": lambda: show_chart(stock, t),
+        "买卖点分析": lambda: show_chart(stock, t),
+        "回测分析": lambda: show_chart(stock, t)
     }
     chart_handlers.get(chart_type, lambda: None)()
 
-def show_kline_chart(stock, t: StockHistoryType):
+def show_chart(stock, t: StockHistoryType):
     st.markdown(
         f"""
                <div class="table-header">
-                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图</div>
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 图表</div>
                </div>
                """,
         unsafe_allow_html=True
     )
-    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_kline_chart_data(stock, t)
-    candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
+    df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_chart_data(stock, t)
 
+
+    st.markdown("""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">图表</span>
+          </div>
+      """, unsafe_allow_html=True)
+
+    # 创建各个独立的图表
+    # 1. 原始K线图
+    kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines)
+
+    # 2. 带形态的K线图
+    candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
     # 转换形态数据用于图表显示
     pattern_markers = []
     for pattern in candlestick_patterns:
@@ -109,25 +108,21 @@ def show_kline_chart(stock, t: StockHistoryType):
         if 'window_bottom' in pattern:
             marker_data['window_bottom'] = pattern['window_bottom']
         pattern_markers.append(marker_data)
-
-    st.markdown("""
-          <div class="chart-header">
-              <span class="chart-icon">🔍</span>
-              <span class="chart-title">图表</span>
-          </div>
-      """, unsafe_allow_html=True)
-
-    # 创建各个独立的图表
-    # 1. 原始K线图（带移动平均线）
-    kline_original = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines)
-
-    # 2. 带形态的K线图（带移动平均线）
     kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
 
     # 3. 成交量图
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
 
     # 4. MACD图表
+    # 计算MACD指标
+    macd_data = {}
+    if len(df) > 0:
+        macd_df = calculate_macd(df)
+        macd_data = {
+            'dif': macd_df['DIFF'].tolist(),
+            'dea': macd_df['DEA'].tolist(),
+            'macd': macd_df['MACD_hist'].tolist()
+        }
     macd_chart = None
     if macd_data and 'dif' in macd_data:
         macd_chart = ChartBuilder.create_macd_chart(
@@ -138,6 +133,13 @@ def show_kline_chart(stock, t: StockHistoryType):
         )
 
     # 5. RSI图表
+    # 计算RSI指标
+    rsi_data = {}
+    if len(df) > 0:
+        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
+        for col in rsi_df.columns:
+            rsi_data[col] = rsi_df[col].tolist()
+
     rsi_chart = None
     if rsi_data:
         rsi_chart = ChartBuilder.create_rsi_chart(dates, rsi_data)
@@ -188,75 +190,61 @@ def show_kline_chart(stock, t: StockHistoryType):
         })
 
     # 创建联动图表
-    total_height = "1400px" if len(charts_config) <= 3 else "2000px"
+    total_height = "1400px" if len(charts_config) <= 3 else "1700px"
     linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height=total_height)
 
     # 显示联动图表
-    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height=total_height, key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_kline_chart")
+    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height=total_height, key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_chart")
 
-def show_kline_pattern_chart(stock, t: StockHistoryType):
-    st.markdown(
-        f"""
-               <div class="table-header">
-                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图形态</div>
-               </div>
-               """,
-        unsafe_allow_html=True
-    )
-    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_kline_chart_data(stock, t)
-    candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
+    # 显示形态表格
+    _build_stock_patterns_tables(t, df, candlestick_patterns)
 
-    # 转换形态数据用于图表显示
-    pattern_markers = []
-    for pattern in candlestick_patterns:
-        pattern_type = pattern['pattern_type']
-        marker_data = {
-            'date': format_date_by_type(pattern['date'], t),
-            'value': pattern['price'],
-            'type': pattern_type.code,
-            'name': pattern_type.text,
-            'icon': pattern_type.icon,
-            'color': pattern_type.color,
-            'offset': pattern_type.offset,
-            'description': pattern['description']
+
+def _build_stock_chart_data(stock, t: StockHistoryType):
+    df = _get_stock_history_data(stock, t)
+    dates = format_dates(df, t)
+    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+    volumes = df['turnover_count'].tolist()
+    max_highest, min_lowest = _get_stock_history_lately_max_min(stock, t, 180)
+    extra_lines = {}
+    if max_highest is not None:
+        extra_lines['阻力线(半年)'] = {
+            'values': [max_highest] * len(dates),  # 阻力线
+            'color': '#ef232a'  # 红色
         }
-        if 'start_index' in pattern and 'end_index' in pattern:
-            marker_data['start_index'] = pattern['start_index']
-            marker_data['end_index'] = pattern['end_index']
-        if 'window_top' in pattern:
-            marker_data['window_top'] = pattern['window_top']
-        if 'window_bottom' in pattern:
-            marker_data['window_bottom'] = pattern['window_bottom']
-        pattern_markers.append(marker_data)
+    if min_lowest is not None:
+        extra_lines['支撑线(半年)'] = {
+            'values': [min_lowest] * len(dates),  # 支撑线
+            'color': '#14b143'  # 绿色
+        }
+    ma_lines = {}
+    if len(df) > 0:
+        # 短期均线
+        if len(df) >= 5:
+            ma_lines['MA5'] = df['closing'].rolling(window=5, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 10:
+            ma_lines['MA10'] = df['closing'].rolling(window=10, min_periods=1).mean().round(2).tolist()
+        # 中期均线
+        if len(df) >= 20:
+            ma_lines['MA20'] = df['closing'].rolling(window=20, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 30:
+            ma_lines['MA30'] = df['closing'].rolling(window=30, min_periods=1).mean().round(2).tolist()
+        # 长期均线
+        if len(df) >= 60:
+            ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
 
-    # 创建K线图
-    st.markdown("""
-          <div class="chart-header">
-              <span class="chart-icon">🔍</span>
-              <span class="chart-title">K线图</span>
-          </div>
-      """, unsafe_allow_html=True)
-    kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
-    streamlit_echarts.st_pyecharts(kline_chart, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_pattern")
+    return df, dates, k_line_data, volumes, extra_lines, ma_lines
 
-    # 显示成交量
-    st.markdown(f"""
-                     <div class="chart-header">
-                         <span class="chart-icon">🔍</span>
-                         <span class="chart-title">成交量</span>
-                     </div>
-                 """, unsafe_allow_html=True)
-    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
-    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="400px", key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar_pattern")
 
+def _build_stock_patterns_tables(t: StockHistoryType, df, candlestick_patterns: List[Dict]):
     # 显示形态信息表格
     if candlestick_patterns:
         st.markdown("""
-              <div class="chart-header">
-                  <span class="chart-icon">🔍</span>
-                  <span class="chart-title">形态信息</span>
-              </div>
-          """, unsafe_allow_html=True)
+                      <div class="chart-header">
+                          <span class="chart-icon">🔍</span>
+                          <span class="chart-title">形态信息</span>
+                      </div>
+                  """, unsafe_allow_html=True)
 
         # 构建表格数据
         pattern_table_data = []
@@ -330,11 +318,11 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
             for col_idx, (pattern_name, count) in enumerate(current_row):
                 with cols[col_idx]:
                     st.markdown(f"""
-                            <div class="metric-sub-card metric-card-{row_idx * items_per_row + col_idx + 1}">
-                                <div class="metric-label">{pattern_name}</div>
-                                <div class="metric-value">{count}</div>
-                            </div>
-                    """, unsafe_allow_html=True)
+                                    <div class="metric-sub-card metric-card-{row_idx * items_per_row + col_idx + 1}">
+                                        <div class="metric-label">{pattern_name}</div>
+                                        <div class="metric-value">{count}</div>
+                                    </div>
+                            """, unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
         # 显示表格
         pattern_df = pd.DataFrame(pattern_table_data)
@@ -347,11 +335,11 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
 
     # 形态算法说明
     st.markdown(f"""
-            <div class="chart-header">
-                <span class="chart-icon">🔮</span>
-                <span class="chart-title">形态算法</span>
-            </div>
-    """, unsafe_allow_html=True)
+                    <div class="chart-header">
+                        <span class="chart-icon">🔮</span>
+                        <span class="chart-title">形态算法</span>
+                    </div>
+            """, unsafe_allow_html=True)
 
     # 从检测器获取算法信息
     pattern_algorithm_infos = CandlestickPatternDetector.get_pattern_algorithm_info()
@@ -377,1183 +365,19 @@ def show_kline_pattern_chart(stock, t: StockHistoryType):
                 color_class = pattern_info['color_class']
 
                 padded_criteria = criteria + [''] * (current_row_max_criteria - len(criteria))
-                criteria_html = '<br>'.join([f"🗳 {criterion}" if criterion else "&nbsp;" for criterion in padded_criteria])
+                criteria_html = '<br>'.join(
+                    [f"🗳 {criterion}" if criterion else "&nbsp;" for criterion in padded_criteria])
                 st.markdown(f"""
-                <div class="sync-button-card {color_class}">
-                    <div class="sync-card-icon {color_class}">
-                        <span class="sync-icon-large">{pattern_type.icon}</span>
-                    </div>
-                    <div class="sync-card-content">
-                        <div class="sync-card-title">{pattern_type.text}  -  {category}  -  {signal}</div>
-                        <div class="sync-card-desc">{criteria_html}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-def show_kline_strategy_chart(stock, t: StockHistoryType, strategies=None):
-    st.markdown(
-        f"""
-               <div class="table-header">
-                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图策略</div>
-               </div>
-               """,
-        unsafe_allow_html=True
-    )
-    df = _get_stock_history_data(stock, t)
-    dates = format_dates(df, t)
-    ma_periods = t.ma_periods  # 5日移动平均线，10日移动平均线，30日移动平均线，250日移动平均线
-    ma_lines = {}
-    for period in ma_periods:
-        ma_lines[f'MA{period}'] = df['closing'].rolling(window=period).mean().tolist()
-    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-    volumes = df['turnover_count'].tolist()
-
-    all_signals = []
-    if strategies:
-        # 获取融合策略配置
-        fusion_config = None
-        if StrategyType.FUSION_STRATEGY in strategies:
-            fusion_config = _get_fusion_config(stock, t)
-        all_signals = calculate_all_signals(df, strategies, merge_and_filter=True, fusion_config=fusion_config)
-        all_signals = format_dates_signals(all_signals, t)
-    # 创建 K 线图
-    st.markdown("""
-          <div class="chart-header">
-              <span class="chart-icon">🔍</span>
-              <span class="chart-title">K线图</span>
-          </div>
-      """, unsafe_allow_html=True)
-    kline = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, signals=all_signals)
-    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
-    #grid = ChartBuilder.create_combined_chart(kline, volume_bar)
-
-    # 显示K线图
-    streamlit_echarts.st_pyecharts(kline, theme="white", height="500px", key=f"{KEY_PREFIX}_{stock.code}_{t}_kline_chart_strategy")
-
-    # 计算 MACD
-    macd_df = calculate_macd(df)
-
-    diff_values = macd_df['DIFF'].tolist()
-    dea_values = macd_df['DEA'].tolist()
-    macd_hist = macd_df['MACD_hist'].tolist()
-    # 显示 MACD 图
-    fast_period = 12
-    slow_period = 26
-    signal_period = 9
-    macd_full_title = f"MACD ({fast_period},{slow_period},{signal_period})"
-    st.markdown(f"""
-          <div class="chart-header">
-              <span class="chart-icon">🔍</span>
-              <span class="chart-title">{macd_full_title}</span>
-          </div>
-      """, unsafe_allow_html=True)
-    macd_chart = ChartBuilder.create_macd_chart(
-        dates=dates,
-        diff=diff_values,
-        dea=dea_values,
-        hist=macd_hist,
-        fast_period=fast_period,
-        slow_period=slow_period,
-        signal_period=signal_period,
-    )
-    streamlit_echarts.st_pyecharts(macd_chart, theme="white", height="350px", key=f"{KEY_PREFIX}_{stock.code}_{t}_macd_chart_strategy")
-
-    # 显示成交量
-    st.markdown(f"""
-          <div class="chart-header">
-              <span class="chart-icon">🔍</span>
-              <span class="chart-title">成交量</span>
-          </div>
-      """, unsafe_allow_html=True)
-    streamlit_echarts.st_pyecharts(volume_bar, theme="white", height="300px", key=f"{KEY_PREFIX}_{stock.code}_{t}_volume_bar_strategy")
-
-    # 显示MACD数据表格
-    if not macd_df.empty:
-        st.markdown("""
-           <div class="chart-header">
-               <span class="chart-icon">🔍</span>
-               <span class="chart-title">MACD指标信息</span>
-           </div>
-           """, unsafe_allow_html=True)
-
-        # 创建MACD数据DataFrame
-        macd_display_df = pd.DataFrame({
-            '日期（时间）': format_dates_series(df['date'], t),
-            'DIFF': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DIFF']],
-            'DEA': [round(x, 4) if not pd.isna(x) else None for x in macd_df['DEA']],
-            'MACD': [round(x, 4) if not pd.isna(x) else None for x in macd_df['MACD_hist']]
-        })
-
-        st.dataframe(
-            macd_display_df,
-            height=min(len(macd_display_df) * 35 + 38, 300),
-            use_container_width=True
-        )
-
-    # 显示信号数据表格
-    if all_signals:
-        st.markdown("""
-                    <div class="chart-header">
-                        <span class="chart-icon">🔍</span>
-                        <span class="chart-title">买卖点信息</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-        # 创建信号DataFrame
-        signal_df = pd.DataFrame([
-            {
-                '日期（时间）': format_date_by_type(s['date'], t),
-                '信号类型': f"{s['type'].fullText}",
-                '信号强度': f"{s['strength'].fullText}",
-                '价格': round(s['price'], 2),
-                '策略': _format_strategy_text(s),
-                '模式': format_pattern_text(s)  # 蜡烛图显示形态，融合策略显示参与策略
-            }
-            for s in all_signals
-        ]).sort_values('日期（时间）')
-        st.dataframe(
-            signal_df,
-            height=min(len(signal_df) * 35 + 38, 600),
-            use_container_width=True
-        )
-
-def show_kline_process_chart(stock, t: StockHistoryType, strategies=None):
-    st.markdown(
-        f"""
-            <div class="table-header">
-                <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - K线图处理</div>
-            </div>
-        """,
-        unsafe_allow_html=True
-    )
-    df = _get_stock_history_data(stock, t)
-    # 创建处理器实例
-    processor = KLineProcessor()
-    try:
-        processor.validate_data(df)
-        processed_df, contains_marks, processing_records, patterns = processor.process_klines(
-            df,
-        )
-        # 识别笔
-        strokes = KLineProcessor.identify_strokes(patterns, processed_df)
-        # 识别线段
-        segments = KLineProcessor.identify_segments(strokes)
-        # 识别中枢
-        centers = KLineProcessor.identify_centers(strokes)
-
-        processed_dates = format_dates(processed_df, t)
-        processed_k_line_data = processed_df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-        processed_kline = ChartBuilder.create_kline_chart(
-            processed_dates,
-            processed_k_line_data,
-            df,
-            ma_lines=None,
-            patterns=patterns,
-            strokes=strokes,
-            segments=segments,
-            centers=centers
-
-        )
-        # 显示图表
-        st.markdown("""
-              <div class="chart-header">
-                  <span class="chart-icon">🔍</span>
-                  <span class="chart-title">K线图</span>
-              </div>
-        """, unsafe_allow_html=True)
-        streamlit_echarts.st_pyecharts(processed_kline,theme="white",height="500px",key=generate_key())
-
-        # 显示处理信息表格
-        if processing_records:
-            st.markdown("""
-               <div class="chart-header">
-                   <span class="chart-icon">🔍</span>
-                   <span class="chart-title">包含关系信息</span>
-               </div>
-            """, unsafe_allow_html=True)
-            st.markdown("""
-               <div class='info-description'>
-               -  当两根K线互相包含时，根据前一根K线的趋势决定处理方向<br>
-               -  向上处理：取两根K线中较高的最高价和较高的最低价<br>
-               -  向下处理：取两根K线中较低的最高价和较低的最低价
-               
-               </div>
-               """, unsafe_allow_html=True)
-            # 创建更直观的包含关系DataFrame
-            contains_df = pd.DataFrame([
-                {
-                    '上一K线日期': format_date_by_type(record['original_k1']['date'], t),
-                    '上一K线最高/低': f"{record['original_k1']['highest']}/{record['original_k1']['lowest']}",
-                    '上一K线开/收盘': f"{record['original_k1']['opening']}/{record['original_k1']['closing']}",
-                    '当前K线日期': format_date_by_type(record['date'], t),
-                    '当前K线最高/低': f"{record['original_k2']['highest']}/{record['original_k2']['lowest']}",
-                    '当前K线开/收盘': f"{record['original_k2']['opening']}/{record['original_k2']['closing']}",
-                    '下一K线日期': format_date_by_type(record['original_k3']['date'], t),
-                    '下一K线最高/低': f"{record['original_k3']['highest']}/{record['original_k3']['lowest']}",
-                    '下一K线开/收盘': f"{record['original_k3']['opening']}/{record['original_k3']['closing']}",
-                    '处理方向': record['trend'],
-                    '合并后最高/低': f"{record['new_values']['high']}/{record['new_values']['low']}"
-                }
-                for record in processing_records
-            ])
-
-            # 显示包含关系表格
-            st.dataframe(
-                contains_df,
-                height=min(len(contains_df) * 35 + 38, 600),
-                use_container_width=True
-            )
-        # 原有的分型信息表格
-        if patterns:
-            st.markdown("""
-              <div class="chart-header">
-                  <span class="chart-icon">🔍</span>
-                  <span class="chart-title">分型标记信息</span>
-              </div>
-           """, unsafe_allow_html=True)
-            pattern_df = pd.DataFrame({
-                '日期': [format_date_by_type(p['date'], t) for p in patterns],
-                '类型': ["🚀 顶分型" if p['type'] == Patterns.TOP else "💣 底分型" for p in patterns],
-                '价格': [p['value'] for p in patterns]
-            })
-
-            st.dataframe(
-                pattern_df,
-                height=min(len(pattern_df) * 35 + 38, 600),
-                use_container_width=True
-            )
-        # 显示笔信息表格
-        if strokes:
-            st.markdown("""
-              <div class="chart-header">
-                  <span class="chart-icon">🔍</span>
-                  <span class="chart-title">笔信息</span>
-              </div>
-           """, unsafe_allow_html=True)
-            stroke_df = pd.DataFrame([
-                {
-                    '起始日期': format_date_by_type(s['start_date'], t),
-                    '结束日期': format_date_by_type(s['end_date'], t),
-                    '起始价格': s['start_value'],
-                    '结束价格': s['end_value'],
-                    '类型': "向上(S)" if s['type'] == 'up' else "向下(X)",
-                    'K线数量': abs(s['end_index'] - s['start_index']) + 1
-                }
-                for s in strokes
-            ])
-            st.dataframe(
-                stroke_df,
-                height=min(len(stroke_df) * 35 + 38, 600),
-                use_container_width=True
-            )
-        # 显示线段信息表格
-        if segments:
-            st.markdown("""
-                  <div class="chart-header">
-                      <span class="chart-icon">🔍</span>
-                      <span class="chart-title">线段信息</span>
-                  </div>
-               """, unsafe_allow_html=True)
-            segment_df = pd.DataFrame([
-                {
-                    '起始日期': format_date_by_type(s['start_date'], t),
-                    '结束日期': format_date_by_type(s['end_date'], t),
-                    '起始价格': s['start_value'],
-                    '结束价格': s['end_value'],
-                    '类型': "向上" if s['type'] == 'up' else "向下",
-                    '包含笔数': len(s['strokes'])
-                }
-                for s in segments
-            ])
-            st.dataframe(
-                segment_df,
-                height=min(len(segment_df) * 35 + 38, 600),
-                use_container_width=True
-            )
-        # 显示中枢信息表格
-        if centers:
-            st.markdown("""
-                 <div class="chart-header">
-                     <span class="chart-icon">🔍</span>
-                     <span class="chart-title">中枢信息</span>
-                 </div>
-              """, unsafe_allow_html=True)
-            center_df = pd.DataFrame([
-                {
-                    '起始日期': format_date_by_type(c['start_date'], t),
-                    '结束日期': format_date_by_type(c['end_date'], t),
-                    '中枢类型': "上涨中枢" if c['type'] == 'up_center' else "下跌中枢",
-                    '中枢高点(ZG)': round(c['ZG'], 2),
-                    '中枢低点(ZD)': round(c['ZD'], 2),
-                    '中枢波动最高点(GG)': round(c['GG'], 2),
-                    '中枢波动最低点(DD)': round(c['DD'], 2),
-                    '包含笔数': len(c['strokes'])
-                }
-                for c in centers
-            ])
-            st.dataframe(
-                center_df,
-                height=min(len(center_df) * 35 + 38, 600),
-                use_container_width=True
-            )
-    except ValueError as e:
-        st.error(f"数据处理失败：{str(e)}")
-
-
-def show_trade_points_chart(stock, t: StockHistoryType, strategies=None):
-    st.markdown(
-        f"""
-               <div class="table-header">
-                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 买卖点分析</div>
-               </div>
-               """,
-        unsafe_allow_html=True
-    )
-    model = get_history_model(t)
-    try:
-        with get_db_session() as session:
-            # 获取该股票的最早和最晚日期
-            date_range = session.query(
-                func.min(model.date),
-                func.max(model.date)
-            ).filter(
-                model.code == stock.code,
-                model.removed == False
-            ).first()
-            if not date_range or None in date_range:
-                st.warning("没有找到数据")
-                return
-            min_date, max_date = date_range
-            default_start_date = t.get_default_start_date(max_date, min_date)
-
-            key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}_trade_points',category=stock.category)
-            start_date_key = f"{key_prefix}_start_date"
-            end_date_key = f"{key_prefix}_end_date"
-
-            if start_date_key not in st.session_state:
-                st.session_state[start_date_key] = default_start_date
-            if end_date_key not in st.session_state:
-                st.session_state[end_date_key] = max_date
-
-            # 添加日期选择器
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "开始日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=start_date_key
-                )
-                if start_date != st.session_state[start_date_key]:
-                    st.session_state[start_date_key] = start_date
-            with col2:
-                end_date = st.date_input(
-                    "结束日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=end_date_key
-                )
-                if end_date != st.session_state[end_date_key]:
-                    st.session_state[end_date_key] = end_date
-
-            # 从数据库获取数据
-            query = session.query(
-                model.date,
-                model.opening,
-                model.highest,
-                model.lowest,
-                model.closing
-            ).filter(
-                model.code == stock.code,
-                model.removed == False,
-                model.date >= start_date,
-                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
-            ).order_by(model.date)
-
-            # 读取数据到DataFrame
-            df = pd.read_sql(query.statement, session.bind)
-            if df.empty:
-                st.warning("所选日期范围内没有数据")
-                return
-            # 计算所有信号
-            fusion_config = None
-            if StrategyType.FUSION_STRATEGY in strategies:
-                fusion_config = _get_fusion_config(stock, t)
-            all_signals = calculate_all_signals(df, strategies, fusion_config=fusion_config)
-            all_signals = format_dates_signals(all_signals, t)
-            # 准备数据
-            dates = format_dates(df, t)
-            open_prices = df['opening'].tolist()
-            high_prices = df['highest'].tolist()
-            low_prices = df['lowest'].tolist()
-            close_prices = df['closing'].tolist()
-
-            line_chart = ChartBuilder.create_trade_points_chart(
-                dates,
-                open_prices,
-                high_prices,
-                low_prices,
-                close_prices,
-                all_signals
-            )
-            st.markdown("""
-                  <div class="chart-header">
-                      <span class="chart-icon">🔍</span>
-                      <span class="chart-title">交易点</span>
-                  </div>
-              """, unsafe_allow_html=True)
-            # 显示图表
-            streamlit_echarts.st_pyecharts(line_chart, theme="white", height="600px", key=f"{KEY_PREFIX}_{stock.code}_{t}_trade_points")
-
-            # 显示买卖点表格
-            if all_signals:
-                st.markdown("""
-                     <div class="chart-header">
-                         <span class="chart-icon">🔍</span>
-                         <span class="chart-title">买卖点信息</span>
-                     </div>
-                  """, unsafe_allow_html=True)
-
-                # 创建买卖点DataFrame - 在表格中用相应的图标表示信号强度
-                trade_points_df = pd.DataFrame([
-                    {
-                        '日期（时间）': format_date_by_type(s['date'], t),
-                        '信号类型': f"{s['type'].fullText}",
-                        '信号强度': f"{s['strength'].fullText}",
-                        '价格': round(s['price'], 2),
-                        '策略': _format_strategy_text(s),
-                        '模式': format_pattern_text(s)  # 蜡烛图显示形态，融合策略显示参与策略
-                    }
-                    for s in all_signals
-                ]).sort_values('日期（时间）')
-                st.dataframe(
-                    trade_points_df,
-                    height=min(len(trade_points_df) * 35 + 38, 800),
-                    use_container_width=True
-                )
-            else:
-                st.info("所选时间范围内未发现符合条件的买卖点信号")
-
-    except Exception as e:
-        st.error(f"加载数据失败：{str(e)}")
-
-
-def show_backtest_analysis(stock, t: StockHistoryType, strategies=None):
-    st.markdown(
-        f"""
-        <div class="table-header">
-            <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 回测分析</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    model = get_history_model(t)
-    try:
-        with get_db_session() as session:
-            # 获取该股票的最早和最晚日期
-            date_range = session.query(
-                func.min(model.date),
-                func.max(model.date)
-            ).filter(
-                model.code == stock.code,
-                model.removed == False
-            ).first()
-
-            if not date_range or None in date_range:
-                st.warning("没有找到数据")
-                return
-
-            min_date, max_date = date_range
-            default_start_date = t.get_default_start_date(max_date, min_date)
-
-            key_prefix = get_session_key(
-                SessionKeys.PAGE,
-                prefix=f'{KEY_PREFIX}_{stock.code}_{t}_backtest',
-                category=stock.category
-            )
-            start_date_key = f"{key_prefix}_start_date"
-            end_date_key = f"{key_prefix}_end_date"
-
-            if start_date_key not in st.session_state:
-                st.session_state[start_date_key] = default_start_date
-            if end_date_key not in st.session_state:
-                st.session_state[end_date_key] = max_date
-
-            # 添加日期选择器
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "开始日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=start_date_key
-                )
-                if start_date != st.session_state[start_date_key]:
-                    st.session_state[start_date_key] = start_date
-            with col2:
-                end_date = st.date_input(
-                    "结束日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=end_date_key
-                )
-                if end_date != st.session_state[end_date_key]:
-                    st.session_state[end_date_key] = end_date
-
-            # 从数据库获取数据
-            query = session.query(
-                model.date,
-                model.opening,
-                model.highest,
-                model.lowest,
-                model.closing
-            ).filter(
-                model.code == stock.code,
-                model.removed == False,
-                model.date >= start_date,
-                model.date <= datetime.combine(end_date, time.max)  # 结束日期包含 23:59:59
-            ).order_by(model.date)
-
-            # 读取数据到DataFrame
-            df = pd.read_sql(query.statement, session.bind)
-            if df.empty:
-                st.warning("所选日期范围内没有数据")
-                return
-            dates = format_dates(df, t)
-            st.markdown("""
-              <div class="chart-header">
-                  <span class="chart-icon">🔧</span>
-                  <span class="chart-title">参数设置</span>
-              </div>
-            """, unsafe_allow_html=True)
-            col_config1, col_config2, col_config3 = st.columns(3)
-
-            with col_config1:
-                initial_capital = st.number_input(
-                    "初始资金 (¥)",
-                    min_value=1000.0,
-                    value=100000.0,
-                    step=1000.0,
-                    key=f"{KEY_PREFIX}_{stock.code}_{t}_initial_capital"
-                )
-
-            with col_config2:
-                buy_ratio_default = {'strong': 0.8, 'weak': 0.5}
-                buy_ratio_strong = st.number_input(
-                    "强买比例",
-                    min_value=0.1,
-                    max_value=1.0,
-                    value=0.8,
-                    step=0.1,
-                    key=f"{KEY_PREFIX}_{stock.code}_{t}_buy_ratio_strong"
-                )
-                buy_ratio_weak = st.number_input(
-                    "弱买比例",
-                    min_value=0.1,
-                    max_value=1.0,
-                    value=0.5,
-                    step=0.1,
-                    key=f"{KEY_PREFIX}_{stock.code}_{t}_buy_ratio_weak"
-                )
-                buy_ratios = {'strong': buy_ratio_strong, 'weak': buy_ratio_weak}
-
-            with col_config3:
-                sell_ratio_default = {'strong': 0.8, 'weak': 0.5}
-                sell_ratio_strong = st.number_input(
-                    "强卖比例",
-                    min_value=0.1,
-                    max_value=1.0,
-                    value=0.8,
-                    step=0.1,
-                    key=f"{KEY_PREFIX}_{stock.code}_{t}_sell_ratio_strong"
-                )
-                sell_ratio_weak = st.number_input(
-                    "弱卖比例",
-                    min_value=0.1,
-                    max_value=1.0,
-                    value=0.5,
-                    step=0.1,
-                    key=f"{KEY_PREFIX}_{stock.code}_{t}_sell_ratio_weak"
-                )
-                sell_ratios = {'strong': sell_ratio_strong, 'weak': sell_ratio_weak}
-
-            # 计算所有信号
-            fusion_config = None
-            if StrategyType.FUSION_STRATEGY in strategies:
-                fusion_config = _get_fusion_config(stock, t)
-            all_signals = calculate_all_signals(df, strategies, fusion_config=fusion_config)
-            if not all_signals:
-                st.warning("所选时间范围内未发现交易信号")
-                return
-            format_all_signals = format_dates_signals(all_signals, t)
-            # 执行回测
-            backtest_result = backtest_strategy(
-                df,
-                format_all_signals,
-                initial_capital=initial_capital,
-                buy_ratios=buy_ratios,
-                sell_ratios=sell_ratios
-            )
-            open_prices = df['opening'].tolist()
-            high_prices = df['highest'].tolist()
-            low_prices = df['lowest'].tolist()
-            close_prices = df['closing'].tolist()
-            trades = backtest_result['trades']
-
-            # 计算
-            trading_advice = generate_trading_advice(df, all_signals)
-            risk_metrics = calculate_risk_metrics(df, all_signals)
-            strategy_metrics = calculate_strategy_metrics(df, all_signals)
-            strategy_cumulative, benchmark_cumulative = calculate_strategy_performance(df, all_signals, backtest_result)
-            position_values, cash_values = calculate_position_and_cash_values(df, backtest_result)
-
-            # 交易建议
-            st.markdown(f"""
-                <div class="chart-header">
-                    <div class="chart-icon">📋</div>
-                    <div>
-                        <div class="chart-title">交易建议</div>
-                        <div class="chart-title">{trading_advice}</div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-
-            # 显示核心指标 - 一行3个
-            st.markdown("""
-                <div class="chart-header">
-                    <span class="chart-icon">💰</span>
-                    <span class="chart-title">核心收益指标</span>
-                </div>
-            """, unsafe_allow_html=True)
-
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown(f"""
-                        <div class="metric-sub-card metric-card-1">
-                            <div class="metric-label">初始资金</div>
-                            <div class="metric-value">¥{backtest_result['initial_capital']:,.2f}</div>
+                        <div class="sync-button-card {color_class}">
+                            <div class="sync-card-icon {color_class}">
+                                <span class="sync-icon-large">{pattern_type.icon}</span>
+                            </div>
+                            <div class="sync-card-content">
+                                <div class="sync-card-title">{pattern_type.text}  -  {category}  -  {signal}</div>
+                                <div class="sync-card-desc">{criteria_html}</div>
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"""
-                        <div class="metric-sub-card metric-card-2">
-                            <div class="metric-label">最终价值</div>
-                            <div class="metric-value">¥{backtest_result['final_value']:,.2f}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-            with col3:
-                return_color = "#00c853" if backtest_result['total_return'] >= 0 else "#ff1744"
-                st.markdown(f"""
-                        <div class="metric-sub-card metric-card-3">
-                            <div class="metric-label">总收益率</div>
-                            <div class="metric-value" style="color: {return_color}">{backtest_result['total_return']:.2f}%</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-            st.markdown("")
-            st.markdown("""
-               <div class="chart-header">
-                   <span class="chart-icon">📊</span>
-                   <span class="chart-title">交易质量指标</span>
-               </div>
-           """, unsafe_allow_html=True)
-
-            col4, col5, col6, col7 = st.columns(4)
-            with col4:
-                win_rate_color = "#00c853" if strategy_metrics['win_rate'] >= 50 else "#ff9800"
-                st.markdown(f"""
-                       <div class="metric-sub-card metric-card-4">
-                           <div class="metric-label">胜率</div>
-                           <div class="metric-value" style="color: {win_rate_color}">{strategy_metrics['win_rate']:.1f}%</div>
-                           <div class="metric-sub-label">{strategy_metrics['winning_trades']}胜/{strategy_metrics['losing_trades']}负</div>
-                       </div>
-                       """, unsafe_allow_html=True)
-            with col5:
-                profit_loss_color = "#00c853" if strategy_metrics['profit_loss_ratio'] >= 1 else "#ff9800"
-                st.markdown(f"""
-                       <div class="metric-sub-card metric-card-5">
-                           <div class="metric-label">盈亏比</div>
-                           <div class="metric-value" style="color: {profit_loss_color}">{strategy_metrics['profit_loss_ratio']:.2f}</div>
-                       </div>
-                       """, unsafe_allow_html=True)
-            with col6:
-                st.markdown(f"""
-                       <div class="metric-sub-card metric-card-6">
-                           <div class="metric-label">总交易次数</div>
-                           <div class="metric-value">{strategy_metrics['total_trades']}</div>
-                       </div>
-                       """, unsafe_allow_html=True)
-            with col7:
-                st.markdown(f"""
-                      <div class="metric-sub-card metric-card-7">
-                          <div class="metric-label">平均持股</div>
-                          <div class="metric-value">{strategy_metrics['avg_holding_period']:.1f}天</div>
-                      </div>
-                      """, unsafe_allow_html=True)
-
-            st.markdown("")
-            st.markdown("""
-                <div class="chart-header">
-                    <span class="chart-icon">⚠️</span>
-                    <span class="chart-title">风险指标</span>
-                </div>
-            """, unsafe_allow_html=True)
-
-            col8, col9, col10 = st.columns(3)
-            with col8:
-                sharpe_color = "#00c853" if risk_metrics['sharpe_ratio'] >= 1 else ("#ff9800" if risk_metrics['sharpe_ratio'] >= 0 else "#ff1744")
-                st.markdown(f"""
-                        <div class="metric-sub-card metric-card-8">
-                            <div class="metric-label">夏普比率</div>
-                            <div class="metric-value" style="color: {sharpe_color}">{risk_metrics['sharpe_ratio']:.2f}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-            with col9:
-                st.markdown(f"""
-                       <div class="metric-sub-card metric-card-9">
-                           <div class="metric-label">年化波动率</div>
-                           <div class="metric-value">{risk_metrics['volatility'] * 100:.2f}%</div>
-                       </div>
-                       """, unsafe_allow_html=True)
-            with col10:
-                drawdown_color = "#00c853" if risk_metrics['max_drawdown'] >= -0.1 else ("#ff9800" if risk_metrics['max_drawdown'] >= -0.2 else "#ff1744")
-                st.markdown(f"""
-                       <div class="metric-sub-card metric-card-10">
-                           <div class="metric-label">最大回撤</div>
-                           <div class="metric-value" style="color: {drawdown_color}">{risk_metrics['max_drawdown'] * 100:.2f}%</div>
-                       </div>
-                       """, unsafe_allow_html=True)
-
-
-            st.markdown("")
-            st.markdown("""
-                    <div class="chart-header">
-                        <span class="chart-icon">🔍</span>
-                        <span class="chart-title">收益对比</span>
-                    </div>
-            """, unsafe_allow_html=True)
-            performance_chart = ChartBuilder.create_backtest_performance_chart(
-                dates,
-                strategy_cumulative,
-                benchmark_cumulative
-            )
-            # 创建收益对比图
-            streamlit_echarts.st_pyecharts(performance_chart, height="450px", key=f"{KEY_PREFIX}_{stock.code}_{t}_performance_chart")
-
-
-            st.markdown("""
-                    <div class="chart-header">
-                        <span class="chart-icon">🔍</span>
-                        <span class="chart-title">交易点</span>
-                    </div>
-            """, unsafe_allow_html=True)
-            backtest_trade_points_chart = ChartBuilder.create_backtest_trade_points_chart(
-                dates,
-                open_prices,
-                high_prices,
-                low_prices,
-                close_prices,
-                format_all_signals,
-                trades
-            )
-            streamlit_echarts.st_pyecharts(backtest_trade_points_chart, height="450px", key=f"{KEY_PREFIX}_{stock.code}_{t}_backtest_trade_points_chart")
-
-            st.markdown("""
-                    <div class="chart-header">
-                        <span class="chart-icon">🔍</span>
-                        <span class="chart-title">资金分布变化</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            position_chart = ChartBuilder.create_position_chart(
-                dates,
-                position_values,
-                cash_values
-            )
-            streamlit_echarts.st_pyecharts(position_chart, height="450px", key=f"{KEY_PREFIX}_{stock.code}_{t}_position_chart")
-
-
-            st.markdown("""
-                   <div class="chart-header">
-                       <span class="chart-icon">🔍</span>
-                       <span class="chart-title">交易信息</span>
-                   </div>
-           """, unsafe_allow_html=True)
-            if backtest_result['trades']:
-                trades_df = pd.DataFrame([
-                    {
-                        '日期（时间）': format_date_by_type(trade['date'], t),
-                        '操作': f"{trade['type'].icon} {trade['type'].display_name}",
-                        '信号强度': '🔥 强' if trade['strength'] == 'strong' else '🥀 弱',
-                        '价格': f"¥{trade['price']:.2f}",
-                        '数量': trade['shares'],
-                        '金额': f"¥{trade['amount']:.2f}",
-                        '剩余资金': f"¥{trade['capital']:.2f}",
-                        '持仓数量': trade['position']
-                    }
-                    for trade in backtest_result['trades']
-                ])
-                st.dataframe(
-                    trades_df,
-                    height=min(len(trades_df) * 35 + 38, 600),
-                    use_container_width=True
-                )
-            else:
-                st.info("没有交易记录")
-    except Exception as e:
-        st.error(f"回测分析失败：{str(e)}")
-
-
-
-def _format_strategy_text(signal):
-    """格式化策略文本，处理融合策略和普通策略"""
-    strategy_code = signal.get('strategy_code', '')
-
-    if not strategy_code:
-        return '未知'
-
-    # 如果是融合策略
-    if strategy_code == 'FS':
-        return '融合策略'
-
-    # 普通策略
-    if ',' in strategy_code:
-        # 多个策略
-        codes = [code.strip() for code in strategy_code.split(',')]
-        strategies = []
-        for code in codes:
-            st_type = StrategyType.lookup(code)
-            if st_type:
-                strategies.append(st_type.fullText)
-        return ', '.join(strategies) if strategies else '未知'
-    else:
-        # 单个策略
-        st_type = StrategyType.lookup(strategy_code)
-        return st_type.fullText if st_type else '未知'
-
-
-def _get_fusion_config(stock, t: StockHistoryType):
-    """获取融合策略配置"""
-    fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
-    fusion_consensus_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_consensus"
-    fusion_weights_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"
-    fusion_threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"
-
-    # 获取模式
-    mode_code = st.session_state.get(fusion_mode_key, FusionStrategyModel.VOTING_MODEL.code)
-
-    # 根据 code 找到对应的枚举
-    mode = next((m for m in FusionStrategyModel if m.code == mode_code), FusionStrategyModel.VOTING_MODEL)
-
-    config = {
-        'mode': mode,
-    }
-
-    # 根据不同模式获取参数
-    if mode == FusionStrategyModel.VOTING_MODEL:
-        config['min_consensus'] = st.session_state.get(fusion_consensus_key, 2)
-    elif mode in [FusionStrategyModel.WEIGHTED_MODEL, FusionStrategyModel.ADAPTIVE_MODEL]:
-        config['weights'] = st.session_state.get(fusion_weights_key)
-        config['threshold'] = st.session_state.get(fusion_threshold_key)
-
-    return config
-
-
-def _show_strategy_config(stock, t: StockHistoryType):
-    strategy_options = {
-        StrategyType.MACD_STRATEGY: StrategyType.MACD_STRATEGY.fullText,
-        StrategyType.SMA_STRATEGY: StrategyType.SMA_STRATEGY.fullText,
-        StrategyType.TURTLE_STRATEGY: StrategyType.TURTLE_STRATEGY.fullText,
-        StrategyType.CBR_STRATEGY: StrategyType.CBR_STRATEGY.fullText,
-        StrategyType.RSI_STRATEGY: StrategyType.RSI_STRATEGY.fullText,
-        StrategyType.BOLL_STRATEGY: StrategyType.BOLL_STRATEGY.fullText,
-        StrategyType.KDJ_STRATEGY: StrategyType.KDJ_STRATEGY.fullText,
-        StrategyType.CANDLESTICK_STRATEGY: StrategyType.CANDLESTICK_STRATEGY.fullText,
-        StrategyType.FUSION_STRATEGY: StrategyType.FUSION_STRATEGY.fullText
-    }
-    selected_strategy_key = f"{KEY_PREFIX}_{stock.code}_{t}_strategies"
-    if selected_strategy_key not in st.session_state:
-        st.session_state[selected_strategy_key] = StrategyType.get_default_strategies_by_type(t)
-    selected_strategies = st.session_state.get(selected_strategy_key, [])
-    cols = st.columns(len(strategy_options))
-    for i, (strategy, strategy_text) in enumerate(strategy_options.items()):
-        with cols[i]:
-            currently_selected = strategy in selected_strategies
-            # 定义回调函数来切换选择状态
-            def toggle_strategy(sel_strategy=strategy):
-                current = st.session_state.get(selected_strategy_key, [])
-                if sel_strategy in current:
-                    st.session_state[selected_strategy_key] = [s for s in current if s != sel_strategy]
-                else:
-                    st.session_state[selected_strategy_key] = current + [sel_strategy]
-            is_selected = st.checkbox(
-                strategy_text,
-                value=currently_selected,
-                key=f"{selected_strategy_key}_{strategy.value}",
-                on_change=toggle_strategy,
-                label_visibility="visible"
-
-            )
-            if is_selected and strategy not in selected_strategies:
-                selected_strategies.append(strategy)
-    # 更新session state
-    st.session_state[selected_strategy_key] = selected_strategies
-
-    # 如果选择了融合策略，显示配置选项
-    if StrategyType.FUSION_STRATEGY in selected_strategies:
-        _show_fusion_strategy_config(stock, t)
-
-def _show_fusion_strategy_config(stock, t: StockHistoryType):
-    with st.expander("⚙️ 融合策略配置", expanded=False):
-        fusion_mode_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_mode"
-        fusion_consensus_key = f"{KEY_PREFIX}_{stock.code}_{t}_fusion_consensus"
-        # 默认值
-        if fusion_mode_key not in st.session_state:
-            st.session_state[fusion_mode_key] = FusionStrategyModel.VOTING_MODEL.code
-        if fusion_consensus_key not in st.session_state:
-            st.session_state[fusion_consensus_key] = 2
-        # 融合模式选择
-        fusion_mode_code = st.selectbox(
-            "模式",
-            options=[m.code for m in FusionStrategyModel],
-            format_func=lambda x: next(m.fullText for m in FusionStrategyModel if m.code == x),
-            key=fusion_mode_key,
-        )
-
-        # 根据选择的模式显示不同的配置选项
-        if fusion_mode_code == FusionStrategyModel.VOTING_MODEL.code:
-            st.caption("""
-**🗳 投票模式说明**
-
-当多个策略达成一致时才发出信号，适合追求稳健的用户。
-
-**📊 工作原理**
-
-在同一日期，当至少N个策略发出相同类型的信号（买入或卖出）时，才触发该信号。
-
-**💡 使用示例**
-
-假设最小一致策略数设为3，某日期出现：
-• ✅ MACD发出买入信号
-• ✅ SMA发出买入信号
-• ✅ RSI发出买入信号
-• ❌ 布林带发出卖出信号
-• ❌ KDJ无信号
-
-结果：3个策略一致发出买入信号 ≥ 3（阈值）→ **触发买入**
-
-**⚙️ 信号强度判定**
-
-• 超过一半是强信号 → 最终判定为**强信号**
-• 否则 → 最终判定为**弱信号**
-            """)
-
-            min_consensus = st.slider(
-                "最小一致策略数 (至少几个策略发出相同信号才触发)",
-                min_value=2,
-                max_value=8,
-                key=fusion_consensus_key,
-            )
-        elif fusion_mode_code == FusionStrategyModel.WEIGHTED_MODEL.code:
-            st.caption("""
-**⚖️ 加权模式说明**
-
-根据您设置的权重计算综合得分，适合有明确策略偏好的用户。
-
-**📊 计算公式**
-```
-综合得分 = Σ(策略权重 × 信号强度值)
-```
-
-**💡 信号强度值**
-• 强信号 = 2.0
-• 弱信号 = 1.0
-
-**🎯 使用示例**
-
-假设某日期出现以下信号：
-• MACD发出强买信号（权重1.5）→ 得分 = 1.5 × 2.0 = 3.0
-• SMA发出弱买信号（权重1.0）→ 得分 = 1.0 × 1.0 = 1.0
-• RSI发出强买信号（权重0.5）→ 得分 = 0.5 × 2.0 = 1.0
-
-综合得分 = 3.0 + 1.0 + 1.0 = 5.0
-
-如果触发阈值设为3.0，则5.0 > 3.0，触发买入信号。
-            """)
-
-            # 为每个策略创建权重滑块
-            weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_weights"
-            threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_threshold"
-
-            # 初始化默认值
-            if threshold_key not in st.session_state:
-                st.session_state[threshold_key] = 3.0
-            # 使用两列布局
-            col1, col2 = st.columns(2)
-            base_strategies = StrategyType.all_base_strategies()
-            weights = {}
-            for idx, strategy_type in enumerate(base_strategies):
-                weight_key = f"{weights_key_prefix}_{strategy_type.code}"
-                if weight_key not in st.session_state:
-                    st.session_state[weight_key] = 1.0
-
-                # 交替分配到两列
-                with (col1 if idx % 2 == 0 else col2):
-                    weight = st.slider(
-                        f"{strategy_type.fullText}",
-                        min_value=0.0,
-                        max_value=3.0,
-                        step=0.5,
-                        key=weight_key,
-                    )
-                    weights[strategy_type] = weight
-
-            # 触发阈值设置
-            threshold = st.slider(
-                "触发阈值 (综合得分超过此阈值才发出信号)",
-                min_value=1.0,
-                max_value=10.0,
-                step=0.5,
-                key=threshold_key
-            )
-
-            # 保存配置到 session_state
-            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
-            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
-
-        elif fusion_mode_code == FusionStrategyModel.ADAPTIVE_MODEL.code:
-            st.caption("""
-**🤖 自适应模式说明**
-
-根据市场环境自动调整策略权重，再叠加您的自定义权重进行微调。
-
-**📊 计算公式**
-```
-最终权重 = 自适应基础权重 × 您的调整系数
-最终得分 = Σ(策略权重 × 信号强度值)
-```
-
-**🎯 自适应基础权重**
-
-趋势市场（ADX > 25）- 侧重趋势跟随：
-• MACD策略: 2.0 | SMA策略: 2.0 | 海龟策略: 1.5
-• CBR策略: 1.0 | 蜡烛图: 1.0
-• RSI策略: 0.5 | 布林带: 0.5 | KDJ策略: 0.5
-
-震荡市场（ADX ≤ 25）- 侧重反转策略：
-• RSI策略: 2.0 | 布林带: 2.0 | KDJ策略: 2.0
-• 蜡烛图: 1.5 | CBR策略: 0.5
-• MACD策略: 0.5 | SMA策略: 0.5 | 海龟策略: 0.5
-
-**💡 使用示例**
-
-假设当前是趋势市场，您设置 MACD调整系数=2.0：
-• MACD最终权重 = 2.0(基础) × 2.0(您的系数) = 4.0
-
-假设该日期MACD发出强买信号（强度值=2.0）：
-• MACD得分 = 4.0(最终权重) × 2.0(强度) = 8.0
-
-**⚙️ 您的权重调整系数**
-
-设置为 1.0 = 使用默认自适应权重
-设置为 2.0 = 加倍该策略的影响力
-设置为 0.5 = 减半该策略的影响力
-设置为 0.0 = 完全禁用该策略
-            """)
-
-            weights_key_prefix = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_weights"
-            threshold_key = f"{KEY_PREFIX}_{stock.code}_{t}_adaptive_threshold"
-
-            # 初始化默认值
-            if threshold_key not in st.session_state:
-                st.session_state[threshold_key] = 3.0
-
-            # 使用两列布局
-            col1, col2 = st.columns(2)
-
-            base_strategies = StrategyType.all_base_strategies()
-            weights = {}
-
-            for idx, strategy_type in enumerate(base_strategies):
-                weight_key = f"{weights_key_prefix}_{strategy_type.code}"
-                if weight_key not in st.session_state:
-                    st.session_state[weight_key] = 1.0
-
-                # 交替分配到两列
-                with (col1 if idx % 2 == 0 else col2):
-                    weight = st.slider(
-                        f"{strategy_type.fullText} (调整系数)",
-                        min_value=0.0,
-                        max_value=3.0,
-                        step=0.5,
-                        key=weight_key,
-                    )
-                    weights[strategy_type] = weight
-
-            # 触发阈值设置
-            threshold = st.slider(
-                "触发阈值 (综合得分超过此阈值才发出信号)",
-                min_value=1.0,
-                max_value=10.0,
-                step=0.5,
-                key=threshold_key,
-            )
-            # 保存配置到 session_state
-            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_weights"] = weights
-            st.session_state[f"{KEY_PREFIX}_{stock.code}_{t}_fusion_threshold"] = threshold
-
-
-
-def _build_stock_kline_chart_data(stock, t: StockHistoryType):
-    df = _get_stock_history_data(stock, t)
-    dates = format_dates(df, t)
-    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-    volumes = df['turnover_count'].tolist()
-    max_highest, min_lowest = _get_stock_history_lately_max_min(stock, t, 180)
-    extra_lines = {}
-    if max_highest is not None:
-        extra_lines['阻力线(半年)'] = {
-            'values': [max_highest] * len(dates),  # 阻力线
-            'color': '#ef232a'  # 红色
-        }
-    if min_lowest is not None:
-        extra_lines['支撑线(半年)'] = {
-            'values': [min_lowest] * len(dates),  # 支撑线
-            'color': '#14b143'  # 绿色
-        }
-    ma_lines = {}
-    if len(df) > 0:
-        # 短期均线
-        if len(df) >= 5:
-            ma_lines['MA5'] = df['closing'].rolling(window=5, min_periods=1).mean().round(2).tolist()
-        if len(df) >= 10:
-            ma_lines['MA10'] = df['closing'].rolling(window=10, min_periods=1).mean().round(2).tolist()
-        # 中期均线
-        if len(df) >= 20:
-            ma_lines['MA20'] = df['closing'].rolling(window=20, min_periods=1).mean().round(2).tolist()
-        if len(df) >= 30:
-            ma_lines['MA30'] = df['closing'].rolling(window=30, min_periods=1).mean().round(2).tolist()
-        # 长期均线
-        if len(df) >= 60:
-            ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
-
-    # 计算MACD指标 - 使用统一的strategy.py中的函数
-    macd_data = {}
-    if len(df) > 0:
-        macd_df = calculate_macd(df)
-        macd_data = {
-            'dif': macd_df['DIFF'].tolist(),
-            'dea': macd_df['DEA'].tolist(),
-            'macd': macd_df['MACD_hist'].tolist()
-        }
-
-    # 计算RSI指标 - 使用统一的strategy.py中的函数
-    rsi_data = {}
-    if len(df) > 0:
-        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
-        for col in rsi_df.columns:
-            rsi_data[col] = rsi_df[col].tolist()
-
-    return df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data
 
 def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
     model = get_history_model(t)
