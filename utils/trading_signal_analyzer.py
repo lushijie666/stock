@@ -59,36 +59,85 @@ class TradingSignalAnalyzer:
         # 检测所有K线形态
         self.patterns = CandlestickPatternDetector.detect_all_patterns(self.df)
 
-    def analyze(self) -> List[Dict]:
+    def analyze(self) -> Tuple[List[Dict], Dict]:
         """
         执行完整的多层级分析，生成买卖信号
 
         Returns:
+            (信号列表, 统计信息字典)
             信号列表，每个信号包含：
             - date: 日期
             - price: 价格
             - type: 信号类型（BUY/SELL）
             - strength: 信号强度
             - analysis: 详细分析结果
+
+            统计信息包含：
+            - total_days: 总分析天数
+            - ranging_days: 震荡期天数
+            - trend_days: 趋势期天数（多头+空头）
+            - long_days: 多头天数
+            - short_days: 空头天数
+            - no_pattern_days: 有趋势但无形态的天数
+            - no_volume_days: 有形态但成交量不足的天数
+            - filtered_by_risk: 被风险过滤掉的天数
+            - signal_days: 最终生成信号的天数
         """
         signals = []
+
+        # 初始化统计计数器
+        stats = {
+            'total_days': 0,
+            'ranging_days': 0,
+            'trend_days': 0,
+            'long_days': 0,
+            'short_days': 0,
+            'no_pattern_days': 0,
+            'no_volume_days': 0,
+            'filtered_by_risk': 0,
+            'signal_days': 0,
+            'ranging_reasons': [],  # 震荡期的详细原因
+        }
 
         # 遍历每一天进行分析（从第60天开始，确保所有指标都有效）
         for i in range(60, len(self.df)):
             row = self.df.iloc[i]
+            stats['total_days'] += 1
 
             # 第一步：判断市场状态
             market_state = self._step1_market_state(i)
 
-            # 如果是震荡期，跳过
+            # 如果是震荡期，记录原因并跳过
             if market_state['direction'] == 'RANGING':
+                stats['ranging_days'] += 1
+                reason = self._get_ranging_reason(market_state)
+                stats['ranging_reasons'].append({
+                    'date': row['date'],
+                    'reason': reason,
+                    'macd': market_state.get('macd_value'),
+                    'rsi': market_state.get('rsi_value')
+                })
                 continue
+
+            # 记录趋势天数
+            stats['trend_days'] += 1
+            if market_state['direction'] == 'LONG':
+                stats['long_days'] += 1
+            else:
+                stats['short_days'] += 1
 
             # 第二步：检查是否在关键区域
             key_area = self._step2_key_area(i)
 
             # 第三步：检查入场触发条件
             entry_trigger = self._step3_entry_trigger(i, market_state['direction'])
+
+            # 统计未触发原因
+            if not entry_trigger['is_triggered']:
+                if not entry_trigger['pattern_matched']:
+                    stats['no_pattern_days'] += 1
+                elif not entry_trigger['volume_confirmed']:
+                    stats['no_volume_days'] += 1
 
             # 第四步：风险过滤
             risk_filter = self._step4_risk_filter(i)
@@ -100,8 +149,35 @@ class TradingSignalAnalyzer:
 
             if signal:
                 signals.append(signal)
+                stats['signal_days'] += 1
+            elif entry_trigger['is_triggered'] and risk_filter['has_risk'] and risk_filter['risk_level'] == 'HIGH':
+                # 本来会触发但被风险过滤
+                stats['filtered_by_risk'] += 1
 
-        return signals
+        return signals, stats
+
+    def _get_ranging_reason(self, market_state: Dict) -> str:
+        """获取震荡期的详细原因"""
+        macd_pos = market_state['macd_position']
+        rsi_state = market_state['rsi_state']
+        macd_val = market_state.get('macd_value', 0)
+        rsi_val = market_state.get('rsi_value', 0)
+
+        reasons = []
+
+        if macd_pos == 'NEUTRAL':
+            reasons.append(f"MACD在0轴附近震荡({macd_val:.3f})")
+
+        if rsi_state == 'NEUTRAL':
+            reasons.append(f"RSI在震荡区间({rsi_val:.1f})")
+
+        if macd_pos == 'ABOVE' and rsi_state == 'BEAR':
+            reasons.append(f"MACD看多({macd_val:.3f})但RSI看空({rsi_val:.1f})，方向不一致")
+
+        if macd_pos == 'BELOW' and rsi_state == 'BULL':
+            reasons.append(f"MACD看空({macd_val:.3f})但RSI看多({rsi_val:.1f})，方向不一致")
+
+        return " | ".join(reasons) if reasons else "市场方向不明确"
 
     def _step1_market_state(self, idx: int) -> Dict:
         """

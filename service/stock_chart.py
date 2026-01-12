@@ -226,7 +226,7 @@ def show_trading_analysis(stock, t: StockHistoryType):
     try:
         with st.spinner("正在分析买卖点..."):
             analyzer = TradingSignalAnalyzer(df)
-            signals = analyzer.analyze()
+            signals, stats = analyzer.analyze()
 
         st.markdown("""
             <div class="chart-header">
@@ -274,7 +274,7 @@ def show_trading_analysis(stock, t: StockHistoryType):
             """)
 
         # 渲染分析结果UI
-        render_trading_analysis_ui(signals, df, analyzer)
+        render_trading_analysis_ui(signals, df, analyzer, stats)
 
     except Exception as e:
         st.error(f"分析过程中出现错误: {str(e)}")

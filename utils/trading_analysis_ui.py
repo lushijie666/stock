@@ -8,7 +8,7 @@ from typing import Dict, List
 from datetime import datetime
 
 
-def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer):
+def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, stats: Dict):
     """
     渲染买卖点分析的完整UI界面
 
@@ -16,6 +16,7 @@ def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer):
         signals: 生成的交易信号列表
         df: 股票数据DataFrame
         analyzer: TradingSignalAnalyzer实例
+        stats: 统计信息字典
     """
     st.markdown("""
         <style>
@@ -106,6 +107,104 @@ def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer):
     with col4:
         strong_signals = [s for s in signals if s['strength'].code == 'STRONG']
         st.metric("强信号数", len(strong_signals))
+
+    # 如果没有信号，显示详细的原因分析
+    if len(signals) == 0:
+        st.markdown("---")
+        st.markdown("### ⚠️ 为什么没有生成交易信号？")
+
+        # 显示统计信息
+        st.info(f"""
+        **分析了 {stats['total_days']} 个交易日，未生成任何信号。下面是详细原因分析：**
+        """)
+
+        # 原因分解
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown("#### 📉 市场状态分析")
+            st.metric(
+                "震荡期天数",
+                stats['ranging_days'],
+                delta=f"{stats['ranging_days']/stats['total_days']*100:.1f}%"
+            )
+            if stats['ranging_days'] > 0:
+                st.caption("市场处于震荡期，MACD与RSI方向不明确或不一致")
+
+        with col2:
+            st.markdown("#### 📈 趋势期天数")
+            st.metric(
+                "有明确趋势",
+                stats['trend_days'],
+                delta=f"{stats['trend_days']/stats['total_days']*100:.1f}%"
+            )
+            if stats['trend_days'] > 0:
+                st.caption(f"其中：多头{stats['long_days']}天，空头{stats['short_days']}天")
+
+        with col3:
+            st.markdown("#### ❌ 信号过滤原因")
+            if stats['no_pattern_days'] > 0:
+                st.metric("缺乏K线形态", stats['no_pattern_days'])
+                st.caption("有趋势但未出现有效的反转形态")
+            if stats['no_volume_days'] > 0:
+                st.metric("成交量不足", stats['no_volume_days'])
+                st.caption("有形态但成交量未放大（<1.3倍）")
+            if stats['filtered_by_risk'] > 0:
+                st.metric("被风险过滤", stats['filtered_by_risk'])
+                st.caption("RSI背离+成交量衰减")
+
+        # 显示震荡期详情
+        if stats['ranging_days'] > 0 and len(stats['ranging_reasons']) > 0:
+            with st.expander(f"🔍 查看震荡期详细原因（共{stats['ranging_days']}天）", expanded=False):
+                # 只显示最近20个
+                recent_reasons = stats['ranging_reasons'][-20:]
+
+                for item in reversed(recent_reasons):
+                    date_str = item['date'].strftime('%Y-%m-%d')
+                    st.markdown(f"""
+                    **{date_str}**
+                    {item['reason']}
+                    """)
+
+                if len(stats['ranging_reasons']) > 20:
+                    st.caption(f"（仅显示最近20天，总共{len(stats['ranging_reasons'])}天）")
+
+        # 给出建议
+        st.markdown("---")
+        st.markdown("### 💡 建议")
+
+        if stats['ranging_days'] > stats['total_days'] * 0.8:
+            st.warning("""
+            **市场主要处于震荡状态**
+
+            - 当前市场方向不明确，不适合按趋势策略交易
+            - 建议等待市场走出明确的趋势方向
+            - 可以观察MACD是否突破0轴，RSI是否突破45或55
+            """)
+        elif stats['trend_days'] > 0 and stats['no_pattern_days'] > stats['trend_days'] * 0.5:
+            st.info("""
+            **有趋势但缺乏入场形态**
+
+            - 市场有趋势但未出现有效的K线反转形态
+            - 可能趋势过于平缓，缺少明显的转折点
+            - 建议继续观察，等待出现吞没、启明星等反转信号
+            """)
+        elif stats['trend_days'] > 0 and stats['no_volume_days'] > stats['trend_days'] * 0.5:
+            st.info("""
+            **有形态但成交量不足**
+
+            - 出现了K线形态但成交量未放大
+            - 可能是资金参与度不够，信号可靠性低
+            - 建议等待放量确认的机会（成交量≥1.3倍5日均量）
+            """)
+        else:
+            st.info("""
+            **综合原因导致无信号**
+
+            - 市场可能正处于变化中
+            - 建议每日查看"逐日分析"了解市场状态变化
+            - 耐心等待符合四个条件的高质量信号
+            """)
 
     st.markdown("---")
 
