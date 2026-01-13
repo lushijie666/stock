@@ -10,7 +10,7 @@ from datetime import datetime
 from enums.market_state import MarketDirection, RiskLevel
 
 
-def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, stats: Dict):
+def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, stats: Dict, daily_analysis: List[Dict] = None):
     """
     渲染买卖点分析的完整UI界面
 
@@ -19,6 +19,7 @@ def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, 
         df: 股票数据DataFrame
         analyzer: TradingSignalAnalyzer实例
         stats: 统计信息字典
+        daily_analysis: 每日分析列表（可选，如果为None则使用analyzer.get_daily_analysis）
     """
     st.markdown("""
         <style>
@@ -232,6 +233,17 @@ def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, 
     # 按日期倒序排列，最新的在最前面
     signals_sorted = sorted(signals, key=lambda x: x['date'], reverse=True)
 
+    # K线图与信号标记
+    st.markdown("#### 📈 K线图与信号标记")
+    st.markdown("在K线图上直观查看所有买卖信号的位置")
+
+    with st.expander("查看带信号标记的K线图", expanded=True):
+        render_kline_with_signals(df, signals)
+
+    st.markdown("---")
+
+    # 信号详情列表
+    st.markdown("#### 📋 信号详情列表")
     for signal in signals_sorted:
         render_signal_detail(signal)
 
@@ -256,12 +268,22 @@ def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, 
     selected_datetime = pd.Timestamp(selected_date)
 
     if st.button("查看该日分析", key="view_daily_analysis"):
-        daily_analysis = analyzer.get_daily_analysis(selected_datetime)
-
+        # 使用传入的 daily_analysis 列表，如果没有则回退到旧方法
         if daily_analysis:
-            render_daily_analysis(daily_analysis)
+            # 从列表中查找对应日期
+            found_analysis = next((d for d in daily_analysis if d['date'] == selected_datetime), None)
+
+            if found_analysis:
+                render_daily_analysis(found_analysis)
+            else:
+                st.warning("该日期数据不足或不存在")
         else:
-            st.warning("该日期数据不足或不存在")
+            # 回退到旧方法（向后兼容）
+            day_analysis = analyzer.get_daily_analysis(selected_datetime)
+            if day_analysis:
+                render_daily_analysis(day_analysis)
+            else:
+                st.warning("该日期数据不足或不存在")
 
 
 def render_signal_detail(signal: Dict):
@@ -301,7 +323,7 @@ def render_signal_detail(signal: Dict):
                 </div>
                 <div class="metric-box">
                     <strong>📝 综合判断：</strong><br/>
-                    {analysis['reason']}
+                    {signal.get('reason', '信号触发')}
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -528,3 +550,122 @@ def render_signal_summary_table(signals: List[Dict]):
 
     df_table = pd.DataFrame(table_data)
     st.dataframe(df_table, use_container_width=True)
+
+
+def render_kline_with_signals(df: pd.DataFrame, signals: List[Dict]):
+    """
+    渲染带有买卖信号标记的K线图
+
+    Args:
+        df: 股票数据DataFrame
+        signals: 买卖信号列表
+    """
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    # 创建子图：K线图 + 成交量
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxis=True,
+        vertical_spacing=0.05,
+        subplot_titles=('K线图与买卖信号', '成交量'),
+        row_heights=[0.7, 0.3]
+    )
+
+    # 添加K线图
+    fig.add_trace(
+        go.Candlestick(
+            x=df['date'],
+            open=df['opening'],
+            high=df['highest'],
+            low=df['lowest'],
+            close=df['close'],
+            name='K线',
+            increasing_line_color='#ef232a',
+            decreasing_line_color='#14b143'
+        ),
+        row=1, col=1
+    )
+
+    # 添加MA均线
+    for ma in ['MA5', 'MA10', 'MA20', 'MA60']:
+        if ma in df.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=df['date'],
+                    y=df[ma],
+                    name=ma,
+                    line=dict(width=1),
+                    opacity=0.7
+                ),
+                row=1, col=1
+            )
+
+    # 添加买卖信号标记
+    for signal in signals:
+        signal_date = signal['date']
+        signal_price = signal['price']
+        signal_type = signal['type'].code
+        action = signal.get('action', '')
+
+        # 买入信号（绿色向上箭头）
+        if signal_type == 'BUY':
+            marker_symbol = 'triangle-up'
+            marker_color = '#10b981'
+            marker_size = 20
+            text = f"买入 {action}<br>价格: ¥{signal_price:.2f}"
+        # 卖出信号（红色向下箭头）
+        else:
+            marker_symbol = 'triangle-down'
+            marker_color = '#ef4444'
+            marker_size = 20
+            text = f"卖出 {action}<br>价格: ¥{signal_price:.2f}"
+
+        fig.add_trace(
+            go.Scatter(
+                x=[signal_date],
+                y=[signal_price],
+                mode='markers+text',
+                marker=dict(
+                    symbol=marker_symbol,
+                    size=marker_size,
+                    color=marker_color,
+                    line=dict(width=2, color='white')
+                ),
+                text=text,
+                textposition='top center',
+                showlegend=False,
+                hovertemplate=f"<b>{text}</b><br>日期: %{{x}}<extra></extra>"
+            ),
+            row=1, col=1
+        )
+
+    # 添加成交量柱状图
+    colors = ['#ef232a' if row['close'] >= row['opening'] else '#14b143'
+              for _, row in df.iterrows()]
+
+    fig.add_trace(
+        go.Bar(
+            x=df['date'],
+            y=df['turnover_count'],
+            name='成交量',
+            marker_color=colors,
+            opacity=0.5
+        ),
+        row=2, col=1
+    )
+
+    # 更新布局
+    fig.update_layout(
+        title='K线图与买卖信号标记',
+        xaxis_rangeslider_visible=False,
+        height=800,
+        hovermode='x unified',
+        template='plotly_white'
+    )
+
+    fig.update_xaxes(title_text="日期", row=2, col=1)
+    fig.update_yaxes(title_text="价格", row=1, col=1)
+    fig.update_yaxes(title_text="成交量", row=2, col=1)
+
+    st.plotly_chart(fig, use_container_width=True)

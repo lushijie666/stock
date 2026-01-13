@@ -72,26 +72,52 @@ class TradingSignalAnalyzer:
                            建议值：120天（确保所有指标稳定且有足够历史数据）
 
         Returns:
-            (信号列表, 统计信息字典)
-            信号列表，每个信号包含：
-            - date: 日期
-            - price: 价格
-            - type: 信号类型（BUY/SELL）
-            - strength: 信号强度
-            - analysis: 详细分析结果
-
-            统计信息包含：
-            - total_days: 总分析天数
-            - ranging_days: 震荡期天数
-            - trend_days: 趋势期天数（多头+空头）
-            - long_days: 多头天数
-            - short_days: 空头天数
-            - no_pattern_days: 有趋势但无形态的天数
-            - no_volume_days: 有形态但成交量不足的天数
-            - filtered_by_risk: 被风险过滤掉的天数
-            - signal_days: 最终生成信号的天数
+            字典包含3部分：
+            {
+                'signals': [  # 1. 触发准确买卖信号的列表
+                    {
+                        'date': 日期,
+                        'price': 价格,
+                        'type': 信号类型（SignalType.BUY/SELL）,
+                        'strength': 信号强度（SignalStrength）,
+                        'analysis': {
+                            'market_state': 市场状态,
+                            'key_area': 关键区域,
+                            'entry_trigger': 入场触发,
+                            'risk_filter': 风险过滤
+                        },
+                        'reason': 触发原因描述
+                    }
+                ],
+                'statistics': {  # 2. 总的统计信息
+                    'total_days': 总分析天数,
+                    'ranging_days': 震荡期天数,
+                    'trend_days': 趋势期天数,
+                    'long_days': 多头天数,
+                    'short_days': 空头天数,
+                    'no_pattern_days': 有趋势但无形态的天数,
+                    'no_volume_days': 有形态但成交量不足的天数,
+                    'filtered_by_risk': 被风险过滤掉的天数,
+                    'signal_days': 最终生成信号的天数,
+                    'ranging_reasons': 震荡期详细原因列表,
+                    'warmup_days': 预热天数
+                },
+                'daily_analysis': [  # 3. 每天的详细分析信息
+                    {
+                        'date': 日期,
+                        'price': 价格,
+                        'step1_market_state': 第一步分析结果,
+                        'step2_key_area': 第二步分析结果,
+                        'step3_entry_trigger': 第三步分析结果,
+                        'step4_risk_filter': 第四步分析结果,
+                        'has_signal': 是否生成信号,
+                        'reason': 当天的分析原因
+                    }
+                ]
+            }
         """
         signals = []
+        daily_analysis = []
 
         # 计算最优预热天数
         if min_warmup_days is None:
@@ -122,8 +148,20 @@ class TradingSignalAnalyzer:
             # 第一步：判断市场状态
             market_state = self._step1_market_state(i)
 
-            # 如果是震荡期，记录原因并跳过
-            if market_state['direction'] == 'RANGING':
+            # 初始化当天的分析记录
+            day_analysis = {
+                'date': row['date'],
+                'price': row['close'],
+                'step1_market_state': market_state,
+                'step2_key_area': None,
+                'step3_entry_trigger': None,
+                'step4_risk_filter': None,
+                'has_signal': False,
+                'reason': ''
+            }
+
+            # 如果是震荡期，记录原因
+            if market_state['direction'] == MarketDirection.RANGING:
                 stats['ranging_days'] += 1
                 reason = self._get_ranging_reason(market_state)
                 stats['ranging_reasons'].append({
@@ -132,30 +170,37 @@ class TradingSignalAnalyzer:
                     'macd': market_state.get('macd_value'),
                     'rsi': market_state.get('rsi_value')
                 })
+                day_analysis['reason'] = f"震荡期：{reason}"
+                daily_analysis.append(day_analysis)
                 continue
 
             # 记录趋势天数
             stats['trend_days'] += 1
-            if market_state['direction'] == 'LONG':
+            if market_state['direction'] == MarketDirection.LONG:
                 stats['long_days'] += 1
             else:
                 stats['short_days'] += 1
 
             # 第二步：检查是否在关键区域
             key_area = self._step2_key_area(i)
+            day_analysis['step2_key_area'] = key_area
 
             # 第三步：检查入场触发条件
             entry_trigger = self._step3_entry_trigger(i, market_state['direction'])
+            day_analysis['step3_entry_trigger'] = entry_trigger
 
             # 统计未触发原因
             if not entry_trigger['is_triggered']:
                 if not entry_trigger['pattern_matched']:
                     stats['no_pattern_days'] += 1
+                    day_analysis['reason'] = f"{market_state['direction'].text}趋势，但未检测到有效K线形态"
                 elif not entry_trigger['volume_confirmed']:
                     stats['no_volume_days'] += 1
+                    day_analysis['reason'] = f"{market_state['direction'].text}趋势，有形态但成交量不足（{entry_trigger['volume_ratio']:.2f}x）"
 
             # 第四步：风险过滤
             risk_filter = self._step4_risk_filter(i)
+            day_analysis['step4_risk_filter'] = risk_filter
 
             # 综合判断：生成信号
             signal = self._generate_signal(
@@ -165,11 +210,28 @@ class TradingSignalAnalyzer:
             if signal:
                 signals.append(signal)
                 stats['signal_days'] += 1
+                day_analysis['has_signal'] = True
+                day_analysis['reason'] = signal.get('reason', '触发买卖信号')
             elif entry_trigger['is_triggered'] and risk_filter['has_risk'] and risk_filter['risk_level'] == RiskLevel.HIGH:
                 # 本来会触发但被风险过滤
                 stats['filtered_by_risk'] += 1
+                risk_type = risk_filter['risk_type']
+                day_analysis['reason'] = f"{market_state['direction'].text}趋势，触发入场但存在{risk_type.text}风险"
 
-        return signals, stats
+            # 如果reason还是空的，给个默认值
+            if not day_analysis['reason']:
+                if entry_trigger['is_triggered']:
+                    day_analysis['reason'] = f"{market_state['direction'].text}趋势，触发入场但风险等级{risk_filter['risk_level'].text if risk_filter['has_risk'] else '可接受'}"
+                else:
+                    day_analysis['reason'] = f"{market_state['direction'].text}趋势，等待入场触发"
+
+            daily_analysis.append(day_analysis)
+
+        return {
+            'signals': signals,
+            'statistics': stats,
+            'daily_analysis': daily_analysis
+        }
 
     def _get_ranging_reason(self, market_state: Dict) -> str:
         """获取震荡期的详细原因"""
@@ -556,36 +618,38 @@ class TradingSignalAnalyzer:
         # 退出信号优先级最高
         if risk_filter['should_exit']:
             # 判断是平多还是平空
-            if risk_filter['risk_type'].text if risk_filter['risk_type'] else None == 'BEARISH_DIVERGENCE':
+            if risk_filter['risk_type'] == RiskType.BEARISH_DIVERGENCE:
                 # 顶背离 → 平多头仓位
+                reason = 'RSI顶背离 + 成交量衰减，建议平多'
                 return {
                     'date': row['date'],
-                    'price': float(row['closing']),
+                    'price': float(row['close']),
                     'type': SignalType.SELL,
                     'strength': SignalStrength.STRONG,
                     'action': 'EXIT_LONG',
+                    'reason': reason,
                     'analysis': {
                         'market_state': market_state,
                         'key_area': key_area,
                         'entry_trigger': entry_trigger,
-                        'risk_filter': risk_filter,
-                        'reason': 'RSI顶背离 + 成交量衰减，建议平多'
+                        'risk_filter': risk_filter
                     }
                 }
-            elif risk_filter['risk_type'].text if risk_filter['risk_type'] else None == 'BULLISH_DIVERGENCE':
+            elif risk_filter['risk_type'] == RiskType.BULLISH_DIVERGENCE:
                 # 底背离 → 平空头仓位
+                reason = 'RSI底背离 + 成交量衰减，建议平空'
                 return {
                     'date': row['date'],
-                    'price': float(row['closing']),
+                    'price': float(row['close']),
                     'type': SignalType.BUY,
                     'strength': SignalStrength.STRONG,
                     'action': 'EXIT_SHORT',
+                    'reason': reason,
                     'analysis': {
                         'market_state': market_state,
                         'key_area': key_area,
                         'entry_trigger': entry_trigger,
-                        'risk_filter': risk_filter,
-                        'reason': 'RSI底背离 + 成交量衰减，建议平空'
+                        'risk_filter': risk_filter
                     }
                 }
 
@@ -634,19 +698,20 @@ class TradingSignalAnalyzer:
             if risk_filter['has_risk']:
                 reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type'].text if risk_filter['risk_type'] else None}风险")
 
+            reason_text = ' | '.join(reasons)
+
             return {
                 'date': row['date'],
-                'price': float(row['closing']),
+                'price': float(row['close']),
                 'type': SignalType.BUY,
                 'strength': strength,
                 'action': 'ENTER_LONG',
+                'reason': reason_text,
                 'analysis': {
                     'market_state': market_state,
                     'key_area': key_area,
                     'entry_trigger': entry_trigger,
-                    'risk_filter': risk_filter,
-                    'reason': ' | '.join(reasons),
-                    'strength_score': strength_score
+                    'risk_filter': risk_filter
                 }
             }
 
@@ -690,19 +755,20 @@ class TradingSignalAnalyzer:
             if risk_filter['has_risk']:
                 reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type'].text if risk_filter['risk_type'] else None}风险")
 
+            reason_text = ' | '.join(reasons)
+
             return {
                 'date': row['date'],
-                'price': float(row['closing']),
+                'price': float(row['close']),
                 'type': SignalType.SELL,
                 'strength': strength,
                 'action': 'ENTER_SHORT',
+                'reason': reason_text,
                 'analysis': {
                     'market_state': market_state,
                     'key_area': key_area,
                     'entry_trigger': entry_trigger,
-                    'risk_filter': risk_filter,
-                    'reason': ' | '.join(reasons),
-                    'strength_score': strength_score
+                    'risk_filter': risk_filter
                 }
             }
 
@@ -711,6 +777,8 @@ class TradingSignalAnalyzer:
     def get_daily_analysis(self, date) -> Optional[Dict]:
         """
         获取指定日期的完整分析结果（用于UI展示）
+
+        注意：此方法已废弃，建议使用 analyze() 返回的 'daily_analysis' 字段
 
         Args:
             date: 要查询的日期
@@ -737,7 +805,7 @@ class TradingSignalAnalyzer:
 
         return {
             'date': date,
-            'price': float(row['closing']),
+            'price': float(row['close']),
             'step1_market_state': market_state,
             'step2_key_area': key_area,
             'step3_entry_trigger': entry_trigger,
