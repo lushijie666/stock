@@ -15,6 +15,10 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 from enums.signal import SignalType, SignalStrength
 from enums.candlestick_pattern import CandlestickPattern
+from enums.market_state import (
+    MarketDirection, MacdPosition, RsiState,
+    AreaType, RiskType, RiskLevel
+)
 from utils.strategy import calculate_macd, calculate_rsi
 from utils.candlestick_pattern_detector import CandlestickPatternDetector
 
@@ -161,7 +165,7 @@ class TradingSignalAnalyzer:
             if signal:
                 signals.append(signal)
                 stats['signal_days'] += 1
-            elif entry_trigger['is_triggered'] and risk_filter['has_risk'] and risk_filter['risk_level'] == 'HIGH':
+            elif entry_trigger['is_triggered'] and risk_filter['has_risk'] and risk_filter['risk_level'] == RiskLevel.HIGH:
                 # 本来会触发但被风险过滤
                 stats['filtered_by_risk'] += 1
 
@@ -176,17 +180,17 @@ class TradingSignalAnalyzer:
 
         reasons = []
 
-        if macd_pos == 'NEUTRAL':
-            reasons.append(f"MACD在0轴附近震荡({macd_val:.3f})")
+        if macd_pos == MacdPosition.NEUTRAL:
+            reasons.append(f"MACD{macd_pos.text}({macd_val:.3f})")
 
-        if rsi_state == 'NEUTRAL':
-            reasons.append(f"RSI在震荡区间({rsi_val:.1f})")
+        if rsi_state == RsiState.NEUTRAL:
+            reasons.append(f"RSI{rsi_state.text}({rsi_val:.1f})")
 
-        if macd_pos == 'ABOVE' and rsi_state == 'BEAR':
-            reasons.append(f"MACD看多({macd_val:.3f})但RSI看空({rsi_val:.1f})，方向不一致")
+        if macd_pos == MacdPosition.ABOVE and rsi_state == RsiState.BEAR:
+            reasons.append(f"MACD{macd_pos.text}({macd_val:.3f})但RSI{rsi_state.text}({rsi_val:.1f})，方向不一致")
 
-        if macd_pos == 'BELOW' and rsi_state == 'BULL':
-            reasons.append(f"MACD看空({macd_val:.3f})但RSI看多({rsi_val:.1f})，方向不一致")
+        if macd_pos == MacdPosition.BELOW and rsi_state == RsiState.BULL:
+            reasons.append(f"MACD{macd_pos.text}({macd_val:.3f})但RSI{rsi_state.text}({rsi_val:.1f})，方向不一致")
 
         return " | ".join(reasons) if reasons else "市场方向不明确"
 
@@ -205,9 +209,9 @@ class TradingSignalAnalyzer:
 
         Returns:
             {
-                'direction': 'LONG' | 'SHORT' | 'RANGING',
-                'macd_position': 'ABOVE' | 'BELOW' | 'NEUTRAL',
-                'rsi_state': 'BULL' | 'BEAR' | 'NEUTRAL',
+                'direction': MarketDirection,
+                'macd_position': MacdPosition,
+                'rsi_state': RsiState,
                 'confidence': float  # 0-1之间的置信度
             }
         """
@@ -217,39 +221,39 @@ class TradingSignalAnalyzer:
 
         # 判断MACD位置
         if pd.isna(diff):
-            macd_position = 'NEUTRAL'
+            macd_position = MacdPosition.NEUTRAL
         elif diff > 0.5:  # MACD明显在0轴上方
-            macd_position = 'ABOVE'
+            macd_position = MacdPosition.ABOVE
         elif diff < -0.5:  # MACD明显在0轴下方
-            macd_position = 'BELOW'
+            macd_position = MacdPosition.BELOW
         else:  # MACD在0轴附近震荡
-            macd_position = 'NEUTRAL'
+            macd_position = MacdPosition.NEUTRAL
 
         # 判断RSI状态
         if pd.isna(rsi):
-            rsi_state = 'NEUTRAL'
+            rsi_state = RsiState.NEUTRAL
         elif rsi > 55:
-            rsi_state = 'BULL'
+            rsi_state = RsiState.BULL
         elif rsi < 45:
-            rsi_state = 'BEAR'
+            rsi_state = RsiState.BEAR
         else:
-            rsi_state = 'NEUTRAL'
+            rsi_state = RsiState.NEUTRAL
 
         # 综合判断方向
-        direction = 'RANGING'
+        direction = MarketDirection.RANGING
         confidence = 0.0
 
-        if macd_position == 'ABOVE' and rsi_state == 'BULL':
-            direction = 'LONG'
+        if macd_position == MacdPosition.ABOVE and rsi_state == RsiState.BULL:
+            direction = MarketDirection.LONG
             confidence = min((rsi - 55) / 20, 1.0)  # RSI越高，置信度越高
-        elif macd_position == 'BELOW' and rsi_state == 'BEAR':
-            direction = 'SHORT'
+        elif macd_position == MacdPosition.BELOW and rsi_state == RsiState.BEAR:
+            direction = MarketDirection.SHORT
             confidence = min((45 - rsi) / 20, 1.0)  # RSI越低，置信度越高
-        elif macd_position == 'ABOVE' and rsi_state == 'NEUTRAL':
-            direction = 'LONG'
+        elif macd_position == MacdPosition.ABOVE and rsi_state == RsiState.NEUTRAL:
+            direction = MarketDirection.LONG
             confidence = 0.5
-        elif macd_position == 'BELOW' and rsi_state == 'NEUTRAL':
-            direction = 'SHORT'
+        elif macd_position == MacdPosition.BELOW and rsi_state == RsiState.NEUTRAL:
+            direction = MarketDirection.SHORT
             confidence = 0.5
 
         return {
@@ -296,7 +300,7 @@ class TradingSignalAnalyzer:
             deviation = abs(current_price - ma_value) / ma_value
             if deviation <= tolerance:
                 is_key_area = True
-                area_type = 'SUPPORT' if current_price >= ma_value else 'RESISTANCE'
+                area_type = AreaType.SUPPORT if current_price >= ma_value else AreaType.RESISTANCE
                 reasons.append(f"价格触及{ma_name}线({ma_value:.2f})")
 
         # 检查是否在前期高低点附近（回看20天）
@@ -308,13 +312,13 @@ class TradingSignalAnalyzer:
             # 检查是否接近前期高点
             if abs(current_price - recent_high) / recent_high <= tolerance:
                 is_key_area = True
-                area_type = 'RESISTANCE'
+                area_type = AreaType.RESISTANCE
                 reasons.append(f"接近前期高点({recent_high:.2f})")
 
             # 检查是否接近前期低点
             if abs(current_price - recent_low) / recent_low <= tolerance:
                 is_key_area = True
-                area_type = 'SUPPORT'
+                area_type = AreaType.SUPPORT
                 reasons.append(f"接近前期低点({recent_low:.2f})")
 
         # 检查当前位置的K线形态
@@ -369,7 +373,7 @@ class TradingSignalAnalyzer:
                 'pattern_info': Dict
             }
         """
-        if direction == 'RANGING':
+        if direction == MarketDirection.RANGING:
             return {
                 'is_triggered': False,
                 'pattern_matched': False,
@@ -416,11 +420,11 @@ class TradingSignalAnalyzer:
         for pattern in current_patterns:
             pattern_type = pattern['pattern_type']
 
-            if direction == 'LONG' and pattern_type in bullish_patterns:
+            if direction == MarketDirection.LONG and pattern_type in bullish_patterns:
                 pattern_matched = True
                 matched_pattern = pattern
                 break
-            elif direction == 'SHORT' and pattern_type in bearish_patterns:
+            elif direction == MarketDirection.SHORT and pattern_type in bearish_patterns:
                 pattern_matched = True
                 matched_pattern = pattern
                 break
@@ -491,25 +495,25 @@ class TradingSignalAnalyzer:
         has_risk = False
         risk_type = None
         should_exit = False
-        risk_level = 'LOW'
+        risk_level = RiskLevel.LOW
 
         # 顶背离：价格创新高时，RSI未创新高
         if current_price >= price_high * 0.98:  # 当前价格接近或创新高
             if price_high_idx > rsi_high_idx:  # 价格高点在RSI高点之后
                 if current_rsi < rsi_high * 0.95:  # RSI明显未创新高
                     has_risk = True
-                    risk_type = 'BEARISH_DIVERGENCE'  # 顶背离
+                    risk_type = RiskType.BEARISH_DIVERGENCE  # 顶背离
                     should_exit = volume_weakening
-                    risk_level = 'HIGH' if volume_weakening else 'MEDIUM'
+                    risk_level = RiskLevel.HIGH if volume_weakening else RiskLevel.MEDIUM
 
         # 底背离：价格创新低时，RSI未创新低
         if current_price <= price_low * 1.02:  # 当前价格接近或创新低
             if price_low_idx > rsi_low_idx:  # 价格低点在RSI低点之后
                 if current_rsi > rsi_low * 1.05:  # RSI明显未创新低
                     has_risk = True
-                    risk_type = 'BULLISH_DIVERGENCE'  # 底背离
+                    risk_type = RiskType.BULLISH_DIVERGENCE  # 底背离
                     should_exit = volume_weakening
-                    risk_level = 'HIGH' if volume_weakening else 'MEDIUM'
+                    risk_level = RiskLevel.HIGH if volume_weakening else RiskLevel.MEDIUM
 
         return {
             'has_risk': has_risk,
@@ -552,7 +556,7 @@ class TradingSignalAnalyzer:
         # 退出信号优先级最高
         if risk_filter['should_exit']:
             # 判断是平多还是平空
-            if risk_filter['risk_type'] == 'BEARISH_DIVERGENCE':
+            if risk_filter['risk_type'].text if risk_filter['risk_type'] else None == 'BEARISH_DIVERGENCE':
                 # 顶背离 → 平多头仓位
                 return {
                     'date': row['date'],
@@ -568,7 +572,7 @@ class TradingSignalAnalyzer:
                         'reason': 'RSI顶背离 + 成交量衰减，建议平多'
                     }
                 }
-            elif risk_filter['risk_type'] == 'BULLISH_DIVERGENCE':
+            elif risk_filter['risk_type'].text if risk_filter['risk_type'] else None == 'BULLISH_DIVERGENCE':
                 # 底背离 → 平空头仓位
                 return {
                     'date': row['date'],
@@ -591,9 +595,9 @@ class TradingSignalAnalyzer:
             strength_penalty = 1
 
         # 生成做多信号
-        if direction == 'LONG' and entry_trigger['is_triggered']:
+        if direction == MarketDirection.LONG and entry_trigger['is_triggered']:
             # 最好是在支撑区，但不是强制要求
-            in_support = key_area['is_key_area'] and key_area['area_type'] == 'SUPPORT'
+            in_support = key_area['is_key_area'] and key_area['area_type'] == AreaType.SUPPORT
 
             # 计算信号强度
             strength_score = 0
@@ -620,7 +624,7 @@ class TradingSignalAnalyzer:
                 strength = SignalStrength.WEAK
 
             reasons = []
-            reasons.append(f"MACD在0轴{'上方' if market_state['macd_position'] == 'ABOVE' else '附近'}")
+            reasons.append(f"MACD在0轴{'上方' if market_state['macd_position'] == MacdPosition.ABOVE else '附近'}")
             reasons.append(f"RSI={market_state['rsi_value']:.1f}（多头趋势）")
             if in_support:
                 reasons.append(f"在关键支撑区：{', '.join(key_area['reasons'])}")
@@ -628,7 +632,7 @@ class TradingSignalAnalyzer:
                 reasons.append(f"出现{entry_trigger['pattern_info']['pattern_type'].text}")
             reasons.append(f"成交量放大{entry_trigger['volume_ratio']:.1f}倍")
             if risk_filter['has_risk']:
-                reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type']}风险")
+                reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type'].text if risk_filter['risk_type'] else None}风险")
 
             return {
                 'date': row['date'],
@@ -647,9 +651,9 @@ class TradingSignalAnalyzer:
             }
 
         # 生成做空信号
-        if direction == 'SHORT' and entry_trigger['is_triggered']:
+        if direction == MarketDirection.SHORT and entry_trigger['is_triggered']:
             # 最好是在阻力区
-            in_resistance = key_area['is_key_area'] and key_area['area_type'] == 'RESISTANCE'
+            in_resistance = key_area['is_key_area'] and key_area['area_type'] == AreaType.RESISTANCE
 
             # 计算信号强度
             strength_score = 0
@@ -676,7 +680,7 @@ class TradingSignalAnalyzer:
                 strength = SignalStrength.WEAK
 
             reasons = []
-            reasons.append(f"MACD在0轴{'下方' if market_state['macd_position'] == 'BELOW' else '附近'}")
+            reasons.append(f"MACD在0轴{'下方' if market_state['macd_position'] == MacdPosition.BELOW else '附近'}")
             reasons.append(f"RSI={market_state['rsi_value']:.1f}（空头趋势）")
             if in_resistance:
                 reasons.append(f"在关键阻力区：{', '.join(key_area['reasons'])}")
@@ -684,7 +688,7 @@ class TradingSignalAnalyzer:
                 reasons.append(f"出现{entry_trigger['pattern_info']['pattern_type'].text}")
             reasons.append(f"成交量放大{entry_trigger['volume_ratio']:.1f}倍")
             if risk_filter['has_risk']:
-                reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type']}风险")
+                reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type'].text if risk_filter['risk_type'] else None}风险")
 
             return {
                 'date': row['date'],

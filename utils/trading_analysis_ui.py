@@ -7,6 +7,8 @@ import pandas as pd
 from typing import Dict, List
 from datetime import datetime
 
+from enums.market_state import MarketDirection, RiskLevel
+
 
 def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, stats: Dict):
     """
@@ -313,10 +315,15 @@ def render_signal_detail(signal: Dict):
             # 第一步：市场状态
             market_state = analysis['market_state']
             st.markdown("**① 市场状态判定（MACD + RSI）**")
+
+            direction = market_state['direction']
+            macd_pos = market_state['macd_position']
+            rsi_state = market_state['rsi_state']
+
             st.markdown(f"""
-            - 方向：**{market_state['direction']}**
-            - MACD位置：{market_state['macd_position']} ({market_state.get('macd_value', 'N/A')})
-            - RSI状态：{market_state['rsi_state']} ({market_state.get('rsi_value', 'N/A'):.1f})
+            - 方向：**{direction.icon} {direction.text}**
+            - MACD位置：{macd_pos.icon} {macd_pos.text} ({market_state.get('macd_value', 'N/A')})
+            - RSI状态：{rsi_state.icon} {rsi_state.text} ({market_state.get('rsi_value', 'N/A'):.1f})
             - 置信度：{market_state['confidence']:.1%}
             """)
 
@@ -324,7 +331,8 @@ def render_signal_detail(signal: Dict):
             key_area = analysis['key_area']
             st.markdown("**② 关键区域识别**")
             if key_area['is_key_area']:
-                st.markdown(f"- 类型：**{key_area['area_type']}**")
+                area_type = key_area['area_type']
+                st.markdown(f"- 类型：**{area_type.icon} {area_type.text}**")
                 for reason in key_area['reasons']:
                     st.markdown(f"- {reason}")
             else:
@@ -348,9 +356,11 @@ def render_signal_detail(signal: Dict):
             risk_filter = analysis['risk_filter']
             st.markdown("**④ 风险过滤（RSI背离）**")
             if risk_filter['has_risk']:
+                risk_type = risk_filter['risk_type']
+                risk_level = risk_filter['risk_level']
                 st.markdown(f"""
-                - ⚠️ 风险类型：**{risk_filter['risk_type']}**
-                - 风险等级：{risk_filter['risk_level']}
+                - ⚠️ 风险类型：**{risk_type.icon} {risk_type.text}**
+                - 风险等级：{risk_level.icon} {risk_level.text}
                 - 建议退出：{'是' if risk_filter['should_exit'] else '否'}
                 - 成交量衰减：{'是' if risk_filter.get('volume_weakening') else '否'}
                 """)
@@ -376,27 +386,25 @@ def render_daily_analysis(daily_analysis: Dict):
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        direction_emoji = {
-            'LONG': '📈',
-            'SHORT': '📉',
-            'RANGING': '↔️'
-        }
+        direction = market_state['direction']
         st.metric(
             "市场方向",
-            f"{direction_emoji.get(market_state['direction'], '')} {market_state['direction']}"
+            f"{direction.icon} {direction.text}"
         )
 
     with col2:
+        macd_pos = market_state['macd_position']
         st.metric(
             "MACD位置",
-            market_state['macd_position'],
+            f"{macd_pos.icon} {macd_pos.text}",
             delta=f"{market_state.get('macd_value', 0):.3f}"
         )
 
     with col3:
+        rsi_state = market_state['rsi_state']
         st.metric(
             "RSI状态",
-            market_state['rsi_state'],
+            f"{rsi_state.icon} {rsi_state.text}",
             delta=f"{market_state.get('rsi_value', 0):.1f}"
         )
 
@@ -405,9 +413,10 @@ def render_daily_analysis(daily_analysis: Dict):
     st.progress(confidence, text=f"置信度: {confidence:.1%}")
 
     st.markdown("**结论：**")
-    if market_state['direction'] == 'LONG':
+    direction = market_state['direction']
+    if direction == MarketDirection.LONG:
         st.success("✅ 可以考虑做多")
-    elif market_state['direction'] == 'SHORT':
+    elif direction == MarketDirection.SHORT:
         st.error("✅ 可以考虑做空")
     else:
         st.warning("⚠️ 震荡期，建议观望")
@@ -419,8 +428,8 @@ def render_daily_analysis(daily_analysis: Dict):
     key_area = daily_analysis['step2_key_area']
 
     if key_area['is_key_area']:
-        area_type_emoji = '🔺' if key_area['area_type'] == 'RESISTANCE' else '🔻'
-        st.info(f"{area_type_emoji} **{key_area['area_type']}区域**")
+        area_type = key_area['area_type']
+        st.info(f"{area_type.icon} **{area_type.text}**")
 
         st.markdown("**原因：**")
         for reason in key_area['reasons']:
@@ -463,15 +472,11 @@ def render_daily_analysis(daily_analysis: Dict):
     risk_filter = daily_analysis['step4_risk_filter']
 
     if risk_filter['has_risk']:
-        risk_emoji = {
-            'LOW': '🟢',
-            'MEDIUM': '🟡',
-            'HIGH': '🔴'
-        }
-        level_emoji = risk_emoji.get(risk_filter['risk_level'], '⚪')
+        risk_level = risk_filter['risk_level']
+        risk_type = risk_filter['risk_type']
 
-        st.warning(f"{level_emoji} **风险等级：{risk_filter['risk_level']}**")
-        st.markdown(f"- 风险类型：{risk_filter['risk_type']}")
+        st.warning(f"{risk_level.icon} **风险等级：{risk_level.text}**")
+        st.markdown(f"- 风险类型：{risk_type.icon} {risk_type.text}")
         st.markdown(f"- 建议退出：{'是' if risk_filter['should_exit'] else '否'}")
         st.markdown(f"- 成交量衰减：{'是' if risk_filter.get('volume_weakening') else '否'}")
     else:
@@ -484,13 +489,13 @@ def render_daily_analysis(daily_analysis: Dict):
 
     direction = market_state['direction']
     is_triggered = entry_trigger['is_triggered']
-    has_high_risk = risk_filter['has_risk'] and risk_filter['risk_level'] == 'HIGH'
+    has_high_risk = risk_filter['has_risk'] and risk_filter['risk_level'] == RiskLevel.HIGH
 
-    if direction == 'RANGING':
+    if direction == MarketDirection.RANGING:
         st.info("🤷 市场震荡，建议观望")
-    elif direction == 'LONG' and is_triggered and not has_high_risk:
+    elif direction == MarketDirection.LONG and is_triggered and not has_high_risk:
         st.success("🎯 建议做多入场")
-    elif direction == 'SHORT' and is_triggered and not has_high_risk:
+    elif direction == MarketDirection.SHORT and is_triggered and not has_high_risk:
         st.error("🎯 建议做空入场")
     elif has_high_risk and risk_filter['should_exit']:
         st.warning("⚠️ 建议退出仓位")
