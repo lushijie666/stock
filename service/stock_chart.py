@@ -218,9 +218,36 @@ def show_trading_analysis(stock, t: StockHistoryType):
     # 获取股票数据
     df = _get_stock_history_data(stock, t)
 
-    if len(df) < 60:
-        st.warning("数据不足60个周期，无法进行买卖点分析（需要至少60个数据点来计算指标）")
+    # 检查数据是否充足
+    min_required = 120  # 预热天数
+    if len(df) < min_required:
+        st.warning(f"""
+        数据不足，无法进行买卖点分析
+
+        - 当前数据：{len(df)} 个周期
+        - 最少需要：{min_required} 个周期
+        - 还需要：{min_required - len(df)} 个周期
+
+        **原因说明：**
+        - MA60均线需要60天数据
+        - 前期高低点分析需要回看20天
+        - RSI背离检测需要回看10天
+        - 额外缓冲确保指标稳定：30天
+
+        **建议：**
+        - 等待更多交易日数据积累
+        - 或切换到周线/月线周期（需要数据量更少）
+        """)
         return
+
+    # 如果数据充足但不够多，给出提示
+    if len(df) < 200:
+        st.info(f"""
+        ℹ️ 当前数据量：{len(df)} 个周期
+
+        建议数据量：200个周期以上（约9个月）可以获得更准确的分析结果。
+        当前可以分析，但历史数据越多，趋势判断越准确。
+        """)
 
     # 创建分析器
     try:

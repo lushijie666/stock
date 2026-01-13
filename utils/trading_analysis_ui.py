@@ -91,6 +91,18 @@ def render_trading_analysis_ui(signals: List[Dict], df: pd.DataFrame, analyzer, 
 
     # 顶部统计
     st.markdown("### 📊 信号统计")
+
+    # 显示数据范围信息
+    if 'warmup_days' in stats:
+        warmup_days = stats['warmup_days']
+        total_data = len(df)
+        analysis_days = stats['total_days']
+
+        st.caption(f"""
+        📅 数据范围：共{total_data}个周期，使用前{warmup_days}天作为指标预热，
+        实际分析{analysis_days}天（{df.iloc[warmup_days]['date'].strftime('%Y-%m-%d')} 至 {df.iloc[-1]['date'].strftime('%Y-%m-%d')}）
+        """)
+
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:

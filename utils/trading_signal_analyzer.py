@@ -59,9 +59,13 @@ class TradingSignalAnalyzer:
         # 检测所有K线形态
         self.patterns = CandlestickPatternDetector.detect_all_patterns(self.df)
 
-    def analyze(self) -> Tuple[List[Dict], Dict]:
+    def analyze(self, min_warmup_days: int = None) -> Tuple[List[Dict], Dict]:
         """
         执行完整的多层级分析，生成买卖信号
+
+        Args:
+            min_warmup_days: 最小预热天数。如果为None，自动计算最优值。
+                           建议值：120天（确保所有指标稳定且有足够历史数据）
 
         Returns:
             (信号列表, 统计信息字典)
@@ -85,6 +89,12 @@ class TradingSignalAnalyzer:
         """
         signals = []
 
+        # 计算最优预热天数
+        if min_warmup_days is None:
+            # 自动计算：确保所有指标都有足够的数据
+            # MA60(60) + 前期高低点分析(20) + RSI背离检测(10) + 额外缓冲(30) = 120
+            min_warmup_days = 120
+
         # 初始化统计计数器
         stats = {
             'total_days': 0,
@@ -97,10 +107,11 @@ class TradingSignalAnalyzer:
             'filtered_by_risk': 0,
             'signal_days': 0,
             'ranging_reasons': [],  # 震荡期的详细原因
+            'warmup_days': min_warmup_days,  # 记录使用的预热天数
         }
 
-        # 遍历每一天进行分析（从第60天开始，确保所有指标都有效）
-        for i in range(60, len(self.df)):
+        # 遍历每一天进行分析（从预热天数后开始，确保所有指标都有效）
+        for i in range(min_warmup_days, len(self.df)):
             row = self.df.iloc[i]
             stats['total_days'] += 1
 
