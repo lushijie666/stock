@@ -579,7 +579,7 @@ def render_kline_with_signals(df: pd.DataFrame, signals: List[Dict]):
             open=df['opening'],
             high=df['highest'],
             low=df['lowest'],
-            close=df['close'],
+            close=df['closing'],
             name='K线',
             increasing_line_color='#ef232a',
             decreasing_line_color='#14b143'
@@ -641,7 +641,7 @@ def render_kline_with_signals(df: pd.DataFrame, signals: List[Dict]):
         )
 
     # 添加成交量柱状图
-    colors = ['#ef232a' if row['close'] >= row['opening'] else '#14b143'
+    colors = ['#ef232a' if row['closing'] >= row['opening'] else '#14b143'
               for _, row in df.iterrows()]
 
     fig.add_trace(

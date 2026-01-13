@@ -151,7 +151,7 @@ class TradingSignalAnalyzer:
             # 初始化当天的分析记录
             day_analysis = {
                 'date': row['date'],
-                'price': row['close'],
+                'price': row['closing'],
                 'step1_market_state': market_state,
                 'step2_key_area': None,
                 'step3_entry_trigger': None,
@@ -623,7 +623,7 @@ class TradingSignalAnalyzer:
                 reason = 'RSI顶背离 + 成交量衰减，建议平多'
                 return {
                     'date': row['date'],
-                    'price': float(row['close']),
+                    'price': float(row['closing']),
                     'type': SignalType.SELL,
                     'strength': SignalStrength.STRONG,
                     'action': 'EXIT_LONG',
@@ -640,7 +640,7 @@ class TradingSignalAnalyzer:
                 reason = 'RSI底背离 + 成交量衰减，建议平空'
                 return {
                     'date': row['date'],
-                    'price': float(row['close']),
+                    'price': float(row['closing']),
                     'type': SignalType.BUY,
                     'strength': SignalStrength.STRONG,
                     'action': 'EXIT_SHORT',
@@ -702,7 +702,7 @@ class TradingSignalAnalyzer:
 
             return {
                 'date': row['date'],
-                'price': float(row['close']),
+                'price': float(row['closing']),
                 'type': SignalType.BUY,
                 'strength': strength,
                 'action': 'ENTER_LONG',
@@ -759,7 +759,7 @@ class TradingSignalAnalyzer:
 
             return {
                 'date': row['date'],
-                'price': float(row['close']),
+                'price': float(row['closing']),
                 'type': SignalType.SELL,
                 'strength': strength,
                 'action': 'ENTER_SHORT',
@@ -805,7 +805,7 @@ class TradingSignalAnalyzer:
 
         return {
             'date': date,
-            'price': float(row['close']),
+            'price': float(row['closing']),
             'step1_market_state': market_state,
             'step2_key_area': key_area,
             'step3_entry_trigger': entry_trigger,
