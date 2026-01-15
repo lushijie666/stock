@@ -546,22 +546,24 @@ class TradingSignalAnalyzer:
         """
         第三步：入场触发验证（K线形态 + 成交量）
 
-        验证逻辑：
-        1. K线形态必须与方向一致（做多看涨形态，做空看跌形态）
-        2. 成交量必须放大（相对5日均量）
+        优化后的验证逻辑：
+        1. 满足以下任一条件即可触发：
+           a) 有符合方向的K线形态 + 成交量≥1.3倍（严格模式）
+           b) 有符合方向的K线形态 + 成交量≥1.1倍（宽松模式）
+           c) 无特定形态，但成交量≥1.5倍 + 价格符合趋势（极度放量）
 
-        成交量有效的三种情况（做多）：
-        - 吞没 + 放量
-        - 回调缩量，反转放量
-        - 突破关键位时明显放量
+        2. 趋势符合判断：
+           - 做多：当日收盘价 > 开盘价（阳线）
+           - 做空：当日收盘价 < 开盘价（阴线）
 
         Returns:
             {
                 'is_triggered': bool,
                 'pattern_matched': bool,
                 'volume_confirmed': bool,
-                'volume_ratio': float,  # 当前成交量 / 5日均量
-                'pattern_info': Dict
+                'volume_ratio': float,
+                'pattern_info': Dict,
+                'trigger_mode': str  # 'strict'(严格), 'loose'(宽松), 'volume_only'(纯放量)
             }
         """
         if direction == MarketDirection.RANGING:
@@ -570,40 +572,48 @@ class TradingSignalAnalyzer:
                 'pattern_matched': False,
                 'volume_confirmed': False,
                 'volume_ratio': 0,
-                'pattern_info': None
+                'pattern_info': None,
+                'trigger_mode': None,
+                'reasons': []
             }
 
         row = self.df.iloc[idx]
         current_date = row['date']
         current_volume = row['turnover_count']
         vol_ma5 = row['VOL_MA5']
+        closing = row['closing']
+        opening = row['opening']
         reasons = []
 
         # 计算成交量放大倍数
         volume_ratio = current_volume / vol_ma5 if not pd.isna(vol_ma5) and vol_ma5 > 0 else 0
-        volume_confirmed = volume_ratio >= 1.3  # 成交量至少放大30%
 
         # 检查K线形态
         current_patterns = [p for p in self.patterns if p['date'] == current_date]
 
-        # 做多的看涨形态
+        # 做多的看涨形态（扩展列表）
         bullish_patterns = [
             CandlestickPattern.BULLISH_ENGULFING,
             CandlestickPattern.MORNING_STAR,
             CandlestickPattern.HAMMER,
             CandlestickPattern.INVERTED_HAMMER,
             CandlestickPattern.PIERCING_PATTERN,
-            CandlestickPattern.THREE_WHITE_SOLDIERS
+            CandlestickPattern.PIERCING_LINE,
+            CandlestickPattern.THREE_WHITE_SOLDIERS,
+            CandlestickPattern.BULLISH_HARAMI,
+            CandlestickPattern.DRAGONFLY_DOJI
         ]
 
-        # 做空的看跌形态
+        # 做空的看跌形态（扩展列表）
         bearish_patterns = [
             CandlestickPattern.BEARISH_ENGULFING,
             CandlestickPattern.EVENING_STAR,
             CandlestickPattern.SHOOTING_STAR,
             CandlestickPattern.HANGING_MAN,
             CandlestickPattern.DARK_CLOUD_COVER,
-            CandlestickPattern.THREE_BLACK_CROWS
+            CandlestickPattern.THREE_BLACK_CROWS,
+            CandlestickPattern.BEARISH_HARAMI,
+            CandlestickPattern.GRAVESTONE_DOJI
         ]
 
         pattern_matched = False
@@ -623,9 +633,52 @@ class TradingSignalAnalyzer:
                 reasons.append(f"匹配形态 → ({pattern_type.fullText})")
                 break
 
-        is_triggered = pattern_matched and volume_confirmed
-        if volume_confirmed:
-            reasons.append(f"匹配5日均成交量[{vol_ma5}*1.3={vol_ma5*1.3}] → ({current_volume}, 倍数: {volume_ratio:.2f})")
+        # 判断价格是否符合趋势
+        price_trend_match = False
+        if direction == MarketDirection.LONG:
+            price_trend_match = closing > opening  # 阳线
+        elif direction == MarketDirection.SHORT:
+            price_trend_match = closing < opening  # 阴线
+
+        # 判断触发条件
+        is_triggered = False
+        trigger_mode = None
+        volume_confirmed = False
+
+        # 模式1：严格模式 - 有形态 + 成交量≥1.3倍
+        if pattern_matched and volume_ratio >= 1.3:
+            is_triggered = True
+            volume_confirmed = True
+            trigger_mode = 'strict'
+            reasons.append(f"严格模式触发：形态+放量1.3x [{vol_ma5:.0f}*1.3={vol_ma5*1.3:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
+
+        # 模式2：宽松模式 - 有形态 + 成交量≥1.1倍
+        elif pattern_matched and volume_ratio >= 1.1:
+            is_triggered = True
+            volume_confirmed = True
+            trigger_mode = 'loose'
+            reasons.append(f"宽松模式触发：形态+放量1.1x [{vol_ma5:.0f}*1.1={vol_ma5*1.1:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
+
+        # 模式3：极度放量模式 - 无形态但成交量≥1.5倍 + 价格符合趋势
+        elif not pattern_matched and volume_ratio >= 1.5 and price_trend_match:
+            is_triggered = True
+            volume_confirmed = True
+            trigger_mode = 'volume_only'
+            trend_desc = "阳线" if direction == MarketDirection.LONG else "阴线"
+            reasons.append(f"放量模式触发：极度放量1.5x+{trend_desc} [{vol_ma5:.0f}*1.5={vol_ma5*1.5:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
+
+        # 记录未触发原因
+        if not is_triggered:
+            if not pattern_matched:
+                reasons.append(f"未匹配到有效K线形态")
+            if volume_ratio < 1.1:
+                reasons.append(f"成交量不足：{volume_ratio:.2f}x < 1.1x")
+            elif not pattern_matched and volume_ratio < 1.5:
+                reasons.append(f"无形态情况下成交量不足：{volume_ratio:.2f}x < 1.5x")
+            if not price_trend_match and not pattern_matched:
+                trend_desc = "阳线" if direction == MarketDirection.LONG else "阴线"
+                actual_desc = "阳线" if closing > opening else "阴线" if closing < opening else "十字星"
+                reasons.append(f"价格趋势不匹配：需要{trend_desc}，实际为{actual_desc}")
 
         return {
             'is_triggered': is_triggered,
@@ -633,8 +686,10 @@ class TradingSignalAnalyzer:
             'volume_confirmed': volume_confirmed,
             'volume_ratio': float(volume_ratio),
             'pattern_info': matched_pattern,
+            'trigger_mode': trigger_mode,
             'reasons': reasons
         }
+
 
     def _step4_risk_filter(self, idx: int) -> Dict:
         """
