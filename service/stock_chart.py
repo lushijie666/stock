@@ -240,7 +240,7 @@ def show_trading_analysis(stock, t: StockHistoryType):
         # 信号信息
         st.markdown(f"""
                <div class="chart-header">
-                   <span class="chart-icon">🔍</span>
+                   <span class="chart-icon">⭕</span>
                    <span class="chart-title">信号信息</span>
                </div>
         """, unsafe_allow_html=True)
@@ -249,42 +249,86 @@ def show_trading_analysis(stock, t: StockHistoryType):
             st.markdown(f"""
                     <div class="metric-sub-card metric-card-20">
                         <div class="metric-label">总信号数</div>
-                        <div class="metric-value">{len(signals)}</div>
+                        <div class="metric-value">{stats['signal_days']}</div>
                     </div>
             """, unsafe_allow_html=True)
         with col2:
-            strong_buy_signals = [s for s in signals if s['strength'] == SignalStrength.STRONG and s['type'] == SignalType.BUY]
             st.markdown(f"""
                     <div class="metric-sub-card metric-card-21">
-                        <div class="metric-label">强买信号</div>
-                        <div class="metric-value">{len(strong_buy_signals)}</div>
+                        <div class="metric-label">买信号(强/中/弱)</div>
+                        <div class="metric-value">{stats['strong_buy_signals']}/{stats['medium_buy_signals']}/{stats['weak_buy_signals']}</div>
                     </div>
             """, unsafe_allow_html=True)
         with col3:
-            strong_sell_signals = [s for s in signals if s['strength'] == SignalStrength.STRONG and s['type'] == SignalType.SELL]
             st.markdown(f"""
                     <div class="metric-sub-card metric-card-25">
-                        <div class="metric-label">强卖信号</div>
-                        <div class="metric-value">{len(strong_sell_signals)}</div>
+                        <div class="metric-label">卖信号(强/中/弱)</div>
+                        <div class="metric-value">{stats['strong_sell_signals']}/{stats['medium_sell_signals']}/{stats['weak_sell_signals']}</div>
                     </div>
             """, unsafe_allow_html=True)
         with col4:
-            strong_buy_signals = [s for s in signals if s['strength'] == SignalStrength.WEAK and s['type'] == SignalType.BUY]
             st.markdown(f"""
-                    <div class="metric-sub-card metric-card-23">
-                        <div class="metric-label">弱买信号</div>
-                        <div class="metric-value">{len(strong_buy_signals)}</div>
+                    <div class="metric-sub-card metric-card-26">
+                        <div class="metric-label">卖出平多</div>
+                        <div class="metric-value">{stats['exit_long_signals']}</div>
                     </div>
             """, unsafe_allow_html=True)
         with col5:
-            strong_sell_signals = [s for s in signals if s['strength'] == SignalStrength.WEAK and s['type'] == SignalType.SELL]
             st.markdown(f"""
-                    <div class="metric-sub-card metric-card-22">
-                        <div class="metric-label">弱卖信号</div>
-                        <div class="metric-value">{len(strong_sell_signals)}</div>
+                    <div class="metric-sub-card metric-card-23">
+                        <div class="metric-label">买入平空</div>
+                        <div class="metric-value">{stats['exit_short_signals']}</div>
                     </div>
             """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
+
+        signals_table_data = []
+        # 定义动作映射表
+        action_mapping = {
+            'ENTER_LONG': ("买入开多", "🟢"),
+            'ENTER_SHORT': ("卖出开空", "🔴"),
+            'EXIT_LONG': ("卖出平多", "🟡"),
+            'EXIT_SHORT': ("买入平空", "🟠")
+        }
+        # 定义强度映射表
+        def get_strength_info(score):
+            if score >= 8:
+                return ("强", "💪")
+            elif score >= 6:
+                return ("中", "👍")
+            elif score >= 4:
+                return ("弱", "👎")
+            else:
+                return ("无", "❌")
+        for r in signals:
+            action = r.get('action', '')
+            signal_type, type_icon = action_mapping.get(action, ("未知", "❓"))
+            # 获取强度信息
+            score = r.get('score', 0)
+            strength, strength_icon = get_strength_info(score)
+            signals_table_data.append({
+                '类型': f"{type_icon} {signal_type}",
+                '强度': f"{strength_icon} {strength}",
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                '分数': r['score'],
+                '说明': r['reason'],
+            })
+
+        if len(signals_table_data) > 0:
+            singles_df = pd.DataFrame(signals_table_data)
+            st.dataframe(
+                singles_df,
+                use_container_width=True,
+                hide_index=True,
+                height=min(600, len(singles_df) * 35 + 38)
+            )
+
+
 
         # 第一阶段（市场状态判定）
         st.markdown(f"""

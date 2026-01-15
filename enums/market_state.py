@@ -32,7 +32,7 @@ class MacdPosition(Enum):
     """MACD位置"""
     ABOVE = ('ABOVE', '0轴上方', '⬆️', '#10b981')     # 在0轴上方
     BELOW = ('BELOW', '0轴下方', '⬇️', '#ef4444')     # 在0轴下方
-    NEUTRAL = ('NEUTRAL', '0轴[-0.5~0.5]附近', '➡️', '#6b7280')  # 在0轴附近震荡
+    NEUTRAL = ('NEUTRAL', '0轴[-0.05~0.05]附近', '➡️', '#6b7280')  # 在0轴附近震荡
 
     def __init__(self, code, text, icon, color):
         self.code = code

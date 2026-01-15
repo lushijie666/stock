@@ -79,7 +79,6 @@ class TradingSignalAnalyzer:
                         'date': 日期,
                         'price': 价格,
                         'type': 信号类型（SignalType.BUY/SELL）,
-                        'strength': 信号强度（SignalStrength）,
                         'analysis': {
                             'market_state': 市场状态,
                             'key_area': 关键区域,
@@ -154,6 +153,14 @@ class TradingSignalAnalyzer:
             'bullish_divergence_days':0,
             'volume_weakening_days': 0,
             'risk_reasons': [],
+            'strong_buy_signals': 0,        # 强买入信号数量 (ENTER_LONG, 8-10分)
+            'medium_buy_signals': 0,        # 中等买入信号数量 (ENTER_LONG, 6-7分)
+            'weak_buy_signals': 0,          # 弱买入信号数量 (ENTER_LONG, 4-5分)
+            'strong_sell_signals': 0,       # 强卖出信号数量 (ENTER_SHORT, 8-10分)
+            'medium_sell_signals': 0,       # 中等卖出信号数量 (ENTER_SHORT, 6-7分)
+            'weak_sell_signals': 0,         # 弱卖出信号数量 (ENTER_SHORT, 4-5分)
+            'exit_long_signals': 0,         # 平多信号数量 (EXIT_LONG, 通常是10分)
+            'exit_short_signals': 0,        # 平空信号数量 (EXIT_SHORT, 通常是10分)
 
             'warmup_days': min_warmup_days,  # 记录使用的预热天数
         }
@@ -310,6 +317,27 @@ class TradingSignalAnalyzer:
             if signal:
                 signals.append(signal)
                 stats['signal_days'] += 1
+                score = signal.get('score', 0)
+                action = signal.get('action', '')  # ENTER_LONG, ENTER_SHORT, EXIT_LONG, EXIT_SHORT
+                if action == 'ENTER_LONG':
+                    if score >= 8:  # 强买入信号
+                        stats['strong_buy_signals'] += 1
+                    elif score >= 6:  # 中等买入信号
+                        stats['medium_buy_signals'] += 1
+                    elif score >= 4:  # 弱买入信号
+                        stats['weak_buy_signals'] += 1
+                elif action == 'ENTER_SHORT':
+                    if score >= 8:  # 强卖出信号
+                        stats['strong_sell_signals'] += 1
+                    elif score >= 6:  # 中等卖出信号
+                        stats['medium_sell_signals'] +=  1
+                    elif score >= 4:  # 弱卖出信号
+                        stats['weak_sell_signals'] +=  1
+                elif action == 'EXIT_LONG':
+                    stats['exit_long_signals'] += 1  # 平多信号
+                elif action == 'EXIT_SHORT':
+                    stats['exit_short_signals'] += 1  # 平空信号
+
                 day_analysis['has_signal'] = True
 
             daily_analysis.append(day_analysis)
@@ -369,13 +397,15 @@ class TradingSignalAnalyzer:
         rsi = row['RSI']
 
         # 判断MACD位置
+        # DIFF是EMA12-EMA26，通常在±0.1到±0.3之间
+        # 阈值设置为±0.05比较合理
         if pd.isna(diff):
             macd_position = MacdPosition.NEUTRAL
-        elif diff > 0.5:  # MACD明显在0轴上方
+        elif diff > 0.05:  # MACD明显在0轴上方
             macd_position = MacdPosition.ABOVE
-        elif diff < -0.5:  # MACD明显在0轴下方
+        elif diff < -0.05:  # MACD明显在0轴下方
             macd_position = MacdPosition.BELOW
-        else:  # MACD在0轴附近震荡
+        else:  # MACD在0轴附近震荡（-0.05 ~ 0.05）
             macd_position = MacdPosition.NEUTRAL
 
         # 判断RSI状态
@@ -980,9 +1010,9 @@ class TradingSignalAnalyzer:
                 'strategy': 'MACD + RSI',
                 'criteria': [
                     "MACD判断趋方向",
-                    "MACD在0轴上方, 只考虑做多 -> MACD的DIFF值 > 0.5",
-                    "MACD在0轴下方, 只考虑做空 -> MACD的DIFF值 < -0.5",
-                    "MACD贴着0轴来回, 震荡, 不交易 -> MACD的DIFF值在-0.5 ~ 0.5之间",
+                    "MACD在0轴上方, 只考虑做多 -> MACD的DIFF值 > 0.05",
+                    "MACD在0轴下方, 只考虑做空 -> MACD的DIFF值 < -0.05",
+                    "MACD贴着0轴来回, 震荡, 不交易 -> MACD的DIFF值在-0.05 ~ 0.05之间",
                     "RSI判断趋势强度",
                     "RSI(14) > 55, 多头趋势",
                     "RSI(14) < 45, 空头趋势",
