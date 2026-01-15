@@ -169,7 +169,7 @@ class TradingSignalAnalyzer:
             # 初始化当天的分析记录
             day_analysis = {
                 'date': row['date'],
-                'price': row['closing'],
+                'row': row,
                 'step1_market_state': market_state,
                 'step2_key_area': None,
                 'step3_entry_trigger': None,
@@ -311,18 +311,6 @@ class TradingSignalAnalyzer:
                 signals.append(signal)
                 stats['signal_days'] += 1
                 day_analysis['has_signal'] = True
-            elif entry_trigger['is_triggered'] and risk_filter['has_risk'] and risk_filter['risk_level'] == RiskLevel.HIGH:
-                # 本来会触发但被风险过滤
-                stats['filtered_by_risk'] += 1
-                risk_type = risk_filter['risk_type']
-                day_analysis['reason'] = f"{market_state['direction'].text}趋势，触发入场但存在{risk_type.text}风险"
-
-            # 如果reason还是空的，给个默认值
-            if not day_analysis['reason']:
-                if entry_trigger['is_triggered']:
-                    day_analysis['reason'] = f"{market_state['direction'].text}趋势，触发入场但风险等级{risk_filter['risk_level'].text if risk_filter['has_risk'] else '可接受'}"
-                else:
-                    day_analysis['reason'] = f"{market_state['direction'].text}趋势，等待入场触发"
 
             daily_analysis.append(day_analysis)
 
@@ -720,34 +708,61 @@ class TradingSignalAnalyzer:
         """
         综合所有分析结果，生成最终的买卖信号
 
-        信号生成规则：
-        1. 做多信号：
-           - 市场状态 = LONG
-           - 在关键支撑区
-           - 出现看涨形态 + 放量
-           - 无顶背离风险
+        评分系统（1-10分）：
+        1. 市场状态（最高3分）
+           - MACD和RSI同向且置信度>0.7：+3分
+           - MACD和RSI同向且置信度>0.5：+2分
+           - 其他情况：+1分
 
-        2. 做空信号：
-           - 市场状态 = SHORT
-           - 在关键阻力区
-           - 出现看跌形态 + 放量
-           - 无底背离风险
+        2. 关键区域（最高2分）
+           - 在关键支撑/阻力区：+2分
+           - 在一般关键区域：+1分
+           - 不在关键区域：+0分
 
-        3. 退出信号：
-           - RSI背离 + 成交量衰减
+        3. 成交量确认（最高3分）
+           - 成交量≥2.0倍MA5：+3分
+           - 成交量≥1.5倍MA5：+2分
+           - 成交量≥1.3倍MA5：+1分
+
+        4. K线形态（最高2分）
+           - 强反转形态（吞没、启明星/黄昏星）：+2分
+           - 一般反转形态（锤子线、流星线等）：+1分
+
+        5. 风险评估（最高-3分）
+           - 无风险：+0分
+           - 低风险：-1分
+           - 中风险：-2分
+           - 高风险：-3分
+
+        总分范围：1-10分
+        - 8-10分：强信号
+        - 6-7分：中等信号
+        - 4-5分：弱信号
+        - <4分：不生成信号
         """
         direction = market_state['direction']
 
-        # 退出信号优先级最高
+        # 退出信号优先级最高（特殊处理，不计分）
         if risk_filter['should_exit']:
             # 判断是平多还是平空
             if risk_filter['risk_type'] == RiskType.BEARISH_DIVERGENCE:
                 # 顶背离 → 平多头仓位
-                reason = 'RSI顶背离 + 成交量衰减, 建议卖出'
+                reason = 'RSI顶背离 + 成交量衰减，建议平多'
                 return {
                     'date': row['date'],
+                    'row': row,
                     'type': SignalType.SELL,
-                    'strength': SignalStrength.STRONG,
+                    'action': 'EXIT_LONG',
+                    'score': 10,  # 退出信号给满分
+                    'score_details': {
+                        'market_state': 0,
+                        'key_area': 0,
+                        'volume': 0,
+                        'pattern': 0,
+                        'risk': 0,
+                        'exit_signal': 10
+                    },
+                    'score_breakdown': ['退出信号：RSI顶背离+成交量衰减 +10分'],
                     'reason': reason,
                     'analysis': {
                         'market_state': market_state,
@@ -758,12 +773,22 @@ class TradingSignalAnalyzer:
                 }
             elif risk_filter['risk_type'] == RiskType.BULLISH_DIVERGENCE:
                 # 底背离 → 平空头仓位
-                reason = 'RSI底背离 + 成交量衰减, 建议买入'
+                reason = 'RSI底背离 + 成交量衰减，建议平空'
                 return {
                     'date': row['date'],
-                    'price': float(row['closing']),
+                    'row': row,
                     'type': SignalType.BUY,
-                    'strength': SignalStrength.STRONG,
+                    'action': 'EXIT_SHORT',
+                    'score': 10,  # 退出信号给满分
+                    'score_details': {
+                        'market_state': 0,
+                        'key_area': 0,
+                        'volume': 0,
+                        'pattern': 0,
+                        'risk': 0,
+                        'exit_signal': 10
+                    },
+                    'score_breakdown': ['退出信号：RSI底背离+成交量衰减 +10分'],
                     'reason': reason,
                     'analysis': {
                         'market_state': market_state,
@@ -773,126 +798,177 @@ class TradingSignalAnalyzer:
                     }
                 }
 
-        # 如果有风险但不是必须退出，降低信号强度
-        strength_penalty = 0
-        if risk_filter['has_risk']:
-            strength_penalty = 1
-
         # 生成做多信号
         if direction == MarketDirection.LONG and entry_trigger['is_triggered']:
-            # 最好是在支撑区，但不是强制要求
-            in_support = key_area['is_key_area'] and key_area['area_type'] == AreaType.SUPPORT
-
-            # 计算信号强度
-            strength_score = 0
-            if market_state['confidence'] > 0.7:
-                strength_score += 2
-            elif market_state['confidence'] > 0.5:
-                strength_score += 1
-
-            if in_support:
-                strength_score += 2
-            elif key_area['is_key_area']:
-                strength_score += 1
-
-            if entry_trigger['volume_ratio'] >= 1.5:
-                strength_score += 2
-            elif entry_trigger['volume_ratio'] >= 1.3:
-                strength_score += 1
-
-            strength_score -= strength_penalty
-
-            if strength_score >= 3:
-                strength = SignalStrength.STRONG
-            else:
-                strength = SignalStrength.WEAK
-
-            reasons = []
-            reasons.append(f"MACD在0轴{'上方' if market_state['macd_position'] == MacdPosition.ABOVE else '附近'}")
-            reasons.append(f"RSI={market_state['rsi_value']:.1f}（多头趋势）")
-            if in_support:
-                reasons.append(f"在关键支撑区：{', '.join(key_area['reasons'])}")
-            if entry_trigger['pattern_info']:
-                reasons.append(f"出现{entry_trigger['pattern_info']['pattern_type'].text}")
-            reasons.append(f"成交量放大{entry_trigger['volume_ratio']:.1f}倍")
-            if risk_filter['has_risk']:
-                reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type'].text if risk_filter['risk_type'] else None}风险")
-
-            reason_text = ' | '.join(reasons)
-
-            return {
-                'date': row['date'],
-                'price': float(row['closing']),
-                'type': SignalType.BUY,
-                'strength': strength,
-                'action': 'ENTER_LONG',
-                'reason': reason_text,
-                'analysis': {
-                    'market_state': market_state,
-                    'key_area': key_area,
-                    'entry_trigger': entry_trigger,
-                    'risk_filter': risk_filter
-                }
-            }
+            return self._calculate_entry_signal_score(
+                row, market_state, key_area, entry_trigger, risk_filter,
+                SignalType.BUY, 'ENTER_LONG'
+            )
 
         # 生成做空信号
         if direction == MarketDirection.SHORT and entry_trigger['is_triggered']:
-            # 最好是在阻力区
-            in_resistance = key_area['is_key_area'] and key_area['area_type'] == AreaType.RESISTANCE
+            return self._calculate_entry_signal_score(
+                row, market_state, key_area, entry_trigger, risk_filter,
+                SignalType.SELL, 'ENTER_SHORT'
+            )
 
-            # 计算信号强度
-            strength_score = 0
-            if market_state['confidence'] > 0.7:
-                strength_score += 2
-            elif market_state['confidence'] > 0.5:
-                strength_score += 1
-
-            if in_resistance:
-                strength_score += 2
-            elif key_area['is_key_area']:
-                strength_score += 1
-
-            if entry_trigger['volume_ratio'] >= 1.5:
-                strength_score += 2
-            elif entry_trigger['volume_ratio'] >= 1.3:
-                strength_score += 1
-
-            strength_score -= strength_penalty
-
-            if strength_score >= 3:
-                strength = SignalStrength.STRONG
-            else:
-                strength = SignalStrength.WEAK
-
-            reasons = []
-            reasons.append(f"MACD在0轴{'下方' if market_state['macd_position'] == MacdPosition.BELOW else '附近'}")
-            reasons.append(f"RSI={market_state['rsi_value']:.1f}（空头趋势）")
-            if in_resistance:
-                reasons.append(f"在关键阻力区：{', '.join(key_area['reasons'])}")
-            if entry_trigger['pattern_info']:
-                reasons.append(f"出现{entry_trigger['pattern_info']['pattern_type'].text}")
-            reasons.append(f"成交量放大{entry_trigger['volume_ratio']:.1f}倍")
-            if risk_filter['has_risk']:
-                reasons.append(f"⚠️ 注意：存在{risk_filter['risk_type'].text if risk_filter['risk_type'] else None}风险")
-
-            reason_text = ' | '.join(reasons)
-
-            return {
-                'date': row['date'],
-                'price': float(row['closing']),
-                'type': SignalType.SELL,
-                'strength': strength,
-                'action': 'ENTER_SHORT',
-                'reason': reason_text,
-                'analysis': {
-                    'market_state': market_state,
-                    'key_area': key_area,
-                    'entry_trigger': entry_trigger,
-                    'risk_filter': risk_filter
-                }
-            }
         return None
 
+    def _calculate_entry_signal_score(
+        self,
+        row: pd.Series,
+        market_state: Dict,
+        key_area: Dict,
+        entry_trigger: Dict,
+        risk_filter: Dict,
+        signal_type: 'SignalType',
+        action: str
+    ) -> Dict:
+        """
+        计算入场信号的评分
+
+        Returns:
+            信号字典，包含score和score_details
+        """
+        score_details = {}
+        score_reasons = []
+
+        # 1. 市场状态得分（最高3分）
+        market_score = 0
+        confidence = market_state['confidence']
+        if confidence > 0.7:
+            market_score = 3
+            score_reasons.append(f"市场状态强劲(置信度{confidence:.1%}) +3分")
+        elif confidence > 0.5:
+            market_score = 2
+            score_reasons.append(f"市场状态良好(置信度{confidence:.1%}) +2分")
+        else:
+            market_score = 1
+            score_reasons.append(f"市场状态一般(置信度{confidence:.1%}) +1分")
+        score_details['market_state'] = market_score
+
+        # 2. 关键区域得分（最高2分）
+        area_score = 0
+        if signal_type == SignalType.BUY:
+            in_key_area = key_area['is_key_area'] and key_area['area_type'] == AreaType.SUPPORT
+            if in_key_area:
+                area_score = 2
+                score_reasons.append(f"在关键支撑区 +2分")
+            elif key_area['is_key_area']:
+                area_score = 1
+                score_reasons.append(f"在一般关键区域 +1分")
+            else:
+                score_reasons.append(f"不在关键区域 +0分")
+        else:  # SELL
+            in_key_area = key_area['is_key_area'] and key_area['area_type'] == AreaType.RESISTANCE
+            if in_key_area:
+                area_score = 2
+                score_reasons.append(f"在关键阻力区 +2分")
+            elif key_area['is_key_area']:
+                area_score = 1
+                score_reasons.append(f"在一般关键区域 +1分")
+            else:
+                score_reasons.append(f"不在关键区域 +0分")
+        score_details['key_area'] = area_score
+
+        # 3. 成交量得分（最高3分）
+        volume_score = 0
+        volume_ratio = entry_trigger['volume_ratio']
+        if volume_ratio >= 2.0:
+            volume_score = 3
+            score_reasons.append(f"成交量放大{volume_ratio:.1f}倍(≥2.0) +3分")
+        elif volume_ratio >= 1.5:
+            volume_score = 2
+            score_reasons.append(f"成交量放大{volume_ratio:.1f}倍(≥1.5) +2分")
+        elif volume_ratio >= 1.3:
+            volume_score = 1
+            score_reasons.append(f"成交量放大{volume_ratio:.1f}倍(≥1.3) +1分")
+        score_details['volume'] = volume_score
+
+        # 4. K线形态得分（最高2分）
+        pattern_score = 0
+        if entry_trigger['pattern_info']:
+            pattern_type = entry_trigger['pattern_info']['pattern_type']
+            # 强反转形态
+            strong_patterns = [
+                CandlestickPattern.BULLISH_ENGULFING,
+                CandlestickPattern.BEARISH_ENGULFING,
+                CandlestickPattern.MORNING_STAR,
+                CandlestickPattern.EVENING_STAR,
+                CandlestickPattern.DARK_CLOUD_COVER,
+                CandlestickPattern.PIERCING_PATTERN
+            ]
+            if pattern_type in strong_patterns:
+                pattern_score = 2
+                score_reasons.append(f"强反转形态({pattern_type.text}) +2分")
+            else:
+                pattern_score = 1
+                score_reasons.append(f"一般形态({pattern_type.text}) +1分")
+        score_details['pattern'] = pattern_score
+
+        # 5. 风险扣分（最高-3分）
+        risk_score = 0
+        if risk_filter['has_risk']:
+            risk_level = risk_filter['risk_level']
+            if risk_level == RiskLevel.HIGH:
+                risk_score = -3
+                score_reasons.append(f"⚠️ 高风险({risk_filter['risk_type'].text}) -3分")
+            elif risk_level == RiskLevel.MEDIUM:
+                risk_score = -2
+                score_reasons.append(f"⚠️ 中等风险({risk_filter['risk_type'].text}) -2分")
+            else:  # LOW
+                risk_score = -1
+                score_reasons.append(f"⚠️ 低风险({risk_filter['risk_type'].text}) -1分")
+        else:
+            score_reasons.append(f"无风险 +0分")
+        score_details['risk'] = risk_score
+
+        # 计算总分
+        total_score = market_score + area_score + volume_score + pattern_score + risk_score
+
+        # 总分必须≥4才生成信号
+        if total_score < 4:
+            return None
+
+        # 构建原因说明
+        macd_pos = market_state['macd_position']
+        rsi_val = market_state['rsi_value']
+
+        reason_parts = []
+        reason_parts.append(f"MACD{macd_pos.text}")
+        reason_parts.append(f"RSI={rsi_val:.2f}")
+
+        if key_area['is_key_area']:
+            area_type = key_area['area_type']
+            reason_parts.append(f"{area_type.text}")
+
+        if entry_trigger['pattern_info']:
+            pattern = entry_trigger['pattern_info']['pattern_type']
+            reason_parts.append(f"{pattern.text}")
+
+        reason_parts.append(f"成交量{volume_ratio:.1f}x")
+
+        if risk_filter['has_risk']:
+            reason_parts.append(f"⚠️{risk_filter['risk_type'].text}")
+
+        reason_text = ' | '.join(reason_parts)
+
+        return {
+            'date': row['date'],
+            'row': row,
+            'type': signal_type,
+            'action': action,
+            'score': total_score,
+            'score_details': score_details,
+            'score_breakdown': score_reasons,
+            'reason': reason_text,
+            'analysis': {
+                'market_state': market_state,
+                'key_area': key_area,
+                'entry_trigger': entry_trigger,
+                'risk_filter': risk_filter
+            }
+        }
 
     @staticmethod
     def get_algorithm_info() -> List[Dict]:
@@ -927,7 +1003,7 @@ class TradingSignalAnalyzer:
                 'icon': "⓶",
                 'strategy': 'K线形态 + 结构位置',
                 'criteria': [
-                    "均线(MA5、MA10、MA20、MA60)支持/阻力区域 -> 价格触及均线 ±2% 范围内",
+                    "均线(MA5、MA10、MA20、MA60)支撑/阻力区域 -> 价格触及均线 ±2% 范围内",
                     "前期高低点区域 -> 价格触及前20天内的最高点/最低点±2%范围内",
                     "K线重要反转形态区域 -> 看涨吞没、看跌吞没、启明星、黄昏星、锤子线、流星线",
                 ],
@@ -957,5 +1033,35 @@ class TradingSignalAnalyzer:
                     "风险等级 -> low(有背离+成交量正常)、medium(背离+成交量走弱)、high(背离+成交量明显衰减)",
                 ],
                 'color_class': 'sync-card-purple'
+            },
+            {
+                'step': "评估分数",
+                'why': "按照比例进行综合评估",
+                'icon': "⭕",
+                'strategy': '1-10分制',
+                'criteria': [
+                    "市场状态 (最高 3 分) -> MACD和RSI同向且置信度 > 0.7 (+3分)",
+                    "市场状态 (最高 3 分) -> MACD和RSI同向且置信度 > 0.5 (+2分)",
+                    "市场状态 (最高 3 分) -> 其他情况 (+1分)",
+                    "关键区域 (最高 2 分) -> 在支撑/阻力区 (+2分)",
+                    "关键区域 (最高 2 分) -> 在一般关键区 (+2分)",
+                    "关键区域 (最高 2 分) -> 不在关键区 (+0分)",
+                    "成交量确认 (最高 3 分) -> 成交量 >= 5日均成交量 * 2 (+3分)",
+                    "成交量确认 (最高 3 分) -> 成交量 >= 5日均成交量 * 1.5 (+2分)",
+                    "成交量确认 (最高 3 分) -> 成交量 >= 5日均成交量 * 1.3 (+1分)",
+                    "K线形态 (最高 2 分) -> 强反转形态(看涨吞没、看跌吞没、启明星、黄昏星) (+2分)",
+                    "K线形态 (最高 2 分) -> 一般反转形态(锤子线、流星线) (+1分)",
+                    "风险评估 (最高 -3 分) -> 无风险 (+0分)",
+                    "风险评估 (最高 -3 分) -> 低风险 (-1分)",
+                    "风险评估 (最高 -3 分) -> 中风险 (-2分)",
+                    "风险评估 (最高 -3 分) -> 高风险 (-3分)",
+                    "退出信号 (10分) -> 顶背离, RSI顶背离 + 成交量衰减, 卖出",
+                    "退出信号 (10分) -> 底背离, RSI底背离 + 成交量衰减, 买入",
+                    "强信号分数 -> 8 - 10分",
+                    "中等信号分数 -> 6 - 7分",
+                    "弱信号分数 -> 4 - 5分",
+                    "不生成信号 -> < 4分",
+                ],
+                'color_class': 'sync-card-red'
             }
         ]
