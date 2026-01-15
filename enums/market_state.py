@@ -32,7 +32,7 @@ class MacdPosition(Enum):
     """MACD位置"""
     ABOVE = ('ABOVE', '0轴上方', '⬆️', '#10b981')     # 在0轴上方
     BELOW = ('BELOW', '0轴下方', '⬇️', '#ef4444')     # 在0轴下方
-    NEUTRAL = ('NEUTRAL', '0轴附近', '➡️', '#6b7280')  # 在0轴附近震荡
+    NEUTRAL = ('NEUTRAL', '0轴[-0.5~0.5]附近', '➡️', '#6b7280')  # 在0轴附近震荡
 
     def __init__(self, code, text, icon, color):
         self.code = code
@@ -56,7 +56,7 @@ class RsiState(Enum):
     """RSI状态"""
     BULL = ('BULL', '多头趋势', '🐂', '#10b981')      # 多头（>55）
     BEAR = ('BEAR', '空头趋势', '🐻', '#ef4444')      # 空头（<45）
-    NEUTRAL = ('NEUTRAL', '震荡区间', '🦘', '#f59e0b')  # 震荡（45-55）
+    NEUTRAL = ('NEUTRAL', '震荡区间[45~55]', '🦘', '#f59e0b')  # 震荡（45-55）
 
     def __init__(self, code, text, icon, color):
         self.code = code

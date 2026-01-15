@@ -6,6 +6,7 @@ from sqlalchemy import func
 import streamlit_echarts
 from typing import List, Dict
 from enums.candlestick_pattern import CandlestickPattern
+from enums.signal import SignalStrength, SignalType
 from models.stock import Stock
 from models.stock_history import get_history_model
 from enums.history_type import StockHistoryType
@@ -18,7 +19,6 @@ from utils.candlestick_pattern_detector import CandlestickPatternDetector
 from utils.db import get_db_session
 from utils.session import get_session_key, SessionKeys
 from utils.trading_signal_analyzer import TradingSignalAnalyzer
-from utils.trading_analysis_ui import render_trading_analysis_ui
 
 KEY_PREFIX = "stock_chart"
 
@@ -51,15 +51,15 @@ def show_detail(stock):
 def show_page(stock, t: StockHistoryType):
     chart_type = st.radio(
         "选择功能",
-        ["图表", "买卖点分析", "回测分析"],
+        ["图表", "买卖点", "回测"],
         horizontal=True,
         key=f"{KEY_PREFIX}_{stock.code}_{t}_radio2",
         label_visibility="collapsed"
     )
     chart_handlers = {
         "图表": lambda: show_chart(stock, t),
-        "买卖点分析": lambda: show_trading_analysis(stock, t),
-        "回测分析": lambda: show_chart(stock, t)
+        "买卖点": lambda: show_trading_analysis(stock, t),
+        "回测": lambda: show_chart(stock, t)
     }
     chart_handlers.get(chart_type, lambda: None)()
 
@@ -74,13 +74,12 @@ def show_chart(stock, t: StockHistoryType):
     )
     df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_chart_data(stock, t)
 
-
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
               <span class="chart-title">图表</span>
           </div>
-      """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     # 创建各个独立的图表
     # 1. 原始K线图
@@ -138,7 +137,7 @@ def show_chart(stock, t: StockHistoryType):
     # 计算RSI指标
     rsi_data = {}
     if len(df) > 0:
-        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
+        rsi_df = calculate_multi_period_rsi(df, periods=[6, 14, 24])
         for col in rsi_df.columns:
             rsi_data[col] = rsi_df[col].tolist()
 
@@ -198,14 +197,11 @@ def show_chart(stock, t: StockHistoryType):
     # 显示联动图表
     streamlit_echarts.st_pyecharts(linked_chart, theme="white", height=total_height, key=f"{KEY_PREFIX}_{stock.code}_{t}_linked_chart")
 
-    # 显示形态表格
-    _build_stock_patterns_tables(t, df, candlestick_patterns)
+    # 显示形态信息
+    _build_stock_patterns_info(t, df, candlestick_patterns)
 
 
 def show_trading_analysis(stock, t: StockHistoryType):
-    """
-    显示买卖点分析页面
-    """
     st.markdown(
         f"""
                <div class="table-header">
@@ -214,104 +210,417 @@ def show_trading_analysis(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-
-    # 获取股票数据
     df = _get_stock_history_data(stock, t)
-
+    is_analyze = True
     # 检查数据是否充足
     min_required = 120  # 预热天数
     if len(df) < min_required:
-        st.warning(f"""
-        数据不足，无法进行买卖点分析
-
-        - 当前数据：{len(df)} 个周期
-        - 最少需要：{min_required} 个周期
-        - 还需要：{min_required - len(df)} 个周期
-
-        **原因说明：**
-        - MA60均线需要60天数据
-        - 前期高低点分析需要回看20天
-        - RSI背离检测需要回看10天
-        - 额外缓冲确保指标稳定：30天
-
-        **建议：**
-        - 等待更多交易日数据积累
-        - 或切换到周线/月线周期（需要数据量更少）
-        """)
-        return
-
+        st.caption(f""" 🔴数据不足，无法进行买卖点分析。当前数据两：{len(df)}个周期，最少需要：{min_required} 个周期，还需要：{min_required - len(df)} 个周期""")
+        st.caption(f""" 🟢MA60均线需要60天数据、高低点分析需要回看20天、RSI背离检测需要回看10天、额外缓冲确保指标稳定：30天""")
+        is_analyze =  False
     # 如果数据充足但不够多，给出提示
-    if len(df) < 200:
-        st.info(f"""
-        ℹ️ 当前数据量：{len(df)} 个周期
+    if min_required < len(df) < 200:
+        st.caption(f""" 🔴当前可以分析，但历史数据越多，趋势判断越准确。当前数据量：{len(df)}个周期，建议数据量：200个周期以上（约9个月）可以获得更准确的分析结果 """)
+    if is_analyze :
+        analyzer = TradingSignalAnalyzer(df)
+        result = analyzer.analyze()
+        # 解包新的数据结构
+        signals = result['signals']
+        stats = result['statistics']
+        daily_analysis = result['daily_analysis']
 
-        建议数据量：200个周期以上（约9个月）可以获得更准确的分析结果。
-        当前可以分析，但历史数据越多，趋势判断越准确。
-        """)
+        # 显示数据范围信息
+        if 'warmup_days' in stats:
+            warmup_days = stats['warmup_days']
+            pre_warmup_end_date = df.iloc[warmup_days - 1]['date'].strftime('%Y-%m-%d')
+            total_data = len(df)
+            analysis_days = stats['total_days']
+            st.caption(f""" 📅 当前数据量：共{total_data}个周期，使用前{warmup_days}天（{df.iloc[0]['date'].strftime('%Y-%m-%d')} 至 {pre_warmup_end_date}）作为指标预热，实际分析{analysis_days}天（{df.iloc[warmup_days]['date'].strftime('%Y-%m-%d')} 至 {df.iloc[-1]['date'].strftime('%Y-%m-%d')}）""")
 
-    # 创建分析器
-    try:
-        with st.spinner("正在分析买卖点..."):
-            analyzer = TradingSignalAnalyzer(df)
-            result = analyzer.analyze()
-
-            # 解包新的数据结构
-            signals = result['signals']
-            stats = result['statistics']
-            daily_analysis = result['daily_analysis']
-
-        st.markdown("""
-            <div class="chart-header">
-                <span class="chart-icon">🎯</span>
-                <span class="chart-title">买卖点分析</span>
-            </div>
+        # 信号信息
+        st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">🔍</span>
+                   <span class="chart-title">信号信息</span>
+               </div>
         """, unsafe_allow_html=True)
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-20">
+                        <div class="metric-label">总信号数</div>
+                        <div class="metric-value">{len(signals)}</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            strong_buy_signals = [s for s in signals if s['strength'] == SignalStrength.STRONG and s['type'] == SignalType.BUY]
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-21">
+                        <div class="metric-label">强买信号</div>
+                        <div class="metric-value">{len(strong_buy_signals)}</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            strong_sell_signals = [s for s in signals if s['strength'] == SignalStrength.STRONG and s['type'] == SignalType.SELL]
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-25">
+                        <div class="metric-label">强卖信号</div>
+                        <div class="metric-value">{len(strong_sell_signals)}</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        with col4:
+            strong_buy_signals = [s for s in signals if s['strength'] == SignalStrength.WEAK and s['type'] == SignalType.BUY]
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-23">
+                        <div class="metric-label">弱买信号</div>
+                        <div class="metric-value">{len(strong_buy_signals)}</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        with col5:
+            strong_sell_signals = [s for s in signals if s['strength'] == SignalStrength.WEAK and s['type'] == SignalType.SELL]
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-22">
+                        <div class="metric-label">弱卖信号</div>
+                        <div class="metric-value">{len(strong_sell_signals)}</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        # 显示策略说明
-        with st.expander("📖 分析策略说明", expanded=False):
-            st.markdown("""
-            ### 四层级买卖点分析体系
+        # 第一阶段（市场状态判定）
+        st.markdown(f"""
+               <div class="chart-header">
+                   <span class="chart-icon">⓵</span>
+                   <span class="chart-title">市场状态分析</span>
+               </div>
+        """, unsafe_allow_html=True)
+        col11, col12, col13, col14, col15 = st.columns(5)
+        with col11:
+            st.markdown(f"""
+                           <div class="metric-sub-card metric-card-26">
+                               <div class="metric-label">总天数</div>
+                               <div class="metric-value">{stats['total_days']}</div>
+                           </div>
+                   """, unsafe_allow_html=True)
+        with col12:
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-27">
+                        <div class="metric-label">震荡天数</div>
+                        <div class="metric-value">{stats['ranging_days']} / {stats['ranging_days']/stats['total_days']*100:.1f}%</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        with col13:
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-28">
+                        <div class="metric-label">趋势天数</div>
+                        <div class="metric-value">{stats['trend_days']} / {stats['trend_days']/stats['total_days']*100:.1f}%</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        with col14:
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-29">
+                        <div class="metric-label">做多天数</div>
+                        <div class="metric-value">{stats['long_days']} / {stats['long_days']/stats['total_days']*100:.1f}%</div>
+                    </div>
+            """, unsafe_allow_html=True)
+        with col15:
+            st.markdown(f"""
+                    <div class="metric-sub-card metric-card-30">
+                        <div class="metric-label">做空天数</div>
+                        <div class="metric-value">{stats['short_days']} / {stats['short_days']/stats['total_days']*100:.1f}%</div>
+                    </div>
+            """, unsafe_allow_html=True)
 
-            本分析系统采用多层级指标体系，严格筛选高质量交易信号：
+        st.markdown("<br>", unsafe_allow_html=True)
+        step1_table_data = []
+        for r in stats['long_reasons']:
+            step1_table_data.append({
+                '类型': "做多",
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                'MACD': f"{r['macd']:.2f}",
+                'RSI': f"{r['rsi']:.2f}",
+                '说明': "-",
+            })
+        for r in stats['short_reasons']:
+            step1_table_data.append({
+                '类型': "做空",
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                'MACD': f"{r['macd']:.2f}",
+                'RSI': f"{r['rsi']:.2f}",
+                '说明': "-",
+            })
+        for r in stats['ranging_reasons']:
+            step1_table_data.append({
+                '类型': "震荡",
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                'MACD': f"{r['macd']:.2f}",
+                'RSI': f"{r['rsi']:.2f}",
+                '说明': r['reason'],
+            })
+        if len(step1_table_data) > 0:
+            step1_df = pd.DataFrame(step1_table_data)
+            st.dataframe(
+                step1_df,
+                use_container_width=True,
+                hide_index=True,
+                height=min(400, len(step1_df) * 35 + 38)
+            )
+        # 第二阶段（关键区域识别）
+        st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">⓶</span>
+                           <span class="chart-title">关键区域分析</span>
+                       </div>
+                """, unsafe_allow_html=True)
+        col21, col22, col23, col24 = st.columns(4)
+        with col21:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-36">
+                                <div class="metric-label">MA均线天数</div>
+                                <div class="metric-value">{stats['key_area_ma_days']} / {stats['key_area_ma_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
+        with col22:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-37">
+                                <div class="metric-label">接近前期高点天数</div>
+                                <div class="metric-value">{stats['key_area_past_high_days']} / {stats['key_area_past_high_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
+        with col23:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-38">
+                                <div class="metric-label">接近前期低点天数</div>
+                                <div class="metric-value">{stats['key_area_past_low_days']} / {stats['key_area_past_low_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
+        with col24:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-39">
+                                <div class="metric-label">K线形态天数</div>
+                                <div class="metric-value">{stats['key_area_candlestick_pattern_days']} / {stats['key_area_candlestick_pattern_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
 
-            #### ① 市场状态判定（MACD + RSI）
-            - **MACD在0轴上方** → 只考虑做多
-            - **MACD在0轴下方** → 只考虑做空
-            - **MACD贴着0轴来回** → 震荡，不交易
-            - **RSI > 55** → 多头趋势
-            - **RSI < 45** → 空头趋势
-            - **45-55** → 震荡
+        st.markdown("<br>", unsafe_allow_html=True)
+        area_type_mapping = {
+            'MA5': '均线(MA5)',
+            'MA10': '均线(MA10)',
+            'MA20': '均线(MA20)',
+            'MA60': '均线(MA60)',
+            'PAST_HIGH': '前期高点',
+            'PAST_LOW': '前期低点',
+            'CANDLESTICK_PATTERN': 'K线形态'
+        }
+        step2_table_data = []
+        for r in stats['key_area_reasons']:
+            chinese_area_types = []
+            for area_type in r['all_types']:
+                chinese_area_types.append(area_type_mapping.get(area_type, area_type))
+            step2_table_data.append({
+                '类型':  " | ".join(chinese_area_types),
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                '说明': r['reason'],
+            })
+        if len(step2_table_data) > 0:
+            step2_df = pd.DataFrame(step2_table_data)
+            st.dataframe(
+                step2_df,
+                use_container_width=True,
+                hide_index=True,
+                height=min(400, len(step2_df) * 35 + 38)
+            )
 
-            #### ② 关键区域识别（K线形态 + 结构位置）
-            寻找关键的支撑/阻力位：
-            - 均线支撑/阻力（MA5/10/20/60）
-            - 前期高低点
-            - 重要K线形态出现的位置
+        # 第三阶段（入场触发验证）
+        st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">⓷</span>
+                           <span class="chart-title">入场触发分析</span>
+                       </div>
+                """, unsafe_allow_html=True)
+        col31, col32, col33, col34,col35 = st.columns(5)
+        with col31:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-1">
+                                <div class="metric-label">全匹配天数</div>
+                                <div class="metric-value">{stats['triggered_days']} / {stats['triggered_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
+        with col32:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-2">
+                                <div class="metric-label">K线形态匹配天数</div>
+                                <div class="metric-value">{stats['pattern_matched_days']} / {stats['pattern_matched_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
+        with col33:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-3">
+                                <div class="metric-label">仅K线形态匹配天数</div>
+                                <div class="metric-value">{stats['only_pattern_matched_days']} / {stats['only_pattern_matched_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
+        with col34:
+            st.markdown(f"""
+                           <div class="metric-sub-card metric-card-4">
+                               <div class="metric-label">交易量匹配天数</div>
+                               <div class="metric-value">{stats['volume_confirmed_days']} / {stats['volume_confirmed_days']/stats['total_days']*100:.1f}%</div>
+                           </div>
+                   """, unsafe_allow_html=True)
+        with col35:
+            st.markdown(f"""
+                            <div class="metric-sub-card metric-card-5">
+                                <div class="metric-label">仅交易量匹配天数</div>
+                                <div class="metric-value">{stats['only_volume_confirmed_days']} / {stats['only_volume_confirmed_days']/stats['total_days']*100:.1f}%</div>
+                            </div>
+                    """, unsafe_allow_html=True)
 
-            #### ③ 入场触发验证（K线形态 + 成交量）
-            验证信号的有效性：
-            - K线形态必须与方向一致
-            - 成交量必须放大（≥1.3倍5日均量）
-            - 重要形态：吞没、启明星/黄昏星、锤子线、流星线等
+        st.markdown("<br>", unsafe_allow_html=True)
+        step3_table_data = []
+        for r in stats['triggered_reasons']:
+            step3_table_data.append({
+                '类型': "全匹配",
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                '说明': r['reason'],
+            })
+        for r in stats['not_triggered_reasons']:
+            step3_table_data.append({
+                '类型': "未全匹配",
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                '说明': r['reason'],
+            })
+        if len(step3_table_data) > 0:
+            step3_df = pd.DataFrame(step3_table_data)
+            st.dataframe(
+                step3_df,
+                use_container_width=True,
+                hide_index=True,
+                height=min(400, len(step3_df) * 35 + 38)
+            )
 
-            #### ④ 风险过滤（RSI背离 + 成交量）
-            识别潜在风险：
-            - **顶背离**：价格创新高，RSI不创新高 → 做多风险
-            - **底背离**：价格创新低，RSI不创新低 → 做空风险
-            - 成交量衰减 → 警惕反转
+        # 第四阶段（风险过滤）
+        st.markdown(f"""
+                  <div class="chart-header">
+                      <span class="chart-icon">⓸</span>
+                      <span class="chart-title">风险过滤分析</span>
+                  </div>
+           """, unsafe_allow_html=True)
+        col41, col42, col43, col44 = st.columns(4)
+        with col41:
+            st.markdown(f"""
+                        <div class="metric-sub-card metric-card-11">
+                            <div class="metric-label">风险天数</div>
+                            <div class="metric-value">{stats['has_risk_days']} / {stats['has_risk_days'] / stats['total_days'] * 100:.1f}%</div>
+                        </div>
+                """, unsafe_allow_html=True)
+        with col42:
+            st.markdown(f"""
+                       <div class="metric-sub-card metric-card-12">
+                           <div class="metric-label">顶背离天数</div>
+                           <div class="metric-value">{stats['bearish_divergence_days']} / {stats['bearish_divergence_days']/stats['total_days']*100:.1f}%</div>
+                       </div>
+               """, unsafe_allow_html=True)
+        with col43:
+            st.markdown(f"""
+                       <div class="metric-sub-card metric-card-13">
+                           <div class="metric-label">底背离天数</div>
+                           <div class="metric-value">{stats['bullish_divergence_days']} / {stats['bullish_divergence_days']/stats['total_days']*100:.1f}%</div>
+                       </div>
+               """, unsafe_allow_html=True)
+        with col44:
+            st.markdown(f"""
+                       <div class="metric-sub-card metric-card-14">
+                           <div class="metric-label">成交量衰减天数</div>
+                           <div class="metric-value">{stats['volume_weakening_days']} / {stats['volume_weakening_days']/stats['total_days']*100:.1f}%</div>
+                       </div>
+               """, unsafe_allow_html=True)
 
-            ### 核心原则
-            > 在 MACD 与 RSI 同向的趋势中，只在关键结构位，出现放量的 K 线反转形态时入场；
-            > 当 RSI 背离且量能衰减时退出。
-            """)
+        st.markdown("<br>", unsafe_allow_html=True)
+        step4_table_data = []
+        for r in stats['risk_reasons']:
+            step4_table_data.append({
+                '类型': r['risk_type'].text,
+                '日期': format_date_by_type(r['date'], t),
+                '开盘价': f"{r['row']['opening']:.2f}",
+                '收盘价': f"{r['row']['closing']:.2f}",
+                '最低价': f"{r['row']['lowest']:.2f}",
+                '最高价': f"{r['row']['highest']:.2f}",
+                '涨跌额': f"{r['row']['change_amount']:.2f}",
+                '成交量是否衰减': {r['volume_weakening']},
+                '风险级别': f"{r['risk_level'].icon} {r['risk_level'].text}",
+                '说明': r['reason'],
+            })
+        if len(step4_table_data) > 0:
+            step4_df = pd.DataFrame(step4_table_data)
+            st.dataframe(
+                step4_df,
+                use_container_width=True,
+                hide_index=True,
+                height=min(400, len(step3_df) * 35 + 38)
+            )
+    # 渲染分析结果UI
+    # render_trading_analysis_ui(signals, df, analyzer, stats, daily_analysis)
 
-        # 渲染分析结果UI
-        render_trading_analysis_ui(signals, df, analyzer, stats, daily_analysis)
+    # 策略算法说明
+    st.markdown(f"""
+                       <div class="chart-header">
+                           <span class="chart-icon">🔮</span>
+                           <span class="chart-title">策略算法</span>
+                       </div>
+    """, unsafe_allow_html=True)
 
-    except Exception as e:
-        st.error(f"分析过程中出现错误: {str(e)}")
-        import traceback
-        st.code(traceback.format_exc())
+    algorithm_infos = TradingSignalAnalyzer.get_algorithm_info()
+
+    for info in algorithm_infos:
+        with st.container():
+            icon = info['icon']
+            step = info['step']
+            why = info['why']
+            strategy = info['strategy']
+            criteria = info['criteria']
+            color_class = info['color_class']
+            criteria_html = '<br>'.join([f"🗳 {criterion}" for criterion in criteria])
+            st.markdown(f"""
+                       <div class="sync-button-card {color_class}">
+                           <div class="sync-card-icon {color_class}">
+                               <span class="sync-icon-large">{icon}</span>
+                           </div>
+                           <div class="sync-card-content">
+                               <div class="sync-card-title">{step}  -  {why}❓  -  {strategy}</div>
+                               <div class="sync-card-desc">{criteria_html}</div>
+                           </div>
+                       </div>
+                       """, unsafe_allow_html=True)
+
 
 
 def _build_stock_chart_data(stock, t: StockHistoryType):
@@ -350,7 +659,7 @@ def _build_stock_chart_data(stock, t: StockHistoryType):
     return df, dates, k_line_data, volumes, extra_lines, ma_lines
 
 
-def _build_stock_patterns_tables(t: StockHistoryType, df, candlestick_patterns: List[Dict]):
+def _build_stock_patterns_info(t: StockHistoryType, df, candlestick_patterns: List[Dict]):
     # 显示形态信息表格
     if candlestick_patterns:
         st.markdown("""
@@ -444,7 +753,7 @@ def _build_stock_patterns_tables(t: StockHistoryType, df, candlestick_patterns: 
             pattern_df,
             use_container_width=True,
             hide_index=True,
-            height=min(400, len(pattern_df) * 35 + 38)
+            height=min(600, len(pattern_df) * 35 + 38)
         )
 
     # 形态算法说明
