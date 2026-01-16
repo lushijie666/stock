@@ -546,30 +546,34 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             </div>
         """, unsafe_allow_html=True)
 
-        # 使用 _build_stock_chart_data 获取所有需要的数据
-        chart_df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(stock, t, key_suffix="signals")
+        # 使用 _build_stock_chart_data 获取所有需要的数据（不显示日期选择器）
+        chart_df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(
+            stock, t, key_suffix="signals", render_date_selector=False
+        )
 
         # 准备买卖点标记
         signal_markers = []
         for signal in signals:
             signal_date = format_date_by_type(signal['date'], t)
-            signal_type = signal['type']
+            # signal['type'] 是 SignalType 枚举对象，需要使用 .value 获取字符串值
+            signal_type_value = signal['type'].value if hasattr(signal['type'], 'value') else str(signal['type'])
             signal_text = signal['show_text']
+            signal_score = signal['score']
 
             # 根据信号类型设置颜色和图标
-            if 'buy' in signal_type.lower():
+            if 'buy' in signal_type_value.lower():
                 color = '#14b143'  # 绿色
                 icon = '▲'
                 offset = [0, 20]  # 标记在K线下方
-            elif 'sell' in signal_type.lower():
+            elif 'sell' in signal_type_value.lower():
                 color = '#ef232a'  # 红色
                 icon = '▼'
                 offset = [0, -20]  # 标记在K线上方
-            elif 'exit_long' in signal_type.lower():
+            elif 'exit_long' in signal_type_value.lower():
                 color = '#ff9800'  # 橙色
                 icon = '◆'
                 offset = [0, -20]
-            elif 'exit_short' in signal_type.lower():
+            elif 'exit_short' in signal_type_value.lower():
                 color = '#2196f3'  # 蓝色
                 icon = '◆'
                 offset = [0, 20]
@@ -581,12 +585,11 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             signal_markers.append({
                 'date': signal_date,
                 'value': signal['row']['closing'],
-                'type': signal_type,
-                'name': signal_text,
+                'name': f"{signal_text} (分数:{signal_score})",
                 'icon': icon,
                 'color': color,
                 'offset': offset,
-                'description': f"分数: {signal['score']}\n" + '\n'.join(signal['reasons'])
+                'description': f"{signal_text}\n分数: {signal_score}\n分数构成: {', '.join(signal['score_breakdowns'])}\n说明: {' | '.join(signal['reasons'])}"
             })
 
         # 创建K线图（带买卖点标记）
