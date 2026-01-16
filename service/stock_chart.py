@@ -547,9 +547,7 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
         """, unsafe_allow_html=True)
 
         # 使用 _build_stock_chart_data 获取所有需要的数据
-        chart_df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(
-            stock, t, key_suffix="signals"
-        )
+        chart_df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(stock, t, key_suffix="signals")
 
         # 准备买卖点标记
         signal_markers = []
@@ -592,7 +590,7 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             })
 
         # 创建K线图（带买卖点标记）
-        kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, chart_df, ma_lines=ma_lines, candlestick_patterns=signal_markers)
+        kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, chart_df, ma_lines=ma_lines, signals=signal_markers)
 
         # 创建 MACD 图表
         macd_chart = None
