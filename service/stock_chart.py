@@ -234,7 +234,7 @@ def show_trading_analysis(stock, t: StockHistoryType):
             st.caption(f""" 📅 当前数据量：共{total_data}个周期，使用前{warmup_days}天（{df.iloc[0]['date'].strftime('%Y-%m-%d')} 至 {pre_warmup_end_date}）作为指标预热，实际分析{analysis_days}天（{df.iloc[warmup_days]['date'].strftime('%Y-%m-%d')} 至 {df.iloc[-1]['date'].strftime('%Y-%m-%d')}）""")
 
         # 信号
-        _build_stock_trading_analysis_single_info(stock, t, signals, stats)
+        _build_stock_trading_analysis_single_info(stock, t, signals, stats, df)
 
         # 第一阶段（市场状态判定）
         _build_stock_trading_analysis_step1_info(stock, t, signals, stats)
@@ -456,7 +456,7 @@ def _build_stock_patterns_info(t: StockHistoryType, df, candlestick_patterns: Li
                         </div>
                         """, unsafe_allow_html=True)
 
-def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signals, stats):
+def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signals, stats, df):
     # 信号信息
     st.markdown(f"""
                    <div class="chart-header">
@@ -536,6 +536,145 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             title="",
             key_prefix=f"{KEY_PREFIX}_{stock.code}_{t}_signals_chart",
             on_row_select=handle_row_select
+        )
+
+        # 展示图表（K线图、MACD、RSI）
+        st.markdown("""
+            <div class="chart-header">
+                <span class="chart-icon">📊</span>
+                <span class="chart-title">信号图表</span>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # 准备图表数据
+        dates = format_dates(df, t)
+        k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+
+        # 计算均线
+        ma_lines = {}
+        if len(df) >= 5:
+            ma_lines['MA5'] = df['closing'].rolling(window=5, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 10:
+            ma_lines['MA10'] = df['closing'].rolling(window=10, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 20:
+            ma_lines['MA20'] = df['closing'].rolling(window=20, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 60:
+            ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
+
+        # 准备买卖点标记
+        signal_markers = []
+        for signal in signals:
+            signal_date = format_date_by_type(signal['date'], t)
+            signal_type = signal['type']
+            signal_text = signal['show_text']
+
+            # 根据信号类型设置颜色和图标
+            if 'buy' in signal_type.lower():
+                color = '#14b143'  # 绿色
+                icon = '▲'
+                offset = [0, 20]  # 标记在K线下方
+            elif 'sell' in signal_type.lower():
+                color = '#ef232a'  # 红色
+                icon = '▼'
+                offset = [0, -20]  # 标记在K线上方
+            elif 'exit_long' in signal_type.lower():
+                color = '#ff9800'  # 橙色
+                icon = '◆'
+                offset = [0, -20]
+            elif 'exit_short' in signal_type.lower():
+                color = '#2196f3'  # 蓝色
+                icon = '◆'
+                offset = [0, 20]
+            else:
+                color = '#9e9e9e'  # 灰色
+                icon = '●'
+                offset = [0, 0]
+
+            signal_markers.append({
+                'date': signal_date,
+                'value': signal['row']['closing'],
+                'type': signal_type,
+                'name': signal_text,
+                'icon': icon,
+                'color': color,
+                'offset': offset,
+                'description': f"分数: {signal['score']}\n" + '\n'.join(signal['reasons'])
+            })
+
+        # 创建K线图（带买卖点标记）
+        kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, candlestick_patterns=signal_markers)
+
+        # 计算 MACD
+        macd_data = {}
+        if len(df) > 0:
+            macd_df = calculate_macd(df)
+            macd_data = {
+                'dif': macd_df['DIFF'].tolist(),
+                'dea': macd_df['DEA'].tolist(),
+                'hist': macd_df['MACD_hist'].tolist()
+            }
+
+        # 创建 MACD 图表
+        macd_chart = None
+        if macd_data and 'dif' in macd_data:
+            macd_chart = ChartBuilder.create_macd_chart(
+                dates,
+                macd_data['dif'],
+                macd_data['dea'],
+                macd_data['hist']
+            )
+
+        # 计算 RSI
+        rsi_data = {}
+        if len(df) > 0:
+            rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
+            for col in rsi_df.columns:
+                rsi_data[col] = rsi_df[col].tolist()
+
+        # 创建 RSI 图表
+        rsi_chart = None
+        if rsi_data:
+            rsi_chart = ChartBuilder.create_rsi_chart(dates, rsi_data)
+
+        # 配置图表联动
+        charts_config = [
+            {
+                "chart": kline_chart,
+                "grid_pos": {"pos_top": "60px", "height": "350px"},
+                "title": "K线图（含买卖点）",
+                "show_tooltip": True,
+                "legend_height": "310px"
+            }
+        ]
+
+        if macd_chart:
+            charts_config.append({
+                "chart": macd_chart,
+                "grid_pos": {"pos_top": "450px", "height": "240px"},
+                "title": "MACD",
+                "show_tooltip": True,
+                "legend_height": "200px"
+            })
+
+        if rsi_chart:
+            charts_config.append({
+                "chart": rsi_chart,
+                "grid_pos": {"pos_top": "730px", "height": "240px"},
+                "title": "RSI",
+                "show_tooltip": True,
+                "legend_height": "200px"
+            })
+
+        # 创建联动图表
+        total_height = "1000px"
+        linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height=total_height)
+
+        # 显示联动图表
+        streamlit_echarts.st_pyecharts(
+            linked_chart,
+            theme="white",
+            height=total_height,
+            key=f"{KEY_PREFIX}_{stock.code}_{t}_signals_linked_chart"
         )
 
 def _build_stock_trading_analysis_step1_info(stock, t, signals, stats):
