@@ -36,9 +36,165 @@ def show_chart_dialog(stock_code):
     with get_db_session() as session:
         stock = session.query(Stock).filter(Stock.code == stock_code).first()
         if stock:
-            show_chart(stock, StockHistoryType.D)
+            show_chart_in_dialog(stock, StockHistoryType.D)
         else:
             st.error(f"未找到股票代码为 {stock_code} 的股票信息")
+
+def show_chart_in_dialog(stock, t: StockHistoryType):
+    """对话框中显示图表的简化版本，不包含日期选择器等交互组件"""
+    st.markdown(
+        f"""
+               <div class="table-header">
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 图表</div>
+               </div>
+               """,
+        unsafe_allow_html=True
+    )
+
+    # 直接获取最近的数据，不使用日期选择器
+    df = _get_stock_history_data_without_date_selector(stock, t)
+
+    if df.empty:
+        st.warning("没有找到数据")
+        return
+
+    dates = format_dates(df, t)
+    k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
+    volumes = df['turnover_count'].tolist()
+    max_highest, min_lowest = _get_stock_history_lately_max_min(stock, t, 180)
+    extra_lines = {}
+    if max_highest is not None:
+        extra_lines['阻力线(半年)'] = {
+            'values': [max_highest] * len(dates),
+            'color': '#ef232a'
+        }
+    if min_lowest is not None:
+        extra_lines['支撑线(半年)'] = {
+            'values': [min_lowest] * len(dates),
+            'color': '#14b143'
+        }
+    ma_lines = {}
+    if len(df) > 0:
+        if len(df) >= 5:
+            ma_lines['MA5'] = df['closing'].rolling(window=5, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 10:
+            ma_lines['MA10'] = df['closing'].rolling(window=10, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 20:
+            ma_lines['MA20'] = df['closing'].rolling(window=20, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 30:
+            ma_lines['MA30'] = df['closing'].rolling(window=30, min_periods=1).mean().round(2).tolist()
+        if len(df) >= 60:
+            ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
+
+    macd_data = {}
+    if len(df) > 0:
+        macd_df = calculate_macd(df)
+        macd_data = {
+            'dif': macd_df['DIFF'].tolist(),
+            'dea': macd_df['DEA'].tolist(),
+            'hist': macd_df['MACD_hist'].tolist()
+        }
+        df['MACD_DIFF'] = macd_df['DIFF']
+        df['MACD_DEA'] = macd_df['DEA']
+        df['MACD_HIST'] = macd_df['MACD_hist']
+    rsi_data = {}
+    if len(df) > 0:
+        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
+        for col in rsi_df.columns:
+            df[col] = rsi_df[col]
+            rsi_data[col] = rsi_df[col].tolist()
+
+    st.markdown("""
+          <div class="chart-header">
+              <span class="chart-icon">🔍</span>
+              <span class="chart-title">图表</span>
+          </div>
+    """, unsafe_allow_html=True)
+
+    # 创建K线图（带形态）
+    candlestick_patterns = CandlestickPatternDetector.detect_all_patterns(df)
+    pattern_markers = []
+    for pattern in candlestick_patterns:
+        pattern_type = pattern['pattern_type']
+        marker_data = {
+            'date': format_date_by_type(pattern['date'], t),
+            'value': pattern['price'],
+            'type': pattern_type.code,
+            'name': pattern_type.text,
+            'icon': pattern_type.icon,
+            'color': pattern_type.color,
+            'offset': pattern_type.offset,
+            'description': pattern['description']
+        }
+        if 'start_index' in pattern and 'end_index' in pattern:
+            marker_data['start_index'] = pattern['start_index']
+            marker_data['end_index'] = pattern['end_index']
+        if 'window_top' in pattern:
+            marker_data['window_top'] = pattern['window_top']
+        if 'window_bottom' in pattern:
+            marker_data['window_bottom'] = pattern['window_bottom']
+        pattern_markers.append(marker_data)
+
+    kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
+    volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
+
+    # MACD图表
+    macd_chart = None
+    if macd_data and 'dif' in macd_data:
+        macd_chart = ChartBuilder.create_macd_chart(
+            dates,
+            macd_data['dif'],
+            macd_data['dea'],
+            macd_data['hist']
+        )
+
+    # RSI图表
+    rsi_chart = None
+    if rsi_data:
+        rsi_chart = ChartBuilder.create_rsi_chart(dates, rsi_data)
+
+    # 配置图表联动
+    charts_config = [
+        {
+            "chart": kline_pattern,
+            "grid_pos": {"pos_top": "60px", "height": "350px"},
+            "title": "K线图（含形态）",
+            "show_tooltip": True,
+            "legend_height": "310px"
+        },
+        {
+            "chart": volume_bar,
+            "grid_pos": {"pos_top": "450px", "height": "240px"},
+            "title": "成交量",
+            "show_tooltip": True,
+            "legend_height": "200px"
+        }
+    ]
+
+    if macd_chart:
+        charts_config.append({
+            "chart": macd_chart,
+            "grid_pos": {"pos_top": "730px", "height": "240px"},
+            "title": "MACD",
+            "show_tooltip": True,
+            "legend_height": "200px"
+        })
+
+    if rsi_chart:
+        charts_config.append({
+            "chart": rsi_chart,
+            "grid_pos": {"pos_top": "1010px", "height": "240px"},
+            "title": "RSI",
+            "show_tooltip": True,
+            "legend_height": "200px"
+        })
+
+    # 创建联动图表
+    total_height = "800px" if len(charts_config) <= 2 else "1300px"
+    linked_chart = ChartBuilder.create_linked_charts(charts_config, total_height=total_height)
+
+    # 使用独特的 key 避免冲突
+    streamlit_echarts.st_pyecharts(linked_chart, theme="white", height=total_height, key=f"{KEY_PREFIX}_dialog_{stock.code}_{t}_linked_chart")
 
 def show_detail(stock):
     t = st.radio(
@@ -503,7 +659,6 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
     signals_table_data = []
     for r in signals:
         signals_table_data.append({
-            'stock_code': stock.code,
             '类型': r['show_text'],
             '分数': r['score'],
             '日期': format_date_by_type(r['date'], t),
@@ -514,7 +669,6 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
 
     if len(signals_table_data) > 0:
         singles_df = pd.DataFrame(signals_table_data)
-        # 定义列配置（不显示 stock_code 列）
         columns_config = {
             '类型': st.column_config.TextColumn('类型', width='small'),
             '分数': st.column_config.NumberColumn('分数', width='small'),
@@ -525,30 +679,17 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
         }
         # 定义行选择处理函数
         def handle_row_select(selected_rows):
-            if selected_rows and len(selected_rows) > 0:
-                row = selected_rows[0]
-                stock_code = row.get('stock_code')
-                if stock_code:
-                    # 将选中的股票代码存储到 session state
-                    st.session_state[f"{KEY_PREFIX}_selected_stock_code"] = stock_code
-                    st.rerun()
+            if selected_rows:
+                show_chart_dialog(stock.code)
 
         # 使用 paginate_dataframe 展示数据
         paginate_dataframe(
             data=singles_df,
             columns_config=columns_config,
             title="",
-            key_prefix=f"{KEY_PREFIX}_{stock.code}_{t}_signals",
+            key_prefix=f"{KEY_PREFIX}_{stock.code}_{t}_signals_chart",
             on_row_select=handle_row_select
         )
-
-        # 检查是否有选中的股票代码，如果有则打开对话框
-        if f"{KEY_PREFIX}_selected_stock_code" in st.session_state:
-            selected_code = st.session_state[f"{KEY_PREFIX}_selected_stock_code"]
-            # 清除选中状态
-            del st.session_state[f"{KEY_PREFIX}_selected_stock_code"]
-            # 打开对话框
-            show_chart_dialog(selected_code)
 
 def _build_stock_trading_analysis_step1_info(stock, t, signals, stats):
     st.markdown(f"""
@@ -938,6 +1079,48 @@ def _get_stock_history_data(stock, t: StockHistoryType) -> pd.DataFrame:
             return pd.read_sql(query.statement, session.bind)
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
+    return pd.DataFrame()
+
+def _get_stock_history_data_without_date_selector(stock, t: StockHistoryType) -> pd.DataFrame:
+    """获取股票历史数据，不包含日期选择器（用于对话框等场景）"""
+    model = get_history_model(t)
+    try:
+        with get_db_session() as session:
+            # 获取该股票的最早和最晚日期
+            date_range = session.query(
+                func.min(model.date),
+                func.max(model.date)
+            ).filter(
+                model.code == stock.code,
+                model.removed == False
+            ).first()
+            if not date_range or None in date_range:
+                return pd.DataFrame()
+            min_date, max_date = date_range
+            default_start_date = t.get_default_start_date(max_date, min_date)
+
+            # 从数据库获取数据（使用默认的日期范围）
+            query = session.query(
+                model.date,
+                model.opening,
+                model.highest,
+                model.lowest,
+                model.closing,
+                model.turnover_count,
+                model.turnover_amount,
+                model.change,
+                model.change_amount,
+                model.turnover_ratio
+            ).filter(
+                model.code == stock.code,
+                model.removed == False,
+                model.date >= default_start_date,
+                model.date <= datetime.combine(max_date, time.max)
+            ).order_by(model.date)
+            # 读取数据到DataFrame
+            return pd.read_sql(query.statement, session.bind)
+    except Exception as e:
+        return pd.DataFrame()
     return pd.DataFrame()
 
 def _get_stock_history_lately_max_min(stock, t: StockHistoryType, days: int):
