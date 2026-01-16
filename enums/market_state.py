@@ -54,8 +54,8 @@ class MacdPosition(Enum):
 
 class RsiState(Enum):
     """RSI状态"""
-    BULL = ('BULL', '多头趋势', '🐂', '#10b981')      # 多头（>55）
-    BEAR = ('BEAR', '空头趋势', '🐻', '#ef4444')      # 空头（<45）
+    BULL = ('BULL', '多头趋势[>55]', '🐂', '#10b981')      # 多头（>55）
+    BEAR = ('BEAR', '空头趋势[<45]', '🐻', '#ef4444')      # 空头（<45）
     NEUTRAL = ('NEUTRAL', '震荡区间[45~55]', '🦘', '#f59e0b')  # 震荡（45-55）
 
     def __init__(self, code, text, icon, color):

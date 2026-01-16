@@ -181,22 +181,29 @@ class TradingSignalAnalyzer:
                 'step2_key_area': None,
                 'step3_entry_trigger': None,
                 'step4_risk_filter': None,
-                'has_signal': False,
-                'reason': ''
+                'is_signal': False,
+                'signal_type': None,
+                'signal_action': None,
+                'step1_reasons': market_state.get('reasons', []),
+                'step2_reasons': [],
+                'step3_reasons': [],
+                'step4_reasons': [],
+                'signal_reasons': [],
+                'signal_score_breakdowns': [],
+                'score': 0,
+                'signal_show_text': None,
             }
 
             # 如果是震荡期，记录原因
             if market_state['direction'] == MarketDirection.RANGING:
                 stats['ranging_days'] += 1
-                reason = self._get_ranging_reason(market_state)
                 stats['ranging_reasons'].append({
                     'date': row['date'],
                     'row': row,
-                    'reason': reason,
+                    'reasons': market_state.get('reasons', []),
                     'macd': market_state.get('macd_value'),
                     'rsi': market_state.get('rsi_value')
                 })
-                day_analysis['reason'] = f"震荡期：{reason}"
                 daily_analysis.append(day_analysis)
                 continue
 
@@ -207,6 +214,7 @@ class TradingSignalAnalyzer:
                 stats['long_reasons'].append({
                     'date': row['date'],
                     'row': row,
+                    'reasons': market_state.get('reasons', []),
                     'macd': market_state.get('macd_value'),
                     'rsi': market_state.get('rsi_value')
                 })
@@ -215,6 +223,7 @@ class TradingSignalAnalyzer:
                 stats['short_reasons'].append({
                     'date': row['date'],
                     'row': row,
+                    'reasons': market_state.get('reasons', []),
                     'macd': market_state.get('macd_value'),
                     'rsi': market_state.get('rsi_value')
                 })
@@ -222,11 +231,13 @@ class TradingSignalAnalyzer:
             # 第二步：检查是否在关键区域
             key_area = self._step2_key_area(i)
             day_analysis['step2_key_area'] = key_area
+            day_analysis['step2_reasons'] = key_area.get('reasons', [])
 
             # 记录各个区域
             if key_area['is_key_area']:
                 # 统计各种类型的关键区域天数
                 area_types = key_area.get('all_area_types', [])
+                chinese_area_types = key_area.get('chinese_all_area_types', [])
                 # 统计各类型，避免重复计算
                 has_ma_type = False
                 has_past_high = False
@@ -246,26 +257,26 @@ class TradingSignalAnalyzer:
                     elif area_type == 'CANDLESTICK_PATTERN' and not has_candlestick_pattern:
                         stats['key_area_candlestick_pattern_days'] += 1
                         has_candlestick_pattern = True
-                reasons = key_area.get('reasons', [])
                 stats['key_area_reasons'].append({
                     'date': row['date'],
                     'row': row,
                     'all_types': area_types,
-                    'reason':   " | ".join(reasons) if reasons else "-"
+                    'chinese_all_types': chinese_area_types,
+                    'reasons':   key_area.get("reasons", [])
                 })
 
             # 第三步：检查入场触发条件
             entry_trigger = self._step3_entry_trigger(i, market_state['direction'])
             day_analysis['step3_entry_trigger'] = entry_trigger
+            day_analysis['step3_reasons'] = entry_trigger.get('reasons', [])
 
             # 记录入场触发天数
-            entry_trigger_reasons = entry_trigger.get('reasons', [])
             if entry_trigger['is_triggered']:
                 stats['triggered_days'] += 1
                 stats['triggered_reasons'].append({
                     'date': row['date'],
                     'row': row,
-                    'reason': " | ".join(entry_trigger_reasons) if entry_trigger_reasons else "-"
+                    'reasons': entry_trigger.get("reasons", [])
                 })
 
             else:
@@ -276,17 +287,17 @@ class TradingSignalAnalyzer:
                 stats['not_triggered_reasons'].append({
                     'date': row['date'],
                     'row': row,
-                    'reason': " | ".join(entry_trigger_reasons) if entry_trigger_reasons else "-"
+                    'reasons': entry_trigger.get("reasons", [])
                 })
             if entry_trigger['pattern_matched']:
                 stats['pattern_matched_days'] += 1
             if entry_trigger['volume_confirmed']:
                 stats['volume_confirmed_days'] += 1
 
-
             # 第四步：风险过滤
             risk_filter = self._step4_risk_filter(i)
             day_analysis['step4_risk_filter'] = risk_filter
+            day_analysis['step4_reasons'] = risk_filter.get('reasons', [])
 
             # 记录风险天数
             if risk_filter['has_risk']:
@@ -297,14 +308,13 @@ class TradingSignalAnalyzer:
                         stats['bearish_divergence_days'] +=  1
                     elif risk_type == RiskType.BULLISH_DIVERGENCE:  # 底背离
                         stats['bullish_divergence_days'] += 1
-                risk_reasons = risk_filter.get('reasons', [])
                 stats['risk_reasons'].append({
                     'date': row['date'],
                     'row': row,
                     'risk_type': risk_type,
                     'risk_level': risk_filter.get('risk_level'),
                     'volume_weakening': risk_filter.get('volume_weakening'),
-                    'reason': " | ".join(risk_reasons) if risk_reasons else "-"
+                    'reasons': risk_filter.get("reasons", [])
                 })
 
             if risk_filter['volume_weakening']:
@@ -338,7 +348,13 @@ class TradingSignalAnalyzer:
                 elif action == 'EXIT_SHORT':
                     stats['exit_short_signals'] += 1  # 平空信号
 
-                day_analysis['has_signal'] = True
+                day_analysis['is_signal'] = True
+                day_analysis['signal_type'] = signal.get('type')
+                day_analysis['signal_action'] = signal.get('action')
+                day_analysis['signal_show_text'] = signal.get('show_text')
+                day_analysis['score'] = score
+                day_analysis['signal_reasons'] = signal.get('reasons', [])
+                day_analysis['signal_score_breakdowns'] = signal.get('score_breakdowns', [])
 
             daily_analysis.append(day_analysis)
 
@@ -347,29 +363,6 @@ class TradingSignalAnalyzer:
             'statistics': stats,
             'daily_analysis': daily_analysis
         }
-
-    def _get_ranging_reason(self, market_state: Dict) -> str:
-        """获取震荡期的详细原因"""
-        macd_pos = market_state['macd_position']
-        rsi_state = market_state['rsi_state']
-        macd_val = market_state.get('macd_value', 0)
-        rsi_val = market_state.get('rsi_value', 0)
-
-        reasons = []
-
-        if macd_pos == MacdPosition.NEUTRAL:
-            reasons.append(f"MACD在{macd_pos.text} → ({macd_val:.2f})")
-
-        if rsi_state == RsiState.NEUTRAL:
-            reasons.append(f"RSI在{rsi_state.text} → ({rsi_val:.2f})")
-
-        if macd_pos == MacdPosition.ABOVE and rsi_state == RsiState.BEAR:
-            reasons.append(f"MACD在{macd_pos.text} → ({macd_val:.2f})但RSI在{rsi_state.text} → ({rsi_val:.2f})，方向不一致")
-
-        if macd_pos == MacdPosition.BELOW and rsi_state == RsiState.BULL:
-            reasons.append(f"MACD在{macd_pos.text} → ({macd_val:.2f})但RSI在{rsi_state.text} → ({rsi_val:.2f})，方向不一致")
-
-        return " | ".join(reasons) if reasons else "市场方向不明确"
 
     def _step1_market_state(self, idx: int) -> Dict:
         """
@@ -395,6 +388,8 @@ class TradingSignalAnalyzer:
         row = self.df.iloc[idx]
         diff = row['DIFF']
         rsi = row['RSI']
+        macd_value  = float(diff) if not pd.isna(diff) else None
+        rsi_value = float(rsi) if not pd.isna(rsi) else None
 
         # 判断MACD位置
         # DIFF是EMA12-EMA26，通常在±0.1到±0.3之间
@@ -418,6 +413,21 @@ class TradingSignalAnalyzer:
         else:
             rsi_state = RsiState.NEUTRAL
 
+        reasons = []
+        if macd_position == MacdPosition.NEUTRAL:
+            reasons.append(f"MACD在{macd_position.text} → ({macd_value:.2f})")
+
+        if rsi_state == RsiState.NEUTRAL:
+            reasons.append(f"RSI在{rsi_state.text} → ({rsi_value:.2f})")
+
+        if macd_position == MacdPosition.ABOVE and rsi_state == RsiState.BEAR:
+            reasons.append(
+                f"MACD在{macd_position.text} → ({macd_value:.2f})但RSI在{rsi_state.text} → ({rsi_value:.2f}), 方向不一致")
+
+        if macd_position == MacdPosition.BELOW and rsi_state == RsiState.BULL:
+            reasons.append(
+                f"MACD在{macd_position.text} → ({macd_value:.2f})但RSI在{rsi_state.text} → ({rsi_value:.2f}), 方向不一致")
+
         # 综合判断方向
         direction = MarketDirection.RANGING
         confidence = 0.0
@@ -425,23 +435,28 @@ class TradingSignalAnalyzer:
         if macd_position == MacdPosition.ABOVE and rsi_state == RsiState.BULL:
             direction = MarketDirection.LONG
             confidence = min((rsi - 55) / 20, 1.0)  # RSI越高，置信度越高
+            reasons.append(f"MACD在{macd_position.text} → ({macd_value:.2f}), RSI在{rsi_state.text} → ({rsi_value:.2f}), 置信度 → ({confidence:.2f})")
         elif macd_position == MacdPosition.BELOW and rsi_state == RsiState.BEAR:
             direction = MarketDirection.SHORT
             confidence = min((45 - rsi) / 20, 1.0)  # RSI越低，置信度越高
+            reasons.append(f"MACD在{macd_position.text} → ({macd_value:.2f}), RSI在{rsi_state.text} → ({rsi_value:.2f}), 置信度 → ({confidence:.2f})")
         elif macd_position == MacdPosition.ABOVE and rsi_state == RsiState.NEUTRAL:
             direction = MarketDirection.LONG
             confidence = 0.5
+            reasons.append(f"MACD在{macd_position.text} → ({macd_value:.2f}), RSI在{rsi_state.text} → ({rsi_value:.2f}), 置信度 → ({confidence:.2f})")
         elif macd_position == MacdPosition.BELOW and rsi_state == RsiState.NEUTRAL:
             direction = MarketDirection.SHORT
             confidence = 0.5
+            reasons.append(f"MACD在{macd_position.text} → ({macd_value:.2f}), RSI在{rsi_state.text} → ({rsi_value:.2f}), 置信度 → ({confidence:.2f})")
 
         return {
             'direction': direction,
             'macd_position': macd_position,
             'rsi_state': rsi_state,
             'confidence': confidence,
-            'macd_value': float(diff) if not pd.isna(diff) else None,
-            'rsi_value': float(rsi) if not pd.isna(rsi) else None
+            'reasons': reasons,
+            'macd_value': macd_value,
+            'rsi_value': rsi_value
         }
 
     def _step2_key_area(self, idx: int) -> Dict:
@@ -462,6 +477,15 @@ class TradingSignalAnalyzer:
                 'patterns': List[Dict]  # 该位置的K线形态
             }
         """
+        area_type_mapping = {
+            'MA5': '均线(MA5)',
+            'MA10': '均线(MA10)',
+            'MA20': '均线(MA20)',
+            'MA60': '均线(MA60)',
+            'PAST_HIGH': '前期高点',
+            'PAST_LOW': '前期低点',
+            'CANDLESTICK_PATTERN': 'K线形态'
+        }
         row = self.df.iloc[idx]
         current_price = row['closing']
 
@@ -482,7 +506,7 @@ class TradingSignalAnalyzer:
             if deviation <= tolerance:
                 is_key_area = True
                 area_type = AreaType.SUPPORT if current_price >= ma_value else AreaType.RESISTANCE
-                reasons.append(f"价格触及{ma_name}线[{ma_value:.2f}] → ({current_price:.2f}, 比例：{deviation:.2f})")
+                reasons.append(f"{area_type.text}, 价格触及{ma_name}线[{ma_value:.2f}] → ({current_price:.2f}, 比例: {deviation:.2f})")
                 all_area_types.append(ma_name)
 
         # 检查是否在前期高低点附近（回看20天）
@@ -500,14 +524,14 @@ class TradingSignalAnalyzer:
             if distance_to_high_ratio <= tolerance:
                 is_key_area = True
                 area_type = AreaType.RESISTANCE
-                reasons.append(f"接近前期[前20天]高点[{recent_high:.2f}] → ({current_price:.2f}, 比例: {distance_to_high_ratio:.2f})")
+                reasons.append(f"{area_type.text}, 接近前期[前20天]高点[{recent_high:.2f}] → ({current_price:.2f}, 比例: {distance_to_high_ratio:.2f})")
                 all_area_types.append('PAST_HIGH')
 
             # 检查是否接近前期低点
             if distance_to_low_ratio <= tolerance:
                 is_key_area = True
                 area_type = AreaType.SUPPORT
-                reasons.append(f"接近前期[前20天]低点[{recent_low:.2f}] → ({current_price:.2f}, 比例: {distance_to_low_ratio:.2f})")
+                reasons.append(f"{area_type.text}, 接近前期[前20天]低点[{recent_low:.2f}] → ({current_price:.2f}, 比例: {distance_to_low_ratio:.2f})")
                 all_area_types.append('PAST_LOW')
 
         # 检查当前位置的K线形态
@@ -534,10 +558,17 @@ class TradingSignalAnalyzer:
                     reasons.append(f"出现形态 → ({pattern['pattern_type'].fullText})")
                     all_area_types.append('CANDLESTICK_PATTERN')
 
+        if not is_key_area:
+            reasons.append(f"未匹配到关键区域")
+
+        chinese_all_area_types = []
+        for t in all_area_types:
+            chinese_all_area_types.append(area_type_mapping.get(t, t))
         return {
             'is_key_area': is_key_area,
             'area_type': area_type,
             'all_area_types': all_area_types,
+            'chinese_all_area_types': chinese_all_area_types,
             'reasons': reasons,
             'patterns': current_patterns
         }
@@ -598,10 +629,8 @@ class TradingSignalAnalyzer:
             CandlestickPattern.HAMMER,
             CandlestickPattern.INVERTED_HAMMER,
             CandlestickPattern.PIERCING_PATTERN,
-            CandlestickPattern.PIERCING_LINE,
             CandlestickPattern.THREE_WHITE_SOLDIERS,
             CandlestickPattern.BULLISH_HARAMI,
-            CandlestickPattern.DRAGONFLY_DOJI
         ]
 
         # 做空的看跌形态（扩展列表）
@@ -613,7 +642,6 @@ class TradingSignalAnalyzer:
             CandlestickPattern.DARK_CLOUD_COVER,
             CandlestickPattern.THREE_BLACK_CROWS,
             CandlestickPattern.BEARISH_HARAMI,
-            CandlestickPattern.GRAVESTONE_DOJI
         ]
 
         pattern_matched = False
@@ -650,14 +678,14 @@ class TradingSignalAnalyzer:
             is_triggered = True
             volume_confirmed = True
             trigger_mode = 'strict'
-            reasons.append(f"严格模式触发：形态+放量1.3x [{vol_ma5:.0f}*1.3={vol_ma5*1.3:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
+            reasons.append(f"形态+放量1.3倍[{vol_ma5:.0f}*1.3={vol_ma5*1.3:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
 
         # 模式2：宽松模式 - 有形态 + 成交量≥1.1倍
         elif pattern_matched and volume_ratio >= 1.1:
             is_triggered = True
             volume_confirmed = True
             trigger_mode = 'loose'
-            reasons.append(f"宽松模式触发：形态+放量1.1x [{vol_ma5:.0f}*1.1={vol_ma5*1.1:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
+            reasons.append(f"形态+放量1.1倍[{vol_ma5:.0f}*1.1={vol_ma5*1.1:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
 
         # 模式3：极度放量模式 - 无形态但成交量≥1.5倍 + 价格符合趋势
         elif not pattern_matched and volume_ratio >= 1.5 and price_trend_match:
@@ -665,20 +693,20 @@ class TradingSignalAnalyzer:
             volume_confirmed = True
             trigger_mode = 'volume_only'
             trend_desc = "阳线" if direction == MarketDirection.LONG else "阴线"
-            reasons.append(f"放量模式触发：极度放量1.5x+{trend_desc} [{vol_ma5:.0f}*1.5={vol_ma5*1.5:.0f}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
+            reasons.append(f"极度放量1.5倍[{vol_ma5:.0f}*1.5={vol_ma5*1.5:.0f}][{trend_desc}] → ({current_volume:.0f}, 倍数: {volume_ratio:.2f})")
 
         # 记录未触发原因
         if not is_triggered:
             if not pattern_matched:
                 reasons.append(f"未匹配到有效K线形态")
             if volume_ratio < 1.1:
-                reasons.append(f"成交量不足：{volume_ratio:.2f}x < 1.1x")
+                reasons.append(f"成交量不足：{volume_ratio:.2f}倍 < 1.1倍")
             elif not pattern_matched and volume_ratio < 1.5:
-                reasons.append(f"无形态情况下成交量不足：{volume_ratio:.2f}x < 1.5x")
+                reasons.append(f"无形态情况下成交量不足：{volume_ratio:.2f}倍 < 1.5倍")
             if not price_trend_match and not pattern_matched:
                 trend_desc = "阳线" if direction == MarketDirection.LONG else "阴线"
                 actual_desc = "阳线" if closing > opening else "阴线" if closing < opening else "十字星"
-                reasons.append(f"价格趋势不匹配：需要{trend_desc}，实际为{actual_desc}")
+                reasons.append(f"价格趋势不匹配：需要{trend_desc}, 实际为{actual_desc}")
 
         return {
             'is_triggered': is_triggered,
@@ -771,7 +799,8 @@ class TradingSignalAnalyzer:
                     risk_level = RiskLevel.HIGH if volume_weakening else RiskLevel.MEDIUM
                     reasons.append(f"当前价格创新低[{price_low:.2f}*1.02={price_low*1.02:.2f}], RSI未创新低[{rsi_low:.2f}*1.05={rsi_low*1.05:.2f}] → (价格: {current_price:.2f}, RSI: {current_rsi:.2f}, 类型: {risk_type.text}, 成交量是否衰减: {volume_weakening}, 级别: {risk_level.text})")
 
-
+        if not has_risk:
+            reasons.append(f"无风险")
         return {
             'has_risk': has_risk,
             'risk_type': risk_type,
@@ -832,12 +861,13 @@ class TradingSignalAnalyzer:
             # 判断是平多还是平空
             if risk_filter['risk_type'] == RiskType.BEARISH_DIVERGENCE:
                 # 顶背离 → 平多头仓位
-                reason = 'RSI顶背离 + 成交量衰减，建议平多'
+                reason = 'RSI顶背离+成交量衰减, 建议卖出平多'
                 return {
                     'date': row['date'],
                     'row': row,
                     'type': SignalType.SELL,
                     'action': 'EXIT_LONG',
+                    'show_text': '🟡卖出平多',
                     'score': 10,  # 退出信号给满分
                     'score_details': {
                         'market_state': 0,
@@ -847,8 +877,8 @@ class TradingSignalAnalyzer:
                         'risk': 0,
                         'exit_signal': 10
                     },
-                    'score_breakdown': ['退出信号：RSI顶背离+成交量衰减 +10分'],
-                    'reason': reason,
+                    'score_breakdowns': ['RSI顶背离+成交量衰减 +10分'],
+                    'reasons': [reason],
                     'analysis': {
                         'market_state': market_state,
                         'key_area': key_area,
@@ -858,12 +888,13 @@ class TradingSignalAnalyzer:
                 }
             elif risk_filter['risk_type'] == RiskType.BULLISH_DIVERGENCE:
                 # 底背离 → 平空头仓位
-                reason = 'RSI底背离 + 成交量衰减，建议平空'
+                reason = 'RSI底背离+成交量衰减, 建议买入平空'
                 return {
                     'date': row['date'],
                     'row': row,
                     'type': SignalType.BUY,
                     'action': 'EXIT_SHORT',
+                    'show_text': '🟠买入平空',
                     'score': 10,  # 退出信号给满分
                     'score_details': {
                         'market_state': 0,
@@ -873,8 +904,8 @@ class TradingSignalAnalyzer:
                         'risk': 0,
                         'exit_signal': 10
                     },
-                    'score_breakdown': ['退出信号：RSI底背离+成交量衰减 +10分'],
-                    'reason': reason,
+                    'score_breakdowns': ['RSI底背离+成交量衰减 +10分'],
+                    'reasons': [reason],
                     'analysis': {
                         'market_state': market_state,
                         'key_area': key_area,
@@ -885,17 +916,23 @@ class TradingSignalAnalyzer:
 
         # 生成做多信号
         if direction == MarketDirection.LONG and entry_trigger['is_triggered']:
-            return self._calculate_entry_signal_score(
+            signal_result =  self._calculate_entry_signal_score(
                 row, market_state, key_area, entry_trigger, risk_filter,
                 SignalType.BUY, 'ENTER_LONG'
             )
+            if signal_result:
+                signal_result['show_text'] = '🟢买入开多'
+            return signal_result
 
         # 生成做空信号
         if direction == MarketDirection.SHORT and entry_trigger['is_triggered']:
-            return self._calculate_entry_signal_score(
+            signal_result = self._calculate_entry_signal_score(
                 row, market_state, key_area, entry_trigger, risk_filter,
                 SignalType.SELL, 'ENTER_SHORT'
             )
+            if signal_result:
+                signal_result['show_text'] = '🔴卖出开空'
+            return signal_result
 
         return None
 
@@ -923,13 +960,13 @@ class TradingSignalAnalyzer:
         confidence = market_state['confidence']
         if confidence > 0.7:
             market_score = 3
-            score_reasons.append(f"市场状态强劲(置信度{confidence:.1%}) +3分")
+            score_reasons.append(f"⓵市场状态: 强劲(置信度{confidence:.2f}) +3分")
         elif confidence > 0.5:
             market_score = 2
-            score_reasons.append(f"市场状态良好(置信度{confidence:.1%}) +2分")
+            score_reasons.append(f"⓵市场状态: 良好(置信度{confidence:.2f}) +2分")
         else:
             market_score = 1
-            score_reasons.append(f"市场状态一般(置信度{confidence:.1%}) +1分")
+            score_reasons.append(f"⓵市场状态: 一般(置信度{confidence:.2f}) +1分")
         score_details['market_state'] = market_score
 
         # 2. 关键区域得分（最高2分）
@@ -938,22 +975,22 @@ class TradingSignalAnalyzer:
             in_key_area = key_area['is_key_area'] and key_area['area_type'] == AreaType.SUPPORT
             if in_key_area:
                 area_score = 2
-                score_reasons.append(f"在关键支撑区 +2分")
+                score_reasons.append(f"⓶关键区域: 关键支撑区 +2分")
             elif key_area['is_key_area']:
                 area_score = 1
-                score_reasons.append(f"在一般关键区域 +1分")
+                score_reasons.append(f"⓶关键区域: 一般关键区 +1分")
             else:
-                score_reasons.append(f"不在关键区域 +0分")
+                score_reasons.append(f"⓶关键区域: 不在关键区 +0分")
         else:  # SELL
             in_key_area = key_area['is_key_area'] and key_area['area_type'] == AreaType.RESISTANCE
             if in_key_area:
                 area_score = 2
-                score_reasons.append(f"在关键阻力区 +2分")
+                score_reasons.append(f"⓶关键区域: 关键阻力区 +2分")
             elif key_area['is_key_area']:
                 area_score = 1
-                score_reasons.append(f"在一般关键区域 +1分")
+                score_reasons.append(f"⓶关键区域: 一般关键区 +1分")
             else:
-                score_reasons.append(f"不在关键区域 +0分")
+                score_reasons.append(f"⓶关键区域: 不在关键区 +0分")
         score_details['key_area'] = area_score
 
         # 3. 成交量得分（最高3分）
@@ -961,13 +998,13 @@ class TradingSignalAnalyzer:
         volume_ratio = entry_trigger['volume_ratio']
         if volume_ratio >= 2.0:
             volume_score = 3
-            score_reasons.append(f"成交量放大{volume_ratio:.1f}倍(≥2.0) +3分")
+            score_reasons.append(f"⓷入场触发: 成交量放大{volume_ratio:.1f}倍(≥2.0) +3分")
         elif volume_ratio >= 1.5:
             volume_score = 2
-            score_reasons.append(f"成交量放大{volume_ratio:.1f}倍(≥1.5) +2分")
+            score_reasons.append(f"⓷入场触发: 成交量放大{volume_ratio:.1f}倍(≥1.5) +2分")
         elif volume_ratio >= 1.3:
             volume_score = 1
-            score_reasons.append(f"成交量放大{volume_ratio:.1f}倍(≥1.3) +1分")
+            score_reasons.append(f"⓷入场触发: 成交量放大{volume_ratio:.1f}倍(≥1.3) +1分")
         score_details['volume'] = volume_score
 
         # 4. K线形态得分（最高2分）
@@ -985,10 +1022,10 @@ class TradingSignalAnalyzer:
             ]
             if pattern_type in strong_patterns:
                 pattern_score = 2
-                score_reasons.append(f"强反转形态({pattern_type.text}) +2分")
+                score_reasons.append(f"⓷入场触发: 强反转形态({pattern_type.fullText}) +2分")
             else:
                 pattern_score = 1
-                score_reasons.append(f"一般形态({pattern_type.text}) +1分")
+                score_reasons.append(f"⓷入场触发: 一般形态({pattern_type.fullText}) +1分")
         score_details['pattern'] = pattern_score
 
         # 5. 风险扣分（最高-3分）
@@ -997,15 +1034,15 @@ class TradingSignalAnalyzer:
             risk_level = risk_filter['risk_level']
             if risk_level == RiskLevel.HIGH:
                 risk_score = -3
-                score_reasons.append(f"⚠️ 高风险({risk_filter['risk_type'].text}) -3分")
+                score_reasons.append(f"⓸风险分析: 高风险({risk_filter['risk_type'].text}) -3分")
             elif risk_level == RiskLevel.MEDIUM:
                 risk_score = -2
-                score_reasons.append(f"⚠️ 中等风险({risk_filter['risk_type'].text}) -2分")
+                score_reasons.append(f"⓸风险分析: 中等风险({risk_filter['risk_type'].text}) -2分")
             else:  # LOW
                 risk_score = -1
-                score_reasons.append(f"⚠️ 低风险({risk_filter['risk_type'].text}) -1分")
+                score_reasons.append(f"⓸风险分析: 低风险({risk_filter['risk_type'].text}) -1分")
         else:
-            score_reasons.append(f"无风险 +0分")
+            score_reasons.append(f"⓸风险分析: 无风险 +0分")
         score_details['risk'] = risk_score
 
         # 计算总分
@@ -1016,27 +1053,22 @@ class TradingSignalAnalyzer:
             return None
 
         # 构建原因说明
-        macd_pos = market_state['macd_position']
-        rsi_val = market_state['rsi_value']
-
-        reason_parts = []
-        reason_parts.append(f"MACD{macd_pos.text}")
-        reason_parts.append(f"RSI={rsi_val:.2f}")
-
+        reasons = []
+        reasons.append(f"⓵市场状态: MACD在{market_state['macd_position'].text}, RSI在{market_state['rsi_state'].text}, 置信度{market_state['confidence']:.2f}")
         if key_area['is_key_area']:
             area_type = key_area['area_type']
-            reason_parts.append(f"{area_type.text}")
+            chinese_all_types = "、".join(key_area['chinese_all_area_types'])
+            if area_type is not None:
+                reasons.append(f"⓶关键区域: {area_type.text}, {chinese_all_types}")
+            else:
+                reasons.append(f"⓶关键区域: {chinese_all_types}")
 
         if entry_trigger['pattern_info']:
             pattern = entry_trigger['pattern_info']['pattern_type']
-            reason_parts.append(f"{pattern.text}")
-
-        reason_parts.append(f"成交量{volume_ratio:.1f}x")
+            reasons.append(f"⓷入场触发: 匹配形态{pattern.fullText}, 成交量放大{volume_ratio:.1f}倍")
 
         if risk_filter['has_risk']:
-            reason_parts.append(f"⚠️{risk_filter['risk_type'].text}")
-
-        reason_text = ' | '.join(reason_parts)
+            reasons.append(f"⓸风险分析: {risk_filter['risk_type'].text}")
 
         return {
             'date': row['date'],
@@ -1045,8 +1077,8 @@ class TradingSignalAnalyzer:
             'action': action,
             'score': total_score,
             'score_details': score_details,
-            'score_breakdown': score_reasons,
-            'reason': reason_text,
+            'score_breakdowns': score_reasons,
+            'reasons': reasons,
             'analysis': {
                 'market_state': market_state,
                 'key_area': key_area,

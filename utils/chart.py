@@ -985,39 +985,67 @@ class ChartBuilder:
                         }}
                         var dfData = {df_json};
                         var currentDate = params[0].axisValue;
-                        var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
+                        var result = '<div style="padding:5px; width:240px;"><strong>' + currentDate + '</strong><br/>';
+
+                        // 获取当前数据索引
+                        var dataIndex = params[0].dataIndex;
+                        var currentData = dfData[dataIndex];
+
                         params.forEach(function(item) {{
                             if (item.seriesName === 'K线') {{
-                                var index = item.dataIndex;
-                                var currentData = dfData[index];
                                 var opening = parseFloat(currentData.opening).toFixed(2);
                                 var closing = parseFloat(currentData.closing).toFixed(2);
                                 var lowest = parseFloat(currentData.lowest).toFixed(2);
                                 var highest = parseFloat(currentData.highest).toFixed(2);
                                 var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
                                 var change = parseFloat(currentData.change).toFixed(2) + '%';
-                                result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
-                                result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
-                                result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
-                                result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
+                                result += '<div style="border-bottom:1px solid #ddd; padding-bottom:3px; margin-bottom:3px;">';
+                                result += '<span style="color:#fa8c16;">开盘</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
+                                result += '<span style="color:#52c41a;">收盘</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
+                                result += '<span style="color:#13c2c2;">最低</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
+                                result += '<span style="color:#f5222d;">最高</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
                                 result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
-                                result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                                result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span>';
+                                result += '</div>';
                             }} else if (item.seriesName === '成交量') {{
-                                var index = item.dataIndex;
-                                var currentData = dfData[index];
                                 var value = item.value;
                                 var shouValue = (value / 100).toFixed(0);
                                 var formattedValue = formatValue(value);
                                 var formattedShou = formatValue(Number(shouValue));
                                 var formattedTurnover = formatValue(currentData.turnover_amount);
                                 var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
-
+                                result += '<div style="border-bottom:1px solid #ddd; padding-bottom:3px; margin-bottom:3px;">';
                                 result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
                                 result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
                                 result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
-                                result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
+                                result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span>';
+                                result += '</div>';
                             }}
                         }});
+
+                        // 添加MACD数据
+                        if (currentData.MACD_DIFF !== undefined) {{
+                            var diff = parseFloat(currentData.MACD_DIFF).toFixed(3);
+                            var dea = parseFloat(currentData.MACD_DEA).toFixed(3);
+                            var hist = parseFloat(currentData.MACD_HIST).toFixed(3);
+                            result += '<div style="border-bottom:1px solid #ddd; padding-bottom:3px; margin-bottom:3px;">';
+                            result += '<span style="color:#FF6B6B;">MACD DIFF</span> <span style="float:right;font-weight:bold;">' + diff + '</span><br/>';
+                            result += '<span style="color:#4ECDC4;">MACD DEA</span> <span style="float:right;font-weight:bold;">' + dea + '</span><br/>';
+                            result += '<span style="color:#95E1D3;">MACD柱</span> <span style="float:right;font-weight:bold;">' + hist + '</span>';
+                            result += '</div>';
+                        }}
+
+                        // 添加RSI数据
+                        if (currentData.RSI6 !== undefined) {{
+                            var rsi6 = parseFloat(currentData.RSI6).toFixed(2);
+                            var rsi12 = parseFloat(currentData.RSI12).toFixed(2);
+                            var rsi24 = parseFloat(currentData.RSI24).toFixed(2);
+                            result += '<div>';
+                            result += '<span style="color:#FF6B6B;">RSI6</span> <span style="float:right;font-weight:bold;">' + rsi6 + '</span><br/>';
+                            result += '<span style="color:#FFA500;">RSI12</span> <span style="float:right;font-weight:bold;">' + rsi12 + '</span><br/>';
+                            result += '<span style="color:#9370DB;">RSI24</span> <span style="float:right;font-weight:bold;">' + rsi24 + '</span>';
+                            result += '</div>';
+                        }}
 
                         result += '</div>';
                         return result;
@@ -1209,7 +1237,7 @@ class ChartBuilder:
         创建RSI指标图表
         Args:
             dates: 日期列表
-            rsi_data: RSI数据字典，格式: {'RSI6': [...], 'RSI12': [...], 'RSI24': [...]}
+            rsi_data: RSI数据字典，格式: {'RSI6': [...], 'RSI14': [...], 'RSI24': [...]}
         """
         line = Line()
         line.add_xaxis(dates)
@@ -1217,7 +1245,7 @@ class ChartBuilder:
         # RSI颜色配置 - 使用更容易区分的颜色
         rsi_colors = {
             'RSI6': '#FF6B6B',   # 红色 - 短期
-            'RSI12': '#FFA500',  # 橙色 - 中期
+            'RSI14': '#FFA500',  # 橙色 - 中期
             'RSI24': '#9370DB'   # 紫色 - 长期
         }
 
@@ -1260,7 +1288,6 @@ class ChartBuilder:
                 ),
                 axislabel_opts=opts.LabelOpts(color="#000000")
             )
-            # 移除visualmap_opts，避免影响Grid中其他图表的颜色
         )
 
         # 添加超买超卖线（辅助线）
