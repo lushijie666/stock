@@ -891,26 +891,34 @@ def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "") ->
                 st.session_state[start_date_key] = default_start_date
             if end_date_key not in st.session_state:
                 st.session_state[end_date_key] = max_date
-            # 添加日期选择器
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "开始日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=start_date_key
-                )
-                if start_date != st.session_state[start_date_key]:
-                    st.session_state[start_date_key] = start_date
-            with col2:
-                end_date = st.date_input(
-                    "结束日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=end_date_key
-                )
-                if end_date != st.session_state[end_date_key]:
-                    st.session_state[end_date_key] = end_date
+
+            # 只在非对话框场景（key_suffix 为空）时显示日期选择器
+            if not key_suffix:
+                # 添加日期选择器
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_date = st.date_input(
+                        "开始日期",
+                        min_value=min_date,
+                        max_value=max_date,
+                        key=start_date_key
+                    )
+                    if start_date != st.session_state[start_date_key]:
+                        st.session_state[start_date_key] = start_date
+                with col2:
+                    end_date = st.date_input(
+                        "结束日期",
+                        min_value=min_date,
+                        max_value=max_date,
+                        key=end_date_key
+                    )
+                    if end_date != st.session_state[end_date_key]:
+                        st.session_state[end_date_key] = end_date
+
+            # 使用 session_state 中的日期值
+            start_date = st.session_state[start_date_key]
+            end_date = st.session_state[end_date_key]
+
             # 从数据库获取数据
             query = session.query(
                 model.date,
