@@ -985,9 +985,8 @@ class ChartBuilder:
                         }}
                         var dfData = {df_json};
                         var currentDate = params[0].axisValue;
-                        var result = '<div style="padding:5px; width:240px;"><strong>' + currentDate + '</strong><br/>';
+                        var result = '<div style="padding:5px; width:250px;"><strong>' + currentDate + '</strong><br/>';
 
-                        // 获取当前数据索引
                         var dataIndex = params[0].dataIndex;
                         var currentData = dfData[dataIndex];
 
@@ -999,7 +998,7 @@ class ChartBuilder:
                                 var highest = parseFloat(currentData.highest).toFixed(2);
                                 var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
                                 var change = parseFloat(currentData.change).toFixed(2) + '%';
-                                result += '<div style="border-bottom:1px solid #ddd; padding-bottom:3px; margin-bottom:3px;">';
+                                result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
                                 result += '<span style="color:#fa8c16;">开盘</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
                                 result += '<span style="color:#52c41a;">收盘</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
                                 result += '<span style="color:#13c2c2;">最低</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
@@ -1014,7 +1013,7 @@ class ChartBuilder:
                                 var formattedShou = formatValue(Number(shouValue));
                                 var formattedTurnover = formatValue(currentData.turnover_amount);
                                 var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
-                                result += '<div style="border-bottom:1px solid #ddd; padding-bottom:3px; margin-bottom:3px;">';
+                                result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
                                 result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
                                 result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
                                 result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
@@ -1023,27 +1022,21 @@ class ChartBuilder:
                             }}
                         }});
 
-                        // 添加MACD数据
-                        if (currentData.MACD_DIFF !== undefined) {{
-                            var diff = parseFloat(currentData.MACD_DIFF).toFixed(3);
-                            var dea = parseFloat(currentData.MACD_DEA).toFixed(3);
-                            var hist = parseFloat(currentData.MACD_HIST).toFixed(3);
-                            result += '<div style="border-bottom:1px solid #ddd; padding-bottom:3px; margin-bottom:3px;">';
-                            result += '<span style="color:#FF6B6B;">MACD DIFF</span> <span style="float:right;font-weight:bold;">' + diff + '</span><br/>';
-                            result += '<span style="color:#4ECDC4;">MACD DEA</span> <span style="float:right;font-weight:bold;">' + dea + '</span><br/>';
-                            result += '<span style="color:#95E1D3;">MACD柱</span> <span style="float:right;font-weight:bold;">' + hist + '</span>';
+                        // 添加MACD数据 - 使用安全的访问方式
+                        if (currentData && currentData.MACD_DIFF != null && !isNaN(currentData.MACD_DIFF)) {{
+                            result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
+                            result += '<span style="color:#FF6B6B;">DIFF</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DIFF).toFixed(3) + '</span><br/>';
+                            result += '<span style="color:#4ECDC4;">DEA</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DEA).toFixed(3) + '</span><br/>';
+                            result += '<span style="color:#95E1D3;">MACD</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_HIST).toFixed(3) + '</span>';
                             result += '</div>';
                         }}
 
-                        // 添加RSI数据
-                        if (currentData.RSI6 !== undefined) {{
-                            var rsi6 = parseFloat(currentData.RSI6).toFixed(2);
-                            var rsi12 = parseFloat(currentData.RSI12).toFixed(2);
-                            var rsi24 = parseFloat(currentData.RSI24).toFixed(2);
-                            result += '<div>';
-                            result += '<span style="color:#FF6B6B;">RSI6</span> <span style="float:right;font-weight:bold;">' + rsi6 + '</span><br/>';
-                            result += '<span style="color:#FFA500;">RSI12</span> <span style="float:right;font-weight:bold;">' + rsi12 + '</span><br/>';
-                            result += '<span style="color:#9370DB;">RSI24</span> <span style="float:right;font-weight:bold;">' + rsi24 + '</span>';
+                        // 添加RSI数据 - 使用安全的访问方式
+                        if (currentData && currentData.RSI6 != null && !isNaN(currentData.RSI6)) {{
+                            result += '<div style="padding:2px 0;">';
+                            result += '<span style="color:#FF6B6B;">RSI6</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI6).toFixed(2) + '</span><br/>';
+                            result += '<span style="color:#FFA500;">RSI12</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI12).toFixed(2) + '</span><br/>';
+                            result += '<span style="color:#9370DB;">RSI24</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI24).toFixed(2) + '</span>';
                             result += '</div>';
                         }}
 
