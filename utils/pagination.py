@@ -100,7 +100,7 @@ class Pagination:
 
 
 def paginate_dataframe(
-        query: Query,
+        query: Query = None,
         page_size: int = 20,
         columns_config: Dict = None,
         format_funcs: Dict = None,
@@ -112,6 +112,78 @@ def paginate_dataframe(
         data: pd.DataFrame = None
 ) -> None:
     try:
+        # 如果提供了 data 参数，直接展示数据，不需要查询和分页
+        if data is not None:
+            # 渲染标题
+            if title:
+                st.markdown(
+                    f"""
+                    <div class="table-header">
+                        <div class="table-title">{title}</div>
+                        <div class="table-meta">
+                            <span class="meta-chip">共 {len(data)} 条</span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            if len(data) == 0:
+                st.info("没有找到数据")
+                return
+
+            df = data.copy()
+
+            # 应用格式化函数
+            if format_funcs:
+                for field, formats in format_funcs.items():
+                    if field in df.columns:
+                        if isinstance(formats, dict):
+                            for format_key, format_func in formats.items():
+                                if format_key != 'raw':  # 如果不是 raw，创建新列
+                                    new_col = f"{field}_{format_key}"
+                                    df[new_col] = df[field].apply(format_func)
+                                else:  # 如果是 raw，处理原列
+                                    df[field] = df[field].apply(format_func)
+                        else:
+                            # 处理普通的格式化函数
+                            df[field] = df[field].apply(formats)
+
+            # 如果提供了 columns_config，使用其键的顺序重排列
+            if columns_config:
+                ordered_columns = [col for col in columns_config.keys() if col in df.columns]
+                df = df[ordered_columns]
+
+            # 显示数据框
+            if on_row_select:
+                # 如果有行点击处理函数，则启用行选择功能
+                event = st.dataframe(
+                    df,
+                    column_config=columns_config,
+                    hide_index=False,
+                    use_container_width=True,
+                    on_select="rerun",
+                    selection_mode="single-row"
+                )
+                # 处理选中的行
+                if event and hasattr(event, 'selection') and event.selection.rows:
+                    selected_indices = event.selection.rows
+                    if selected_indices:
+                        # 获取选中的行数据
+                        selected_rows = df.iloc[selected_indices].to_dict('records')
+                        # 调用行点击处理函数
+                        on_row_select(selected_rows)
+            else:
+                # 显示数据框
+                st.dataframe(
+                    df,
+                    column_config=columns_config,
+                    hide_index=False,
+                    use_container_width=True
+                )
+            return
+
+        # 原有的分页逻辑
         # 初始化session_state
         if f"{key_prefix}_current_page" not in st.session_state:
             st.session_state[f"{key_prefix}_current_page"] = 1
