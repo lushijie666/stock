@@ -201,14 +201,9 @@ def show_page(category: Category, t: StockHistoryType):
 
 # 添加行点击处理函数
 def handle_row_click(selected_rows):
-    """
-    处理行点击事件
-    :param selected_rows: 选中的行数据
-    """
     if selected_rows:
         selected_row = selected_rows[0]
         show_detail_dialog(selected_row['code'])
-
 
 def reload(category: Category, t: StockHistoryType, ignore_message: bool = False):
     # 获取选择的日期范围

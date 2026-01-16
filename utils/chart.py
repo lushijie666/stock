@@ -971,78 +971,74 @@ class ChartBuilder:
                 border_color="#ccc",
                 textstyle_opts=opts.TextStyleOpts(color="#000000"),
                 formatter=JsCode(f"""
-                    function(params) {{
-                        if (!params || params.length === 0) return '';
+                        function(params) {{
+                            if (!params || params.length === 0) return '';
 
-                        function formatValue(value) {{
-                            if (value >= 100000000) {{
-                                return (value / 100000000).toFixed(2) + '亿';
-                            }} else if (value >= 10000) {{
-                                return (value / 10000).toFixed(2) + '万';
-                            }} else {{
-                                return value.toLocaleString();
+                            function formatValue(value) {{
+                                if (value >= 100000000) {{
+                                    return (value / 100000000).toFixed(2) + '亿';
+                                }} else if (value >= 10000) {{
+                                    return (value / 10000).toFixed(2) + '万';
+                                }} else {{
+                                    return value.toLocaleString();
+                                }}
                             }}
+                            var dfData = {df_json};
+                            var currentDate = params[0].axisValue;
+                            var result = '<div style="padding:2px; width:200px;"><strong>' + currentDate + '</strong><br/>';
+                            params.forEach(function(item) {{
+                                if (item.seriesName === 'K线') {{
+                                    var index = item.dataIndex;
+                                    var currentData = dfData[index];
+                                    var opening = parseFloat(currentData.opening).toFixed(2);
+                                    var closing = parseFloat(currentData.closing).toFixed(2);
+                                    var lowest = parseFloat(currentData.lowest).toFixed(2);
+                                    var highest = parseFloat(currentData.highest).toFixed(2);
+                                    var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
+                                    var change = parseFloat(currentData.change).toFixed(2) + '%';
+                                    result += '<span style="color:#fa8c16;">开盘价</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
+                                    result += '<span style="color:#52c41a;">收盘价</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
+                                    result += '<span style="color:#13c2c2;">最低价</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
+                                    result += '<span style="color:#f5222d;">最高价</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
+                                    result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
+                                    result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span><br/>';
+                                    
+                                    if (currentData.MACD_DIFF !== undefined) {{
+                                        var diff = currentData.MACD_DIFF.toFixed(3);
+                                        var dea = currentData.MACD_DEA.toFixed(3);
+                                        var hist = currentData.MACD_HIST.toFixed(3);
+                                        result += '<span style="color:#FF6B6B;">MACD DIFF</span><span style="float:right;font-weight:bold;">' + diff + '</span><br/>';
+                                        result += '<span style="color:#4ECDC4;">MACD DEA</span><span style="float:right;font-weight:bold;">' + dea + '</span><br/>';
+                                        result += '<span style="color:#95E1D3;">MACD柱</span><span style="float:right;font-weight:bold;">' + hist + '</span><br/>';
+                                    }}
+                                    if (currentData.RSI6 !== undefined) {{
+                                        var rsi6 = currentData.RSI6.toFixed(2);
+                                        var rsi12 = currentData.RSI12.toFixed(2);
+                                        var rsi24 = currentData.RSI24.toFixed(2);
+                                        result += '<span style="color:#FF6B6B;">RSI6</span><span style="float:right;font-weight:bold;">' + rsi6 + '</span><br/>';
+                                        result += '<span style="color:#FFA500;">RSI12</span><span style="float:right;font-weight:bold;">' + rsi12 + '</span><br/>';
+                                        result += '<span style="color:#9370DB;">RSI24</span><span style="float:right;font-weight:bold;">' + rsi24 + '</span><br/>';
+                                    }}
+                                }} else if (item.seriesName === '成交量') {{
+                                    var index = item.dataIndex;
+                                    var currentData = dfData[index];
+                                    var value = item.value;
+                                    var shouValue = (value / 100).toFixed(0);
+                                    var formattedValue = formatValue(value);
+                                    var formattedShou = formatValue(Number(shouValue));
+                                    var formattedTurnover = formatValue(currentData.turnover_amount);
+                                    var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
+
+                                    result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
+                                    result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
+                                    result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
+                                    result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span><br/>';
+                                }}
+                            }});
+
+                            result += '</div>';
+                            return result;
                         }}
-                        var dfData = {df_json};
-                        var currentDate = params[0].axisValue;
-                        var result = '<div style="padding:5px; width:250px;"><strong>' + currentDate + '</strong><br/>';
-
-                        params.forEach(function(item) {{
-                            if (item.seriesName === 'K线') {{
-                                var index = item.dataIndex;
-                                var currentData = dfData[index];
-                                var opening = parseFloat(currentData.opening).toFixed(2);
-                                var closing = parseFloat(currentData.closing).toFixed(2);
-                                var lowest = parseFloat(currentData.lowest).toFixed(2);
-                                var highest = parseFloat(currentData.highest).toFixed(2);
-                                var changeAmount = parseFloat(currentData.change_amount).toFixed(2);
-                                var change = parseFloat(currentData.change).toFixed(2) + '%';
-                                result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
-                                result += '<span style="color:#fa8c16;">开盘</span> <span style="float:right;font-weight:bold;">' + opening + '</span><br/>';
-                                result += '<span style="color:#52c41a;">收盘</span> <span style="float:right;font-weight:bold;">' + closing + '</span><br/>';
-                                result += '<span style="color:#13c2c2;">最低</span> <span style="float:right;font-weight:bold;">' + lowest + '</span><br/>';
-                                result += '<span style="color:#f5222d;">最高</span> <span style="float:right;font-weight:bold;">' + highest + '</span><br/>';
-                                result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
-                                result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span>';
-                                result += '</div>';
-
-                                // 在K线数据部分添加MACD和RSI
-                                if (currentData.MACD_DIFF != null && !isNaN(currentData.MACD_DIFF)) {{
-                                    result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
-                                    result += '<span style="color:#FF6B6B;">DIFF</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DIFF).toFixed(3) + '</span><br/>';
-                                    result += '<span style="color:#4ECDC4;">DEA</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DEA).toFixed(3) + '</span><br/>';
-                                    result += '<span style="color:#95E1D3;">MACD</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_HIST).toFixed(3) + '</span>';
-                                    result += '</div>';
-                                }}
-
-                                if (currentData.RSI6 != null && !isNaN(currentData.RSI6)) {{
-                                    result += '<div style="padding:2px 0;">';
-                                    result += '<span style="color:#FF6B6B;">RSI6</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI6).toFixed(2) + '</span><br/>';
-                                    result += '<span style="color:#FFA500;">RSI12</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI12).toFixed(2) + '</span><br/>';
-                                    result += '<span style="color:#9370DB;">RSI24</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI24).toFixed(2) + '</span>';
-                                    result += '</div>';
-                                }}
-                            }} else if (item.seriesName === '成交量') {{
-                                var index = item.dataIndex;
-                                var currentData = dfData[index];
-                                var value = item.value;
-                                var shouValue = (value / 100).toFixed(0);
-                                var formattedValue = formatValue(value);
-                                var formattedShou = formatValue(Number(shouValue));
-                                var formattedTurnover = formatValue(currentData.turnover_amount);
-                                var turnoverRatio = parseFloat(currentData.turnover_ratio).toFixed(2) + '%';
-                                result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
-                                result += '<span style="color:#722ed1;">成交量(股)</span> <span style="float:right;font-weight:bold;">' + formattedValue + '</span><br/>';
-                                result += '<span style="color:#722ed1;">成交量(手)</span> <span style="float:right;font-weight:bold;">' + formattedShou + '</span><br/>';
-                                result += '<span style="color:#eb2f96;">成交额</span> <span style="float:right;font-weight:bold;">' + formattedTurnover + '</span><br/>';
-                                result += '<span style="color:#faad14;">换手率</span> <span style="float:right;font-weight:bold;">' + turnoverRatio + '</span>';
-                                result += '</div>';
-                            }}
-                        }});
-
-                        result += '</div>';
-                        return result;
-                    }}
                 """)
             ),
         )

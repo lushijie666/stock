@@ -22,12 +22,21 @@ from utils.trading_signal_analyzer import TradingSignalAnalyzer
 KEY_PREFIX = "stock_chart"
 
 
-@st.dialog("股票图表", width="large")
+@st.dialog("股票图表详情", width="large")
 def show_detail_dialog(stock_code):
     with get_db_session() as session:
         stock = session.query(Stock).filter(Stock.code == stock_code).first()
         if stock:
             show_detail(stock)
+        else:
+            st.error(f"未找到股票代码为 {stock_code} 的股票信息")
+
+@st.dialog("股票图表", width="large")
+def show_chart_dialog(stock_code):
+    with get_db_session() as session:
+        stock = session.query(Stock).filter(Stock.code == stock_code).first()
+        if stock:
+            show_chart(stock)
         else:
             st.error(f"未找到股票代码为 {stock_code} 的股票信息")
 
@@ -71,7 +80,7 @@ def show_chart(stock, t: StockHistoryType):
                """,
         unsafe_allow_html=True
     )
-    df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_chart_data(stock, t)
+    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(stock, t)
 
     st.markdown("""
           <div class="chart-header">
@@ -108,36 +117,23 @@ def show_chart(stock, t: StockHistoryType):
         if 'window_bottom' in pattern:
             marker_data['window_bottom'] = pattern['window_bottom']
         pattern_markers.append(marker_data)
+
     kline_pattern = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, extra_lines=extra_lines, candlestick_patterns=pattern_markers)
 
     # 3. 成交量图
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
 
     # 4. MACD图表
-    macd_data = {}
-    if len(df) > 0:
-        macd_df = calculate_macd(df)
-        macd_data = {
-            'dif': macd_df['DIFF'].tolist(),
-            'dea': macd_df['DEA'].tolist(),
-            'macd': macd_df['MACD_hist'].tolist()
-        }
     macd_chart = None
     if macd_data and 'dif' in macd_data:
         macd_chart = ChartBuilder.create_macd_chart(
             dates,
             macd_data['dif'],
             macd_data['dea'],
-            macd_data['macd']
+            macd_data['hist']
         )
 
     # 5. RSI图表
-    rsi_data = {}
-    if len(df) > 0:
-        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
-        for col in rsi_df.columns:
-            rsi_data[col] = rsi_df[col].tolist()
-
     rsi_chart = None
     if rsi_data:
         rsi_chart = ChartBuilder.create_rsi_chart(dates, rsi_data)
@@ -293,7 +289,25 @@ def _build_stock_chart_data(stock, t: StockHistoryType):
         if len(df) >= 60:
             ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
 
-    return df, dates, k_line_data, volumes, extra_lines, ma_lines
+    macd_data = {}
+    if len(df) > 0:
+        macd_df = calculate_macd(df)
+        macd_data = {
+            'dif': macd_df['DIFF'].tolist(),
+            'dea': macd_df['DEA'].tolist(),
+            'hist': macd_df['MACD_hist'].tolist()
+        }
+        df['MACD_DIFF'] = macd_df['DIFF']
+        df['MACD_DEA'] = macd_df['DEA']
+        df['MACD_HIST'] = macd_df['MACD_hist']
+    rsi_data = {}
+    if len(df) > 0:
+        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
+        for col in rsi_df.columns:
+            df[col] = rsi_df[col]
+            rsi_data[col] = rsi_df[col].tolist()
+
+    return df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data
 
 
 def _build_stock_patterns_info(t: StockHistoryType, df, candlestick_patterns: List[Dict]):
@@ -506,6 +520,8 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             hide_index=True,
             height=min(600, len(singles_df) * 35 + 38)
         )
+
+
 
 def _build_stock_trading_analysis_step1_info(stock, t, signals, stats):
     st.markdown(f"""

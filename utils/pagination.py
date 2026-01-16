@@ -108,7 +108,8 @@ def paginate_dataframe(
         action_config: Optional[ActionConfig] = None,
         title: str = "",
         key_prefix: str = "",
-        on_row_select: Optional[Callable] = None
+        on_row_select: Optional[Callable] = None,
+        data: pd.DataFrame = None
 ) -> None:
     try:
         # 初始化session_state
