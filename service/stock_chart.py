@@ -13,7 +13,7 @@ from utils.chart import ChartBuilder
 from utils.convert import format_dates, format_date_by_type
 from utils.strategy import calculate_macd, calculate_multi_period_rsi
 from utils.candlestick_pattern_detector import CandlestickPatternDetector
-
+from utils.pagination import paginate_dataframe
 
 from utils.db import get_db_session
 from utils.session import get_session_key, SessionKeys
@@ -499,13 +499,13 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
                 """, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # 构建信号数据
     signals_table_data = []
-
-
     for r in signals:
         signals_table_data.append({
+            'stock_code': stock.code,
             '类型': r['show_text'],
-            '分数': {r['score']},
+            '分数': r['score'],
             '日期': format_date_by_type(r['date'], t),
             '收盘价': f"{r['row']['closing']:.2f}",
             '分数构成': '｜'.join(r['score_breakdowns']),
@@ -514,12 +514,33 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
 
     if len(signals_table_data) > 0:
         singles_df = pd.DataFrame(signals_table_data)
-        st.dataframe(
-            singles_df,
-            use_container_width=True,
-            hide_index=True,
-            height=min(600, len(singles_df) * 35 + 38)
+        # 定义列配置（不显示 stock_code 列）
+        columns_config = {
+            '类型': st.column_config.TextColumn('类型', width='small'),
+            '分数': st.column_config.NumberColumn('分数', width='small'),
+            '日期': st.column_config.TextColumn('日期', width='small'),
+            '收盘价': st.column_config.TextColumn('收盘价', width='small'),
+            '分数构成': st.column_config.TextColumn('分数构成', width='medium'),
+            '说明': st.column_config.TextColumn('说明', width='large'),
+        }
+
+        # 定义行选择处理函数
+        def handle_row_select(selected_rows):
+            if selected_rows and len(selected_rows) > 0:
+                row = selected_rows[0]
+                stock_code = row.get('stock_code')
+                if stock_code:
+                    show_chart_dialog(stock_code)
+
+        # 使用 paginate_dataframe 展示数据
+        paginate_dataframe(
+            data=singles_df,
+            columns_config=columns_config,
+            title="",
+            key_prefix=f"{KEY_PREFIX}_{stock.code}_{t}_signals",
+            on_row_select=handle_row_select
         )
+
 
 
 
