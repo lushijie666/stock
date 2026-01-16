@@ -80,10 +80,8 @@ def show_chart(stock, t: StockHistoryType, key_suffix: str = ""):
                """,
         unsafe_allow_html=True
     )
-
-    # 获取数据 - 在对话框中不先渲染日期选择器
-    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(stock, t, key_suffix, render_date_selector=(not key_suffix))
-
+    # 获取数据
+    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(stock, t, key_suffix)
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
@@ -198,10 +196,6 @@ def show_chart(stock, t: StockHistoryType, key_suffix: str = ""):
     # 显示形态信息
     _build_stock_patterns_info(t, df, candlestick_patterns)
 
-    # 在对话框中，将日期选择器放在最后渲染（避免自动聚焦）
-    if key_suffix:
-        _render_date_selector(stock, t, key_suffix)
-
 
 def show_trading_analysis(stock, t: StockHistoryType):
     st.markdown(
@@ -265,8 +259,8 @@ def show_trading_analysis(stock, t: StockHistoryType):
 
 
 
-def _build_stock_chart_data(stock, t: StockHistoryType, key_suffix: str = "", render_date_selector: bool = True):
-    df = _get_stock_history_data(stock, t, key_suffix, render_date_selector)
+def _build_stock_chart_data(stock, t: StockHistoryType, key_suffix: str = ""):
+    df = _get_stock_history_data(stock, t, key_suffix)
     dates = format_dates(df, t)
     k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
     volumes = df['turnover_count'].tolist()
@@ -865,7 +859,7 @@ def _build_stock_trading_analysis_algorithm_info():
                            </div>
                            """, unsafe_allow_html=True)
 
-def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "", render_date_selector: bool = True) -> pd.DataFrame:
+def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "") -> pd.DataFrame:
     model = get_history_model(t)
     try:
         with get_db_session() as session:
@@ -898,28 +892,26 @@ def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "", re
             if end_date_key not in st.session_state:
                 st.session_state[end_date_key] = max_date
 
-            # 只在 render_date_selector 为 True 时渲染日期选择器
-            if render_date_selector:
-                # 添加日期选择器
-                col1, col2 = st.columns(2)
-                with col1:
-                    start_date = st.date_input(
-                        "开始日期",
-                        min_value=min_date,
-                        max_value=max_date,
-                        key=start_date_key
-                    )
-                    if start_date != st.session_state[start_date_key]:
-                        st.session_state[start_date_key] = start_date
-                with col2:
-                    end_date = st.date_input(
-                        "结束日期",
-                        min_value=min_date,
-                        max_value=max_date,
-                        key=end_date_key
-                    )
-                    if end_date != st.session_state[end_date_key]:
-                        st.session_state[end_date_key] = end_date
+            # 添加日期选择器
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input(
+                    "开始日期",
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=start_date_key
+                )
+                if start_date != st.session_state[start_date_key]:
+                    st.session_state[start_date_key] = start_date
+            with col2:
+                end_date = st.date_input(
+                    "结束日期",
+                    min_value=min_date,
+                    max_value=max_date,
+                    key=end_date_key
+                )
+                if end_date != st.session_state[end_date_key]:
+                    st.session_state[end_date_key] = end_date
 
             # 使用 session_state 中的日期值
             start_date = st.session_state[start_date_key]
@@ -948,61 +940,6 @@ def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "", re
     except Exception as e:
         st.error(f"加载数据失败：{str(e)}")
     return pd.DataFrame()
-
-def _render_date_selector(stock, t: StockHistoryType, key_suffix: str):
-    """在对话框中渲染日期选择器（放在页面最后以避免自动聚焦）"""
-    model = get_history_model(t)
-    try:
-        with get_db_session() as session:
-            # 获取该股票的最早和最晚日期
-            date_range = session.query(
-                func.min(model.date),
-                func.max(model.date)
-            ).filter(
-                model.code == stock.code,
-                model.removed == False
-            ).first()
-            if not date_range or None in date_range:
-                return
-            min_date, max_date = date_range
-
-            # 生成 key
-            base_key_prefix = get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}_{stock.code}_{t}',category=stock.category)
-            key_prefix = f"{base_key_prefix}_{key_suffix}"
-            start_date_key = f"{key_prefix}_start_date"
-            end_date_key = f"{key_prefix}_end_date"
-
-            st.markdown("""
-                <div class="chart-header">
-                    <span class="chart-icon">📅</span>
-                    <span class="chart-title">日期范围</span>
-                </div>
-            """, unsafe_allow_html=True)
-
-            # 添加日期选择器
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "开始日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=start_date_key
-                )
-                if start_date != st.session_state[start_date_key]:
-                    st.session_state[start_date_key] = start_date
-                    st.rerun()
-            with col2:
-                end_date = st.date_input(
-                    "结束日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=end_date_key
-                )
-                if end_date != st.session_state[end_date_key]:
-                    st.session_state[end_date_key] = end_date
-                    st.rerun()
-    except Exception as e:
-        pass
 
 def _get_stock_history_lately_max_min(stock, t: StockHistoryType, days: int):
     model = get_history_model(t)
