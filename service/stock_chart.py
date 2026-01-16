@@ -73,6 +73,30 @@ def show_chart(stock, t: StockHistoryType):
     )
     df, dates, k_line_data, volumes, extra_lines, ma_lines = _build_stock_chart_data(stock, t)
 
+    # 先计算MACD和RSI数据并添加到df中，这样tooltip就能访问这些数据
+    # 计算MACD指标并添加到df中
+    macd_data = {}
+    if len(df) > 0:
+        macd_df = calculate_macd(df)
+        # 将MACD数据添加到df中，以便tooltip可以访问
+        df['MACD_DIFF'] = macd_df['DIFF']
+        df['MACD_DEA'] = macd_df['DEA']
+        df['MACD_HIST'] = macd_df['MACD_hist']
+        macd_data = {
+            'dif': macd_df['DIFF'].tolist(),
+            'dea': macd_df['DEA'].tolist(),
+            'macd': macd_df['MACD_hist'].tolist()
+        }
+
+    # 计算RSI指标并添加到df中
+    rsi_data = {}
+    if len(df) > 0:
+        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
+        # 将RSI数据添加到df中，以便tooltip可以访问
+        for col in rsi_df.columns:
+            df[col] = rsi_df[col]
+            rsi_data[col] = rsi_df[col].tolist()
+
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
@@ -114,19 +138,6 @@ def show_chart(stock, t: StockHistoryType):
     volume_bar = ChartBuilder.create_volume_bar(dates, volumes, df)
 
     # 4. MACD图表
-    # 计算MACD指标并添加到df中
-    macd_data = {}
-    if len(df) > 0:
-        macd_df = calculate_macd(df)
-        # 将MACD数据添加到df中，以便tooltip可以访问
-        df['MACD_DIFF'] = macd_df['DIFF']
-        df['MACD_DEA'] = macd_df['DEA']
-        df['MACD_HIST'] = macd_df['MACD_hist']
-        macd_data = {
-            'dif': macd_df['DIFF'].tolist(),
-            'dea': macd_df['DEA'].tolist(),
-            'macd': macd_df['MACD_hist'].tolist()
-        }
     macd_chart = None
     if macd_data and 'dif' in macd_data:
         macd_chart = ChartBuilder.create_macd_chart(
@@ -137,15 +148,6 @@ def show_chart(stock, t: StockHistoryType):
         )
 
     # 5. RSI图表
-    # 计算RSI指标并添加到df中
-    rsi_data = {}
-    if len(df) > 0:
-        rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
-        # 将RSI数据添加到df中，以便tooltip可以访问
-        for col in rsi_df.columns:
-            df[col] = rsi_df[col]
-            rsi_data[col] = rsi_df[col].tolist()
-
     rsi_chart = None
     if rsi_data:
         rsi_chart = ChartBuilder.create_rsi_chart(dates, rsi_data)
