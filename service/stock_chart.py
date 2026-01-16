@@ -36,7 +36,7 @@ def show_chart_dialog(stock_code):
     with get_db_session() as session:
         stock = session.query(Stock).filter(Stock.code == stock_code).first()
         if stock:
-            show_chart(stock)
+            show_chart(stock, StockHistoryType.D)
         else:
             st.error(f"未找到股票代码为 {stock_code} 的股票信息")
 
@@ -523,14 +523,15 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             '分数构成': st.column_config.TextColumn('分数构成', width='medium'),
             '说明': st.column_config.TextColumn('说明', width='large'),
         }
-
         # 定义行选择处理函数
         def handle_row_select(selected_rows):
             if selected_rows and len(selected_rows) > 0:
                 row = selected_rows[0]
                 stock_code = row.get('stock_code')
                 if stock_code:
-                    show_chart_dialog(stock_code)
+                    # 将选中的股票代码存储到 session state
+                    st.session_state[f"{KEY_PREFIX}_selected_stock_code"] = stock_code
+                    st.rerun()
 
         # 使用 paginate_dataframe 展示数据
         paginate_dataframe(
@@ -541,8 +542,13 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             on_row_select=handle_row_select
         )
 
-
-
+        # 检查是否有选中的股票代码，如果有则打开对话框
+        if f"{KEY_PREFIX}_selected_stock_code" in st.session_state:
+            selected_code = st.session_state[f"{KEY_PREFIX}_selected_stock_code"]
+            # 清除选中状态
+            del st.session_state[f"{KEY_PREFIX}_selected_stock_code"]
+            # 打开对话框
+            show_chart_dialog(selected_code)
 
 def _build_stock_trading_analysis_step1_info(stock, t, signals, stats):
     st.markdown(f"""

@@ -127,7 +127,6 @@ def paginate_dataframe(
                     """,
                     unsafe_allow_html=True
                 )
-
             if len(data) == 0:
                 st.info("没有找到数据")
                 return
