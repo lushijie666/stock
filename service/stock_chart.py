@@ -555,25 +555,25 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
         signal_markers = []
         for signal in signals:
             signal_date = format_date_by_type(signal['date'], t)
-            # signal['type'] 是 SignalType 枚举对象，需要使用 .value 获取字符串值
-            signal_type_value = signal['type'].value if hasattr(signal['type'], 'value') else str(signal['type'])
+            # 使用 action 字段判断信号类型
+            signal_action = signal.get('action', '')
             signal_text = signal['show_text']
             signal_score = signal['score']
 
-            # 根据信号类型设置颜色和图标
-            if 'buy' in signal_type_value.lower():
+            # 根据 action 设置颜色和图标
+            if signal_action == 'ENTER_LONG':  # 买入开多
                 color = '#14b143'  # 绿色
                 icon = '▲'
                 offset = [0, 20]  # 标记在K线下方
-            elif 'sell' in signal_type_value.lower():
+            elif signal_action == 'ENTER_SHORT':  # 卖出开空
                 color = '#ef232a'  # 红色
                 icon = '▼'
                 offset = [0, -20]  # 标记在K线上方
-            elif 'exit_long' in signal_type_value.lower():
+            elif signal_action == 'EXIT_LONG':  # 卖出平多
                 color = '#ff9800'  # 橙色
                 icon = '◆'
                 offset = [0, -20]
-            elif 'exit_short' in signal_type_value.lower():
+            elif signal_action == 'EXIT_SHORT':  # 买入平空
                 color = '#2196f3'  # 蓝色
                 icon = '◆'
                 offset = [0, 20]
