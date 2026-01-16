@@ -546,20 +546,10 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             </div>
         """, unsafe_allow_html=True)
 
-        # 准备图表数据
-        dates = format_dates(df, t)
-        k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
-
-        # 计算均线
-        ma_lines = {}
-        if len(df) >= 5:
-            ma_lines['MA5'] = df['closing'].rolling(window=5, min_periods=1).mean().round(2).tolist()
-        if len(df) >= 10:
-            ma_lines['MA10'] = df['closing'].rolling(window=10, min_periods=1).mean().round(2).tolist()
-        if len(df) >= 20:
-            ma_lines['MA20'] = df['closing'].rolling(window=20, min_periods=1).mean().round(2).tolist()
-        if len(df) >= 60:
-            ma_lines['MA60'] = df['closing'].rolling(window=60, min_periods=1).mean().round(2).tolist()
+        # 使用 _build_stock_chart_data 获取所有需要的数据
+        chart_df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(
+            stock, t, key_suffix="signals"
+        )
 
         # 准备买卖点标记
         signal_markers = []
@@ -602,17 +592,7 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             })
 
         # 创建K线图（带买卖点标记）
-        kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, candlestick_patterns=signal_markers)
-
-        # 计算 MACD
-        macd_data = {}
-        if len(df) > 0:
-            macd_df = calculate_macd(df)
-            macd_data = {
-                'dif': macd_df['DIFF'].tolist(),
-                'dea': macd_df['DEA'].tolist(),
-                'hist': macd_df['MACD_hist'].tolist()
-            }
+        kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, chart_df, ma_lines=ma_lines, candlestick_patterns=signal_markers)
 
         # 创建 MACD 图表
         macd_chart = None
@@ -623,13 +603,6 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
                 macd_data['dea'],
                 macd_data['hist']
             )
-
-        # 计算 RSI
-        rsi_data = {}
-        if len(df) > 0:
-            rsi_df = calculate_multi_period_rsi(df, periods=[6, 12, 24])
-            for col in rsi_df.columns:
-                rsi_data[col] = rsi_df[col].tolist()
 
         # 创建 RSI 图表
         rsi_chart = None
