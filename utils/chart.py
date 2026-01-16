@@ -987,11 +987,10 @@ class ChartBuilder:
                         var currentDate = params[0].axisValue;
                         var result = '<div style="padding:5px; width:250px;"><strong>' + currentDate + '</strong><br/>';
 
-                        var dataIndex = params[0].dataIndex;
-                        var currentData = dfData[dataIndex];
-
                         params.forEach(function(item) {{
                             if (item.seriesName === 'K线') {{
+                                var index = item.dataIndex;
+                                var currentData = dfData[index];
                                 var opening = parseFloat(currentData.opening).toFixed(2);
                                 var closing = parseFloat(currentData.closing).toFixed(2);
                                 var lowest = parseFloat(currentData.lowest).toFixed(2);
@@ -1006,7 +1005,26 @@ class ChartBuilder:
                                 result += '<span style="color:#FF3030;">涨跌额</span> <span style="float:right;font-weight:bold;">' + changeAmount + '</span><br/>';
                                 result += '<span style="color:#fa8c16;">涨跌率</span> <span style="float:right;font-weight:bold;">' + change + '</span>';
                                 result += '</div>';
+
+                                // 在K线数据部分添加MACD和RSI
+                                if (currentData.MACD_DIFF != null && !isNaN(currentData.MACD_DIFF)) {{
+                                    result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
+                                    result += '<span style="color:#FF6B6B;">DIFF</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DIFF).toFixed(3) + '</span><br/>';
+                                    result += '<span style="color:#4ECDC4;">DEA</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DEA).toFixed(3) + '</span><br/>';
+                                    result += '<span style="color:#95E1D3;">MACD</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_HIST).toFixed(3) + '</span>';
+                                    result += '</div>';
+                                }}
+
+                                if (currentData.RSI6 != null && !isNaN(currentData.RSI6)) {{
+                                    result += '<div style="padding:2px 0;">';
+                                    result += '<span style="color:#FF6B6B;">RSI6</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI6).toFixed(2) + '</span><br/>';
+                                    result += '<span style="color:#FFA500;">RSI12</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI12).toFixed(2) + '</span><br/>';
+                                    result += '<span style="color:#9370DB;">RSI24</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI24).toFixed(2) + '</span>';
+                                    result += '</div>';
+                                }}
                             }} else if (item.seriesName === '成交量') {{
+                                var index = item.dataIndex;
+                                var currentData = dfData[index];
                                 var value = item.value;
                                 var shouValue = (value / 100).toFixed(0);
                                 var formattedValue = formatValue(value);
@@ -1021,24 +1039,6 @@ class ChartBuilder:
                                 result += '</div>';
                             }}
                         }});
-
-                        // 添加MACD数据 - 使用安全的访问方式
-                        if (currentData && currentData.MACD_DIFF != null && !isNaN(currentData.MACD_DIFF)) {{
-                            result += '<div style="border-bottom:1px solid #ddd; padding:2px 0; margin:2px 0;">';
-                            result += '<span style="color:#FF6B6B;">DIFF</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DIFF).toFixed(3) + '</span><br/>';
-                            result += '<span style="color:#4ECDC4;">DEA</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_DEA).toFixed(3) + '</span><br/>';
-                            result += '<span style="color:#95E1D3;">MACD</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.MACD_HIST).toFixed(3) + '</span>';
-                            result += '</div>';
-                        }}
-
-                        // 添加RSI数据 - 使用安全的访问方式
-                        if (currentData && currentData.RSI6 != null && !isNaN(currentData.RSI6)) {{
-                            result += '<div style="padding:2px 0;">';
-                            result += '<span style="color:#FF6B6B;">RSI6</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI6).toFixed(2) + '</span><br/>';
-                            result += '<span style="color:#FFA500;">RSI12</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI12).toFixed(2) + '</span><br/>';
-                            result += '<span style="color:#9370DB;">RSI24</span> <span style="float:right;font-weight:bold;">' + parseFloat(currentData.RSI24).toFixed(2) + '</span>';
-                            result += '</div>';
-                        }}
 
                         result += '</div>';
                         return result;
