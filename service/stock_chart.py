@@ -81,7 +81,8 @@ def show_chart(stock, t: StockHistoryType, key_suffix: str = ""):
         unsafe_allow_html=True
     )
     # 获取数据
-    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(stock, t, key_suffix)
+    df = _get_stock_history_data(stock, t, key_suffix)
+    df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(df, stock, t, key_suffix)
     st.markdown("""
           <div class="chart-header">
               <span class="chart-icon">🔍</span>
@@ -251,16 +252,12 @@ def show_trading_analysis(stock, t: StockHistoryType):
         # 统计信息
         _build_stock_trading_analysis_analysis_info(stock, t, signals, stats, daily_analysis)
 
-    # 渲染分析结果UI
-    # render_trading_analysis_ui(signals, df, analyzer, stats, daily_analysis)
-
     # 策略算法说明
     _build_stock_trading_analysis_algorithm_info()
 
 
 
-def _build_stock_chart_data(stock, t: StockHistoryType, key_suffix: str = ""):
-    df = _get_stock_history_data(stock, t, key_suffix)
+def _build_stock_chart_data(df, stock, t: StockHistoryType, key_suffix: str = ""):
     dates = format_dates(df, t)
     k_line_data = df[['opening', 'closing', 'lowest', 'highest']].values.tolist()
     volumes = df['turnover_count'].tolist()
@@ -464,6 +461,7 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
                        <span class="chart-title">信号信息</span>
                    </div>
             """, unsafe_allow_html=True)
+    st.caption(f""" 🟡卖出平多、🟠买入平空、🟢买入开多、🔴卖出开空""")
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.markdown(f"""
@@ -515,85 +513,19 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
         })
 
     if len(signals_table_data) > 0:
-        singles_df = pd.DataFrame(signals_table_data)
-        columns_config = {
-            '类型': st.column_config.TextColumn('类型', width='small'),
-            '分数': st.column_config.NumberColumn('分数', width='small'),
-            '日期': st.column_config.TextColumn('日期', width='small'),
-            '收盘价': st.column_config.TextColumn('收盘价', width='small'),
-            '分数构成': st.column_config.TextColumn('分数构成', width='medium'),
-            '说明': st.column_config.TextColumn('说明', width='large'),
-        }
-        # 定义行选择处理函数
-        def handle_row_select(selected_rows):
-            if selected_rows:
-                show_chart_dialog(stock.code)
-
-        # 使用 paginate_dataframe 展示数据
-        paginate_dataframe(
-            data=singles_df,
-            columns_config=columns_config,
-            title="",
-            key_prefix=f"{KEY_PREFIX}_{stock.code}_{t}_signals_chart",
-            on_row_select=handle_row_select
-        )
-
-        # 展示图表（K线图、MACD、RSI）
-        st.markdown("""
-            <div class="chart-header">
-                <span class="chart-icon">📊</span>
-                <span class="chart-title">信号图表</span>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # 使用 _build_stock_chart_data 获取所有需要的数据（不显示日期选择器）
-        chart_df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(
-            stock, t, key_suffix="signals", render_date_selector=False
-        )
-
+        df, dates, k_line_data, volumes, extra_lines, ma_lines, macd_data, rsi_data = _build_stock_chart_data(df, stock, t, key_suffix="signals")
         # 准备买卖点标记
         signal_markers = []
         for signal in signals:
-            signal_date = format_date_by_type(signal['date'], t)
-            # 使用 action 字段判断信号类型
-            signal_action = signal.get('action', '')
-            signal_text = signal['show_text']
-            signal_score = signal['score']
-
-            # 根据 action 设置颜色和图标
-            if signal_action == 'ENTER_LONG':  # 买入开多
-                color = '#14b143'  # 绿色
-                icon = '▲'
-                offset = [0, 20]  # 标记在K线下方
-            elif signal_action == 'ENTER_SHORT':  # 卖出开空
-                color = '#ef232a'  # 红色
-                icon = '▼'
-                offset = [0, -20]  # 标记在K线上方
-            elif signal_action == 'EXIT_LONG':  # 卖出平多
-                color = '#ff9800'  # 橙色
-                icon = '◆'
-                offset = [0, -20]
-            elif signal_action == 'EXIT_SHORT':  # 买入平空
-                color = '#2196f3'  # 蓝色
-                icon = '◆'
-                offset = [0, 20]
-            else:
-                color = '#9e9e9e'  # 灰色
-                icon = '●'
-                offset = [0, 0]
-
             signal_markers.append({
-                'date': signal_date,
-                'value': signal['row']['closing'],
-                'name': f"{signal_text} (分数:{signal_score})",
-                'icon': icon,
-                'color': color,
-                'offset': offset,
-                'description': f"{signal_text}\n分数: {signal_score}\n分数构成: {', '.join(signal['score_breakdowns'])}\n说明: {' | '.join(signal['reasons'])}"
-            })
+                'date': signal['date'],
+                'price': signal['row']['closing'],
+                'action': signal.get('action', ''),
+                'score': signal['score'],
 
+            })
         # 创建K线图（带买卖点标记）
-        kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, chart_df, ma_lines=ma_lines, signals=signal_markers)
+        kline_chart = ChartBuilder.create_kline_chart(dates, k_line_data, df, ma_lines=ma_lines, signals=signal_markers, extra_lines=extra_lines)
 
         # 创建 MACD 图表
         macd_chart = None
@@ -620,7 +552,6 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
                 "legend_height": "310px"
             }
         ]
-
         if macd_chart:
             charts_config.append({
                 "chart": macd_chart,
@@ -629,7 +560,6 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
                 "show_tooltip": True,
                 "legend_height": "200px"
             })
-
         if rsi_chart:
             charts_config.append({
                 "chart": rsi_chart,
@@ -650,6 +580,33 @@ def _build_stock_trading_analysis_single_info(stock, t: StockHistoryType, signal
             height=total_height,
             key=f"{KEY_PREFIX}_{stock.code}_{t}_signals_linked_chart"
         )
+
+        singles_df = pd.DataFrame(signals_table_data)
+        columns_config = {
+            '类型': st.column_config.TextColumn('类型', width='small'),
+            '分数': st.column_config.NumberColumn('分数', width='small'),
+            '日期': st.column_config.TextColumn('日期', width='small'),
+            '收盘价': st.column_config.TextColumn('收盘价', width='small'),
+            '分数构成': st.column_config.TextColumn('分数构成', width='medium'),
+            '说明': st.column_config.TextColumn('说明', width='large'),
+        }
+        # 定义行选择处理函数
+        def handle_row_select(selected_rows):
+            if selected_rows:
+                show_chart_dialog(stock.code)
+
+        # 使用 paginate_dataframe 展示数据
+        paginate_dataframe(
+            data=singles_df,
+            columns_config=columns_config,
+            title="",
+            key_prefix=f"{KEY_PREFIX}_{stock.code}_{t}_signals_chart",
+            on_row_select=handle_row_select
+        )
+
+
+
+
 
 def _build_stock_trading_analysis_step1_info(stock, t, signals, stats):
     st.markdown(f"""
@@ -972,7 +929,7 @@ def _build_stock_trading_analysis_algorithm_info():
                            </div>
                            """, unsafe_allow_html=True)
 
-def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "") -> pd.DataFrame:
+def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "", render_date_selector: bool = True) -> pd.DataFrame:
     model = get_history_model(t)
     try:
         with get_db_session() as session:
@@ -1005,26 +962,27 @@ def _get_stock_history_data(stock, t: StockHistoryType, key_suffix: str = "") ->
             if end_date_key not in st.session_state:
                 st.session_state[end_date_key] = max_date
 
-            # 添加日期选择器
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input(
-                    "开始日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=start_date_key
-                )
-                if start_date != st.session_state[start_date_key]:
-                    st.session_state[start_date_key] = start_date
-            with col2:
-                end_date = st.date_input(
-                    "结束日期",
-                    min_value=min_date,
-                    max_value=max_date,
-                    key=end_date_key
-                )
-                if end_date != st.session_state[end_date_key]:
-                    st.session_state[end_date_key] = end_date
+            if render_date_selector:
+                # 添加日期选择器
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_date = st.date_input(
+                        "开始日期",
+                        min_value=min_date,
+                        max_value=max_date,
+                        key=start_date_key
+                    )
+                    if start_date != st.session_state[start_date_key]:
+                        st.session_state[start_date_key] = start_date
+                with col2:
+                    end_date = st.date_input(
+                        "结束日期",
+                        min_value=min_date,
+                        max_value=max_date,
+                        key=end_date_key
+                    )
+                    if end_date != st.session_state[end_date_key]:
+                        st.session_state[end_date_key] = end_date
 
             # 使用 session_state 中的日期值
             start_date = st.session_state[start_date_key]

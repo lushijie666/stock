@@ -275,121 +275,142 @@ class ChartBuilder:
                 kline = kline.overlap(scatter_bottom)
         # 添加信号
         if signals:
-            buy_signals_strong = []
-            buy_signals_weak = []
-            sell_signals_strong = []
-            sell_signals_weak = []
+            enter_long_signals = []  # 买入开多 (绿色 ▲)
+            enter_short_signals = []  # 卖出开空 (红色 ▼)
+            exit_long_signals = []  # 卖出平多 (橙色 ◆)
+            exit_short_signals = []  # 买入平空 (蓝色 ◆)
 
             for signal in signals:
-
-                # 确保日期格式与 K 线图 x 轴一致
-                if hasattr(signal['date'], 'strftime'):
-                    date_str = signal['date'].strftime('%Y-%m-%d')
-                else:
-                    date_str = str(signal['date'])
-
-                # 确保价格是数值类型
-                price = float(signal['price'])
-                point = [date_str, price, signal]
-
-                if signal['type'] == SignalType.BUY:
-                    if signal['strength'] == SignalStrength.STRONG:
-                        buy_signals_strong.append(point)
+                # 检查是否是新的signal_markers格式
+                if 'action' in signal:  # 新的格式
+                    # 确保日期格式与 K 线图 x 轴一致
+                    if hasattr(signal['date'], 'strftime'):
+                        date_str = signal['date'].strftime('%Y-%m-%d')
                     else:
-                        buy_signals_weak.append(point)
-                elif signal['type'] == SignalType.SELL:
-                    if signal['strength'] == SignalStrength.STRONG:
-                        sell_signals_strong.append(point)
+                        date_str = str(signal['date'])
+
+                    # 使用收盘价作为标记位置
+                    price = float(signal.get('price', 0))
+
+                    # 根据action确定信号类型
+                    action = signal['action']
+                    if action == 'ENTER_LONG':  # 买入开多
+                        enter_long_signals.append([date_str, price, signal])
+                    elif action == 'ENTER_SHORT':  # 卖出开空
+                        enter_short_signals.append([date_str, price, signal])
+                    elif action == 'EXIT_LONG':  # 卖出平多
+                        exit_long_signals.append([date_str, price, signal])
+                    elif action == 'EXIT_SHORT':  # 买入平空
+                        exit_short_signals.append([date_str, price, signal])
+                else:  # 旧的格式
+                    # 确保日期格式与 K 线图 x 轴一致
+                    if hasattr(signal['date'], 'strftime'):
+                        date_str = signal['date'].strftime('%Y-%m-%d')
                     else:
-                        sell_signals_weak.append(point)
+                        date_str = str(signal['date'])
 
-            # 添加强买入信号
-            if buy_signals_strong:
-                scatter_buy_strong = (
-                    Scatter()
-                    .add_xaxis([p[0] for p in buy_signals_strong])
-                    .add_yaxis(
-                        series_name="MB-买入(强)",
-                        y_axis=[p[1] for p in buy_signals_strong],
-                        symbol_size=10,
-                        symbol='triangle',  # 使用三角形符号更明显
-                        itemstyle_opts=opts.ItemStyleOpts(color='#8B0000'),
-                        label_opts=opts.LabelOpts(
-                            is_show=True,
-                            position="top",
-                            formatter="MB\n(强)",
-                            font_size=10,
-                            color='#8B0000',
-                        )
-                    )
-                )
-                kline = kline.overlap(scatter_buy_strong)
+                    # 确保价格是数值类型
+                    price = float(signal['price'])
+                    point = [date_str, price, signal]
 
-            # 添加弱买入信号
-            if buy_signals_weak:
-                scatter_buy_weak = (
-                    Scatter()
-                    .add_xaxis([p[0] for p in buy_signals_weak])
-                    .add_yaxis(
-                        series_name="MB-买入(弱)",
-                        y_axis=[p[1] for p in buy_signals_weak],
-                        symbol_size=10,
-                        symbol='triangle',
-                        itemstyle_opts=opts.ItemStyleOpts(color='#FF7F7F'),
-                        label_opts=opts.LabelOpts(
-                            is_show=True,
-                            position="top",
-                            formatter="MB\n(弱)",
-                            font_size=10,
-                            color='#FF7F7F',
-                        )
-                    )
-                )
-                kline = kline.overlap(scatter_buy_weak)
+                    if signal['type'] == SignalType.BUY:
+                        if signal['strength'] == SignalStrength.STRONG:
+                            enter_long_signals.append(point)  # 强买入作为买入开多
+                        else:
+                            enter_long_signals.append(point)  # 弱买入作为买入开多
+                    elif signal['type'] == SignalType.SELL:
+                        if signal['strength'] == SignalStrength.STRONG:
+                            enter_short_signals.append(point)  # 强卖出作为卖出开空
+                        else:
+                            enter_short_signals.append(point)  # 弱卖出作为卖出开空
 
-            # 添加强卖出信号
-            if sell_signals_strong:
-                scatter_sell_strong = (
+            # 添加买入开多信号 (绿色 🟢 )
+            if enter_long_signals:
+                scatter_enter_long = (
                     Scatter()
-                    .add_xaxis([p[0] for p in sell_signals_strong])
+                    .add_xaxis([p[0] for p in enter_long_signals])
                     .add_yaxis(
-                        series_name="MS-卖出(强)",
-                        y_axis=[p[1] for p in sell_signals_strong],
+                        series_name="买入开多",
+                        y_axis=[p[1] for p in enter_long_signals],
                         symbol_size=10,
-                        symbol='diamond',  # 使用菱形符号
-                        itemstyle_opts=opts.ItemStyleOpts(color='#006400'),
+                        symbol='circle',
+                        itemstyle_opts=opts.ItemStyleOpts(color='#00C853'),  # 绿色
                         label_opts=opts.LabelOpts(
-                            is_show=True,
+                            is_show=False,
                             position="bottom",
-                            formatter="MS\n(强)",
-                            font_size=10,
-                            color='#006400'
+                            formatter="●",
+                            font_size=12,
+                            color='#00C853',
                         )
                     )
                 )
-                kline = kline.overlap(scatter_sell_strong)
+                kline = kline.overlap(scatter_enter_long)
 
-            # 添加弱卖出信号
-            if sell_signals_weak:
-                scatter_sell_weak = (
+            # 添加卖出开空信号 (红色 🔴 )
+            if enter_short_signals:
+                scatter_enter_short = (
                     Scatter()
-                    .add_xaxis([p[0] for p in sell_signals_weak])
+                    .add_xaxis([p[0] for p in enter_short_signals])
                     .add_yaxis(
-                        series_name="MS-卖出(弱)",
-                        y_axis=[p[1] for p in sell_signals_weak],
+                        series_name="卖出开空",
+                        y_axis=[p[1] for p in enter_short_signals],
                         symbol_size=10,
-                        symbol='diamond',
-                        itemstyle_opts=opts.ItemStyleOpts(color='#90EE90'),
+                        symbol='circle',
+                        itemstyle_opts=opts.ItemStyleOpts(color='#FF3B30'),  # 红色
                         label_opts=opts.LabelOpts(
-                            is_show=True,
-                            position="bottom",
-                            formatter="MS\n(弱)",
-                            font_size=10,
-                            color='#90EE90'
+                            is_show=False,
+                            position="top",
+                            formatter="●",
+                            font_size=12,
+                            color='#FF3B30',
                         )
                     )
                 )
-                kline = kline.overlap(scatter_sell_weak)
+                kline = kline.overlap(scatter_enter_short)
+
+            # 添加卖出平多信号 (黄色 🟡)
+            if exit_long_signals:
+                scatter_exit_long = (
+                    Scatter()
+                    .add_xaxis([p[0] for p in exit_long_signals])
+                    .add_yaxis(
+                        series_name="卖出平多",
+                        y_axis=[p[1] for p in exit_long_signals],
+                        symbol_size=10,
+                        symbol='circle',
+                        itemstyle_opts=opts.ItemStyleOpts(color='#FFD700'),
+                        label_opts=opts.LabelOpts(
+                            is_show=False,
+                            position="top",
+                            formatter="●",
+                            font_size=12,
+                            color='#FFD700',
+                        )
+                    )
+                )
+                kline = kline.overlap(scatter_exit_long)
+
+            # 添加买入平空信号 (橙色 🟠)
+            if exit_short_signals:
+                scatter_exit_short = (
+                    Scatter()
+                    .add_xaxis([p[0] for p in exit_short_signals])
+                    .add_yaxis(
+                        series_name="买入平空",
+                        y_axis=[p[1] for p in exit_short_signals],
+                        symbol_size=10,
+                        symbol='circle',
+                        itemstyle_opts=opts.ItemStyleOpts(color='#FF9800'),
+                        label_opts=opts.LabelOpts(
+                            is_show=False,
+                            position="bottom",
+                            formatter="●",
+                            font_size=12,
+                            color='#FF9800',
+                        )
+                    )
+                )
+                kline = kline.overlap(scatter_exit_short)
 
         # 添加蜡烛图形态标记（通用化处理）
         if candlestick_patterns:

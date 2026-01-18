@@ -291,7 +291,10 @@ def show_manual_sync_dashboard():
                         "最近30天": 30,
                         "最近90天": 90,
                         "最近1年": 365,
-                        "最近2年": 730
+                        "最近2年": 730,
+                        "从2025-01-01开始": (today_date - date(2025, 1, 1)).days,
+                        "从2024-01-01开始": (today_date - date(2024, 1, 1)).days,
+                        "从2023-01-01开始": (today_date - date(2023, 1, 1)).days,
                     }
                     selected_range = st.selectbox(
                         "请选择同步几天",
