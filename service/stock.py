@@ -473,10 +473,44 @@ def fetch(category: Category) -> list:
             logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
             df = fetch_func()
             logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, 共 {len(df)} 条记录")
+
+            # 为A股获取额外的详情数据
+            stock_individual_info = {}
+            stock_profile_info = {}
+
+            if category in [Category.A_SH, Category.A_SZ, Category.A_BJ]:
+                try:
+                    logging.info(f"开始获取[{KEY_PREFIX}]个股详情数据 (stock_individual_info_em)...")
+                    individual_df = ak.stock_individual_info_em(symbol="全部A股")
+                    if individual_df is not None and not individual_df.empty:
+                        # 使用股票代码作为key建立映射
+                        for _, info_row in individual_df.iterrows():
+                            stock_code = str(info_row.get("代码", "")).strip()
+                            if stock_code:
+                                stock_individual_info[stock_code] = info_row
+                        logging.info(f"成功获取个股详情数据，共 {len(stock_individual_info)} 条")
+                except Exception as e:
+                    logging.error(f"获取stock_individual_info_em数据失败: {str(e)}")
+
+                try:
+                    logging.info(f"开始获取[{KEY_PREFIX}]公司概况数据 (stock_profile_cninfo)...")
+                    profile_df = ak.stock_profile_cninfo()
+                    if profile_df is not None and not profile_df.empty:
+                        # 使用股票代码作为key建立映射
+                        for _, profile_row in profile_df.iterrows():
+                            stock_code = str(profile_row.get("证券代码", "")).strip()
+                            if stock_code:
+                                stock_profile_info[stock_code] = profile_row
+                        logging.info(f"成功获取公司概况数据，共 {len(stock_profile_info)} 条")
+                except Exception as e:
+                    logging.error(f"获取stock_profile_cninfo数据失败: {str(e)}")
+
             data = []
             for i, row in df.iterrows():
                 try:
                     code = get_column_value(row, "code")
+
+                    # 基础字段
                     s = Stock(
                         category=Category.from_stock_code(code),
                         code=code,
@@ -487,6 +521,90 @@ def fetch(category: Category) -> list:
                         flow_capital=clean_number_value(get_column_value(row, "flow_capital")),
                         industry=row.get("所属行业"),
                     )
+
+                    # 合并stock_individual_info_em的数据
+                    if code in stock_individual_info:
+                        individual_row = stock_individual_info[code]
+                        # 获取"行业"字段
+                        industry_from_individual = individual_row.get("行业", "")
+                        # 获取"总市值"字段
+                        total_market_value = individual_row.get("总市值", "")
+
+                        # 合并行业字段（拼接）
+                        industries = []
+                        if s.industry:
+                            industries.append(str(s.industry))
+                        if industry_from_individual:
+                            industries.append(str(industry_from_individual))
+                        s.industry = " / ".join(industries) if industries else None
+
+                        # 设置总市值
+                        s.total_market_value = str(total_market_value) if total_market_value else None
+
+                    # 合并stock_profile_cninfo的数据
+                    if code in stock_profile_info:
+                        profile_row = stock_profile_info[code]
+
+                        # 使用"公司名称"更新full_name（如果存在）
+                        company_name = profile_row.get("公司名称", "")
+                        if company_name and not s.full_name:
+                            s.full_name = str(company_name)
+
+                        # 使用"上市日期"更新ipo_at（如果存在且原值为空）
+                        ipo_date = profile_row.get("上市日期", "")
+                        if ipo_date and pd.notna(ipo_date):
+                            try:
+                                if isinstance(ipo_date, str):
+                                    s.ipo_at = pd.to_datetime(ipo_date)
+                                elif isinstance(ipo_date, pd.Timestamp):
+                                    s.ipo_at = ipo_date.to_pydatetime()
+                            except Exception as date_error:
+                                logging.warning(f"解析上市日期失败: {ipo_date}, 错误: {str(date_error)}")
+
+                        # 获取"入选指数"
+                        selected_indices = profile_row.get("入选指数", "")
+                        s.selected_indices = str(selected_indices) if selected_indices else None
+
+                        # 合并行业字段（拼接）
+                        industry_from_profile = profile_row.get("所属行业", "")
+                        if industry_from_profile:
+                            if s.industry:
+                                # 避免重复
+                                existing_industries = set(s.industry.split(" / "))
+                                if str(industry_from_profile) not in existing_industries:
+                                    s.industry = f"{s.industry} / {industry_from_profile}"
+                            else:
+                                s.industry = str(industry_from_profile)
+
+                        # 获取"成立日期"
+                        founded_date = profile_row.get("成立日期", "")
+                        if founded_date and pd.notna(founded_date):
+                            try:
+                                if isinstance(founded_date, str):
+                                    s.founded_at = pd.to_datetime(founded_date)
+                                elif isinstance(founded_date, pd.Timestamp):
+                                    s.founded_at = founded_date.to_pydatetime()
+                            except Exception as date_error:
+                                logging.warning(f"解析成立日期失败: {founded_date}, 错误: {str(date_error)}")
+
+                        # 获取"主营业务"
+                        main_business = profile_row.get("主营业务", "")
+                        s.main_business = str(main_business) if main_business else None
+
+                        # 获取"经营范围"
+                        business_scope = profile_row.get("经营范围", "")
+                        s.business_scope = str(business_scope) if business_scope else None
+
+                        # 合并地址字段（注册地址和办公地址）
+                        registered_address = profile_row.get("注册地址", "")
+                        office_address = profile_row.get("办公地址", "")
+                        addresses = []
+                        if registered_address:
+                            addresses.append(f"注册地址: {registered_address}")
+                        if office_address:
+                            addresses.append(f"办公地址: {office_address}")
+                        s.address = "; ".join(addresses) if addresses else None
+
                     s.pinyin = s.generate_pinyin()
                     logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {s}")
                     data.append(s)

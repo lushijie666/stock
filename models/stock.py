@@ -35,6 +35,12 @@ class Stock(Base):
     industry = Column(String(256), default=0) # 行业
     is_followed = Column(Boolean, default=False) # 是否关注
     followed_at = Column(DateTime) # 关注时间
+    founded_at = Column(DateTime) # 成立日期
+    main_business = Column(String(1024)) # 主营业务
+    business_scope = Column(String(2048)) # 经营范围
+    selected_indices = Column(String(512)) # 入选指数
+    address = Column(String(512)) # 地址（包括注册地址和办公地址）
+    total_market_value = Column(String(128)) # 总市值
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -42,9 +48,12 @@ class Stock(Base):
 
     def __repr__(self):
         return (f"Stock(code='{self.code}', name='{self.name}', category={self.category}, "
-                f"full_name='{self.full_name}', ipo_at={self.ipo_at}, "
+                f"full_name='{self.full_name}', ipo_at={self.ipo_at}, founded_at={self.founded_at}, "
                 f"total_capital={self.total_capital}, flow_capital={self.flow_capital}, "
-                f"industry='{self.industry}', pinyin='{self.pinyin}')")
+                f"industry='{self.industry}', total_market_value='{self.total_market_value}', "
+                f"main_business='{self.main_business}', business_scope='{self.business_scope}', "
+                f"selected_indices='{self.selected_indices}', address='{self.address}', "
+                f"pinyin='{self.pinyin}')")
 
     def generate_pinyin(self):
         if self.category == Category.US_XX:
