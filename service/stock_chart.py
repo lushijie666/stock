@@ -202,7 +202,7 @@ def show_trading_analysis(stock, t: StockHistoryType):
     st.markdown(
         f"""
                <div class="table-header">
-                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 买卖点分析</div>
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{stock.industry}] - [{t.text}] - 买卖点分析</div>
                </div>
                """,
         unsafe_allow_html=True
