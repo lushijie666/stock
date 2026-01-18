@@ -31,11 +31,11 @@ class Pages:
             handler=stock.chartIndex,
             icon="heart-fill",
         ),
-        "买卖记录": PageConfig(
-            title="买卖记录",
-            handler=stock_trade.index,
-            icon="clipboard2-data",
-        ),
+        #"买卖记录": PageConfig(
+        #    title="买卖记录",
+        #    handler=stock_trade.index,
+        #    icon="clipboard2-data",
+        #),
         "策略指南": PageConfig(
             title="策略学习",
             handler=strategy_guide.index,

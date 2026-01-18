@@ -1,7 +1,7 @@
 # 股票
 
 from functools import partial
-from typing import  Dict, Any, List
+from typing import Dict, Any, List
 import akshare as ak
 import streamlit_echarts
 import logging
@@ -14,14 +14,15 @@ from service.stock_chart import KEY_PREFIX as chartKP, show_detail_dialog
 from enums.category import Category
 from models.stock import Stock
 from utils.chart import ChartBuilder
-from utils.convert import get_column_value, clean_number_value,clean_name
+from utils.convert import get_column_value, clean_number_value, clean_name, safe_string_assign, format_date_by_type, \
+    format_date
 from utils.db import get_db_session
 from utils.fetch_handler import create_reload_handler
 from utils.message import show_message
 from utils.pagination import paginate_dataframe, SearchConfig, SearchField, ActionConfig, ActionButton
 from utils.session import get_session_key, SessionKeys
 from utils.stock_selector import create_stock_selector, handle_error, handle_not_found
-from utils.table import  format_pinyin_short
+from utils.table import format_pinyin_short
 
 KEY_PREFIX = "stock"
 
@@ -34,6 +35,7 @@ def get_codes(category: Category) -> List[str]:
         logging.error(f"获取股票失败: {str(e)}")
         return []
 
+
 def get_followed_codes(category: Category) -> List[str]:
     try:
         with get_db_session() as session:
@@ -41,6 +43,7 @@ def get_followed_codes(category: Category) -> List[str]:
     except Exception as e:
         logging.error(f"获取股票失败: {str(e)}")
         return []
+
 
 def show_category_pie_chart():
     try:
@@ -102,7 +105,7 @@ def show_page(category: Category):
                     'name': st.column_config.TextColumn('股票名称', help="股票名称"),
                     'pinyin': st.column_config.TextColumn('股票简拼', help="股票拼音简称"),
                     'full_name': st.column_config.TextColumn('全称', help="公司名称"),
-                    'ipo_at': st.column_config.DatetimeColumn('上市时间', help="上市时间"),
+                    'ipo_at': st.column_config.DateColumn('上市时间', help="上市时间"),
                     'total_capital': st.column_config.TextColumn('总股本(股)', help="总股本"),
                     'flow_capital': st.column_config.TextColumn('流通股本(股)', help="流通股本"),
                     'industry': st.column_config.TextColumn('行业', help="行业"),
@@ -110,7 +113,7 @@ def show_page(category: Category):
                 },
                 # 格式化函数
                 format_funcs={
-                    'pinyin': format_pinyin_short,
+                    'pinyin': format_pinyin_short
                 },
                 search_config=SearchConfig(
                     fields=[
@@ -119,7 +122,7 @@ def show_page(category: Category):
                             label="股票代码/名称/简拼",
                             type="text",
                             placeholder="输入股票代码/名称/简拼",
-                            search_fields = ["code", "name", "pinyin"]
+                            search_fields=["code", "name", "pinyin"]
                         )
                     ],
                     layout=[1, 1, 1, 1]
@@ -135,7 +138,7 @@ def show_page(category: Category):
                     ],
                     layout=[1, 0.2]  # 每个按钮占一列
                 ),
-                title= category.fullText,
+                title=category.fullText,
                 key_prefix=get_session_key(SessionKeys.PAGE, prefix=f'{KEY_PREFIX}', category=category),
             )
     except Exception as e:
@@ -279,7 +282,7 @@ def show_follow_page(category: Category):
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            
+
             # 搜索框
             search_key = f"follow_search_{category.value}"
             search_term = st.text_input(
@@ -288,7 +291,7 @@ def show_follow_page(category: Category):
                 placeholder="输入股票代码/名称/简拼",
                 label_visibility="collapsed"
             )
-            
+
             # 根据搜索词过滤股票
             if search_term:
                 search_term_lower = search_term.lower()
@@ -299,15 +302,15 @@ def show_follow_page(category: Category):
                         (stock.full_name and search_term_lower in stock.full_name.lower()))
                 ]
                 stocks = filtered_stocks
-                
+
                 if not filtered_stocks:
                     st.info(f"未找到包含 '{search_term}' 的股票")
                     return
-            
+
             # 显示搜索结果数量
             if search_term:
                 st.caption(f"找到 {len(stocks)} 只股票")
-            
+
             # 使用网格布局，每行显示多个股票卡片
             for i in range(0, len(stocks), 3):
                 cols = st.columns(3)
@@ -315,7 +318,8 @@ def show_follow_page(category: Category):
                     if i + j < len(stocks):
                         stock = stocks[i + j]
                         with col:
-                            followed_time = stock.followed_at.strftime('%Y-%m-%d %H:%M:%S') if stock.followed_at else '-'
+                            followed_time = stock.followed_at.strftime(
+                                '%Y-%m-%d %H:%M:%S') if stock.followed_at else '-'
                             ipo_time = stock.ipo_at.strftime('%Y-%m-%d') if stock.ipo_at else '-'
                             card_html = f"""
                             <div class="stock-card" style="border-left: 4px solid #9c27b0;">
@@ -353,7 +357,8 @@ def show_follow_page(category: Category):
                                     remove_follow(category, stock.code)
                                     st.rerun()
                             with col2:
-                                if st.button("股票图表", key=f"kline_{stock.code}", type="primary", use_container_width=True):
+                                if st.button("股票图表", key=f"kline_{stock.code}", type="primary",
+                                             use_container_width=True):
                                     current_stock_key = get_session_key(
                                         SessionKeys.CURRENT_STOCK,
                                         prefix=chartKP,
@@ -363,7 +368,8 @@ def show_follow_page(category: Category):
                                     st.session_state.selected_page = "股票图表"
                                     st.rerun()
                             with col3:
-                                if st.button("买卖记录", key=f"trade_{stock.code}", type="primary", use_container_width=True):
+                                if st.button("买卖记录", key=f"trade_{stock.code}", type="primary",
+                                             use_container_width=True):
                                     current_stock_key = get_session_key(
                                         SessionKeys.CURRENT_STOCK,
                                         prefix=chartKP,
@@ -395,7 +401,8 @@ def show_add_follow(category: Category):
         # 添加确定和取消按钮
         col1, = st.columns([1])  # 调整按钮布局
         with col1:
-            if st.button("确定", key=f'confirm_follow_{KEY_PREFIX}_{category.value}', type="primary", use_container_width=True):
+            if st.button("确定", key=f'confirm_follow_{KEY_PREFIX}_{category.value}', type="primary",
+                         use_container_width=True):
                 if stock_code := st.session_state.get(selected_stock_key):
                     add_follow(category, stock_code)
                     # 清理状态并刷新
@@ -422,6 +429,7 @@ def add_follow(category: Category, stock_code: str):
     except Exception as e:
         show_message(f"添加关注失败：{str(e)}", type="error")
 
+
 def remove_follow(category: Category, stock_code: str):
     try:
         with get_db_session() as session:
@@ -440,6 +448,7 @@ def remove_follow(category: Category, stock_code: str):
     except Exception as e:
         show_message(f"取消关注失败：{str(e)}", type="error")
 
+
 def reload(category: Category):
     """
     刷新股票数据
@@ -447,10 +456,12 @@ def reload(category: Category):
     Args:
         category: 股票分类
     """
+
     def build_filter(args: Dict[str, Any], session: Session) -> List:
         return [
             Stock.category == category,
         ]
+
     history_handler = create_reload_handler(
         model=Stock,
         fetch_func=fetch,
@@ -461,224 +472,13 @@ def reload(category: Category):
     )
     return history_handler.refresh(category=category)
 
+
 def fetch(category: Category) -> list:
-    # 拉取 https://akshare.akfamily.xyz/data/stock/stock.html#id11
-    fetch_functions = {
-        Category.A_SH: partial(ak.stock_info_sh_name_code, symbol="主板A股"),
-        Category.A_SZ: partial(ak.stock_info_sz_name_code, symbol="A股列表"),
-        Category.A_BJ: partial(ak.stock_info_bj_name_code),
-    }
-    try:
-        if fetch_func := fetch_functions.get(category):
-            logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
-            df = fetch_func()
-            logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, 共 {len(df)} 条记录")
-
-            # 为A股获取额外的详情数据
-            stock_individual_info = {}
-            stock_profile_info = {}
-
-            if category in [Category.A_SH, Category.A_SZ, Category.A_BJ]:
-                try:
-                    logging.info(f"开始获取[{KEY_PREFIX}]个股详情数据 (stock_individual_info_em)...")
-                    individual_df = ak.stock_individual_info_em(symbol="全部A股")
-                    if individual_df is not None and not individual_df.empty:
-                        # 使用股票代码作为key建立映射
-                        for _, info_row in individual_df.iterrows():
-                            stock_code = str(info_row.get("代码", "")).strip()
-                            if stock_code:
-                                stock_individual_info[stock_code] = info_row
-                        logging.info(f"成功获取个股详情数据，共 {len(stock_individual_info)} 条")
-                except Exception as e:
-                    logging.error(f"获取stock_individual_info_em数据失败: {str(e)}")
-
-                try:
-                    logging.info(f"开始获取[{KEY_PREFIX}]公司概况数据 (stock_profile_cninfo)...")
-                    profile_df = ak.stock_profile_cninfo()
-                    if profile_df is not None and not profile_df.empty:
-                        # 使用股票代码作为key建立映射
-                        for _, profile_row in profile_df.iterrows():
-                            stock_code = str(profile_row.get("证券代码", "")).strip()
-                            if stock_code:
-                                stock_profile_info[stock_code] = profile_row
-                        logging.info(f"成功获取公司概况数据，共 {len(stock_profile_info)} 条")
-                except Exception as e:
-                    logging.error(f"获取stock_profile_cninfo数据失败: {str(e)}")
-
-            data = []
-            for i, row in df.iterrows():
-                try:
-                    code = get_column_value(row, "code")
-
-                    # 基础字段
-                    s = Stock(
-                        category=Category.from_stock_code(code),
-                        code=code,
-                        name=clean_name(get_column_value(row, "name")),
-                        full_name=row.get("公司全称"),
-                        ipo_at=get_column_value(row, "ipo_at"),
-                        total_capital=clean_number_value(get_column_value(row, "total_capital")),
-                        flow_capital=clean_number_value(get_column_value(row, "flow_capital")),
-                        industry=row.get("所属行业"),
-                    )
-
-                    # 合并stock_individual_info_em的数据
-                    if code in stock_individual_info:
-                        individual_row = stock_individual_info[code]
-                        # 获取"行业"字段
-                        industry_from_individual = individual_row.get("行业", "")
-                        # 获取"总市值"字段
-                        total_market_value = individual_row.get("总市值", "")
-
-                        # 合并行业字段（拼接）
-                        industries = []
-                        if s.industry:
-                            industries.append(str(s.industry))
-                        if industry_from_individual:
-                            industries.append(str(industry_from_individual))
-                        s.industry = " / ".join(industries) if industries else None
-
-                        # 设置总市值
-                        s.total_market_value = str(total_market_value) if total_market_value else None
-
-                    # 合并stock_profile_cninfo的数据
-                    if code in stock_profile_info:
-                        profile_row = stock_profile_info[code]
-
-                        # 使用"公司名称"更新full_name（如果存在）
-                        company_name = profile_row.get("公司名称", "")
-                        if company_name and not s.full_name:
-                            s.full_name = str(company_name)
-
-                        # 使用"上市日期"更新ipo_at（如果存在且原值为空）
-                        ipo_date = profile_row.get("上市日期", "")
-                        if ipo_date and pd.notna(ipo_date):
-                            try:
-                                if isinstance(ipo_date, str):
-                                    s.ipo_at = pd.to_datetime(ipo_date)
-                                elif isinstance(ipo_date, pd.Timestamp):
-                                    s.ipo_at = ipo_date.to_pydatetime()
-                            except Exception as date_error:
-                                logging.warning(f"解析上市日期失败: {ipo_date}, 错误: {str(date_error)}")
-
-                        # 获取"入选指数"
-                        selected_indices = profile_row.get("入选指数", "")
-                        s.selected_indices = str(selected_indices) if selected_indices else None
-
-                        # 合并行业字段（拼接）
-                        industry_from_profile = profile_row.get("所属行业", "")
-                        if industry_from_profile:
-                            if s.industry:
-                                # 避免重复
-                                existing_industries = set(s.industry.split(" / "))
-                                if str(industry_from_profile) not in existing_industries:
-                                    s.industry = f"{s.industry} / {industry_from_profile}"
-                            else:
-                                s.industry = str(industry_from_profile)
-
-                        # 获取"成立日期"
-                        founded_date = profile_row.get("成立日期", "")
-                        if founded_date and pd.notna(founded_date):
-                            try:
-                                if isinstance(founded_date, str):
-                                    s.founded_at = pd.to_datetime(founded_date)
-                                elif isinstance(founded_date, pd.Timestamp):
-                                    s.founded_at = founded_date.to_pydatetime()
-                            except Exception as date_error:
-                                logging.warning(f"解析成立日期失败: {founded_date}, 错误: {str(date_error)}")
-
-                        # 获取"主营业务"
-                        main_business = profile_row.get("主营业务", "")
-                        s.main_business = str(main_business) if main_business else None
-
-                        # 获取"经营范围"
-                        business_scope = profile_row.get("经营范围", "")
-                        s.business_scope = str(business_scope) if business_scope else None
-
-                        # 合并地址字段（注册地址和办公地址）
-                        registered_address = profile_row.get("注册地址", "")
-                        office_address = profile_row.get("办公地址", "")
-                        addresses = []
-                        if registered_address:
-                            addresses.append(f"注册地址: {registered_address}")
-                        if office_address:
-                            addresses.append(f"办公地址: {office_address}")
-                        s.address = "; ".join(addresses) if addresses else None
-
-                    s.pinyin = s.generate_pinyin()
-                    logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {s}")
-                    data.append(s)
-                except Exception as row_error:
-                    logging.error(f"获取[{KEY_PREFIX}]到的数据异常, 信息: {row}, 错误: {str(row_error)}")
-                    continue
-            return data
-        # 处理美股数据
-        elif category == Category.US_XX:
-            logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
-            data = []  # 在循环外初始化，收集所有分类的数据
-            for symbol in [
-                "科技类",
-                "金融类",
-                "医药食品类",
-                "媒体类",
-                "汽车能源类",
-                "制造零售类",
-            ]:
-                df = ak.stock_us_famous_spot_em(symbol=symbol)
-                logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, symbol: {symbol}, 共 {len(df)} 条记录")
-                for i, row in df.iterrows():
-                    try:
-                        raw_code = row.get("代码", "")
-                        if not raw_code or pd.isna(raw_code):
-                            logging.warning(f"跳过无效美股数据，第{i}行，代码为空")
-                            continue
-
-                        # 提取前缀和代码
-                        if '.' in str(raw_code):
-                            prefix, code = str(raw_code).split('.', 1)
-                        else:
-                            prefix = ""
-                            code = str(raw_code)
-
-                        # 添加数据验证，跳过空代码或无效数据
-                        if not code or code.strip() == '':
-                            logging.warning(f"跳过无效美股数据，第{i}行，代码为空")
-                            continue
-
-                        # 检查是否已存在相同代码的数据（避免重复）
-                        if any(existing_stock.code == code for existing_stock in data):
-                            logging.warning(f"跳过重复美股数据，代码: {code}")
-                            continue
-
-                        name = row.get("名称", "")
-                        if not name or pd.isna(name):
-                            logging.warning(f"跳过无效美股数据，第{i}行，名称为空")
-                            continue
-
-                        # 将原始名称和前缀保存到 full_name 中
-                        full_name = f"{name}({prefix})" if prefix else str(name)
-
-                        s = Stock(
-                            category=category,
-                            code=code,
-                            name=clean_name(str(name)),
-                            full_name=full_name,  # 保存前缀信息，格式：名称(前缀)
-                            ipo_at=None,
-                            total_capital=None,
-                            flow_capital=None,
-                            industry=symbol,  # 使用美股分类作为行业
-                        )
-                        s.pinyin = s.generate_pinyin()
-                        logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {s}")
-                        data.append(s)
-                    except Exception as row_error:
-                        logging.error(f"获取[{KEY_PREFIX}]到的数据异常, 信息: {row}, 错误: {str(row_error)}")
-                        continue
-            return data
-        return None
-    except Exception as e:
-        logging.error(f"获取[{KEY_PREFIX}]到的数据异常: {str(e)}")
-        return None
+    if category in [Category.A_SH, Category.A_SZ, Category.A_BJ]:
+        return _fetch_a(category)
+    elif category == Category.US_XX:
+        return _fetch_us(category)
+    return None
 
 
 def get_total_stocks_count():
@@ -712,17 +512,247 @@ def sync() -> Dict[str, int]:
     logging.info(f"开始同步{KEY_PREFIX}数据")
     categories = Category.get_all()
     for category in categories:
-        #show_message(f"正在处理分类: {category.fullText}", type="warning")
+        # show_message(f"正在处理分类: {category.fullText}", type="warning")
         try:
             reload(category)
             success_count += 1
-            #show_message(f"分类: {category.fullText} 处理完成", type="success")
+            # show_message(f"分类: {category.fullText} 处理完成", type="success")
         except Exception as e:
             failed_count += 1
-            #show_message(f"分类: {category.fullText} 处理时出错: {str(e)}", type="error")
+            # show_message(f"分类: {category.fullText} 处理时出错: {str(e)}", type="error")
         logging.info(f"同步[{KEY_PREFIX}]的数据完成...，分类: {category.fullText}")
     logging.info(f"同步[{KEY_PREFIX}]数据完成，成功数: {success_count}, 失败数: {failed_count}")
     return {
         "success_count": success_count,
         "failed_count": failed_count
     }
+
+
+def _fetch_a(category: Category) -> list:
+    if category not in [Category.A_SH, Category.A_SZ, Category.A_BJ]:
+        return None
+    # 拉取 https://akshare.akfamily.xyz/data/stock/stock.html#id11
+    fetch_functions = {
+        Category.A_SH: partial(ak.stock_info_sh_name_code, symbol="主板A股"),
+        Category.A_SZ: partial(ak.stock_info_sz_name_code, symbol="A股列表"),
+        Category.A_BJ: partial(ak.stock_info_bj_name_code),
+    }
+
+    def _fetch_stock_details(code: str):
+        """获取个股详情和公司概况数据"""
+        try:
+            details = {}
+            # 获取个股详情数据
+            logging.info(f"开始获取[{KEY_PREFIX}]详情数据..., 分类: {category.text}, 股票代码: {code}")
+            individual_df = ak.stock_individual_info_em(symbol=code)
+            if individual_df is not None and not individual_df.empty:
+                # 将DataFrame转换为字典，方便后续访问
+                for _, row in individual_df.iterrows():
+                    item = row['item']
+                    value = row['value']
+                    if pd.notna(value):
+                        details[f"individual_{item}"] = value
+            # 获取公司概况数据
+            """logging.info(f"开始获取[{KEY_PREFIX}]股票概括数据..., 分类: {category.text}, 股票代码: {code}")
+            profile_df = ak.stock_profile_cninfo(symbol=code)
+            if profile_df is not None and not profile_df.empty and len(profile_df) > 0:
+                # 将profile数据合并到details字典中
+                profile_series = profile_df.iloc[0]
+                for key, value in profile_series.items():
+                    if pd.notna(value):
+                        details[f"profile_{key}"] = value"""
+            logging.info(f"获取[{KEY_PREFIX}]的详情数据 , 股票代码: {code}, 信息为: {details}")
+            return details
+        except Exception as e:
+            logging.error(f"获取获取[{KEY_PREFIX}]股票详情异常, 股票代码: {code}, 错误: {str(e)}")
+            return None
+
+    def _merge_stock_details(stock_obj: Stock, details_dict):
+        """合并个股详情数据到股票对象"""
+        if details_dict is None:
+            return
+        industry_from_individual = details_dict.get("individual_行业", "")
+        total_market_value = details_dict.get("individual_总市值", "0")
+        total_capital = details_dict.get("individual_总股本", "0")
+        flow_capital = details_dict.get("individual_流通股", "0")
+
+        # 合并行业字段（拼接）
+        industries = []
+        if stock_obj.industry:
+            industries.append(str(stock_obj.industry))
+        if industry_from_individual:
+            industries.append(str(industry_from_individual))
+        stock_obj.industry = " / ".join(industries) if industries else None
+
+        # 设置总市值
+        if total_market_value:
+            stock_obj.total_market_value = clean_number_value(total_market_value)
+        if total_market_value:
+            stock_obj.total_capital = clean_number_value(total_capital)
+        if total_market_value:
+            stock_obj.flow_capital = clean_number_value(flow_capital)
+
+        # 从details_dict中提取公司概况字段
+        # 使用"公司名称"更新full_name（如果存在）
+        company_name = safe_string_assign(details_dict.get("profile_公司名称", ""))
+        if company_name:
+            stock_obj.full_name = company_name
+
+        # 使用"上市日期"更新ipo_at（如果存在且原值为空）
+        ipo_date = details_dict.get("profile_上市日期", "")
+        if ipo_date and pd.notna(ipo_date) and ipo_date != "":
+            try:
+                if isinstance(ipo_date, str):
+                    stock_obj.ipo_at = pd.to_datetime(ipo_date)
+                elif isinstance(ipo_date, pd.Timestamp):
+                    stock_obj.ipo_at = ipo_date.to_pydatetime()
+            except Exception as date_error:
+                logging.warning(f"解析上市日期失败: {ipo_date}, 错误: {str(date_error)}")
+
+        # 获取"入选指数"
+        selected_indices = safe_string_assign(details_dict.get("profile_入选指数", ""))
+        if selected_indices:
+            stock_obj.selected_indices = selected_indices
+
+        # 合并行业字段（拼接）
+        industry_from_profile = safe_string_assign(details_dict.get("profile_所属行业", ""))
+        if industry_from_profile:
+            if stock_obj.industry:
+                # 避免重复
+                existing_industries = set(stock_obj.industry.split(" / "))
+                if str(industry_from_profile) not in existing_industries:
+                    stock_obj.industry = f"{stock_obj.industry} / {industry_from_profile}"
+            else:
+                stock_obj.industry = str(industry_from_profile)
+
+        # 获取"成立日期"
+        founded_date = details_dict.get("profile_成立日期", "")
+        if founded_date and pd.notna(founded_date) and founded_date != "":
+            try:
+                if isinstance(founded_date, str):
+                    stock_obj.founded_at = pd.to_datetime(founded_date)
+                elif isinstance(founded_date, pd.Timestamp):
+                    stock_obj.founded_at = founded_date.to_pydatetime()
+            except Exception as date_error:
+                logging.warning(f"解析成立日期失败: {founded_date}, 错误: {str(date_error)}")
+
+        # 获取"主营业务"
+        main_business = safe_string_assign(details_dict.get("profile_主营业务", ""))
+        if main_business:
+            stock_obj.main_business = str(main_business)
+
+        # 获取"经营范围"
+        business_scope = safe_string_assign(details_dict.get("profile_经营范围", ""))
+        if business_scope:
+            stock_obj.business_scope = str(business_scope)
+
+        # 合并地址字段（注册地址和办公地址）
+        registered_address = safe_string_assign(details_dict.get("profile_注册地址", ""))
+        office_address = safe_string_assign(details_dict.get("profile_办公地址", ""))
+        addresses = []
+        if registered_address and registered_address != "":
+            addresses.append(f"注册地址: {registered_address}")
+        if office_address and office_address != "":
+            addresses.append(f"办公地址: {office_address}")
+        if addresses:
+            stock_obj.address = "; ".join(addresses)
+
+    try:
+        if fetch_func := fetch_functions.get(category):
+            logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
+            df = fetch_func()
+            logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, 共 {len(df)} 条记录")
+            data = []
+            for i, row in df.iterrows():
+                try:
+                    code = get_column_value(row, "code")
+                    if 50 >= i > 100:
+                        continue
+                    # 基础字段
+                    s = Stock(
+                        category=Category.from_stock_code(code),
+                        code=code,
+                        name=clean_name(get_column_value(row, "name")),
+                        full_name=row.get("公司全称"),
+                        ipo_at=get_column_value(row, "ipo_at"),
+                        total_capital=clean_number_value(get_column_value(row, "total_capital")),
+                        flow_capital=clean_number_value(get_column_value(row, "flow_capital")),
+                        industry=row.get("所属行业"),
+                    )
+                    s.pinyin = s.generate_pinyin()
+                    details = _fetch_stock_details(code)
+                    _merge_stock_details(s, details)
+                    logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 股票代码: {code}, 信息为: {s}")
+                    data.append(s)
+                except Exception as row_error:
+                    logging.error(f"获取[{KEY_PREFIX}]到的数据异常, 信息: {row}, 错误: {str(row_error)}")
+                    continue
+            return data
+        return None
+    except Exception as e:
+        logging.error(f"获取[{KEY_PREFIX}]到的数据异常: {str(e)}")
+        return None
+
+def _fetch_us(category: Category) -> list:
+    if category != Category.US_XX:
+        return None
+    logging.info(f"开始获取[{KEY_PREFIX}]数据..., 分类: {category.text}")
+    data = []  # 在循环外初始化，收集所有分类的数据
+    for symbol in [
+        "科技类",
+        "金融类",
+        "医药食品类",
+        "媒体类",
+        "汽车能源类",
+        "制造零售类",
+    ]:
+        df = ak.stock_us_famous_spot_em(symbol=symbol)
+        logging.info(f"成功获取[{KEY_PREFIX}]数据, 分类: {category.text}, symbol: {symbol}, 共 {len(df)} 条记录")
+        for i, row in df.iterrows():
+            try:
+                raw_code = row.get("代码", "")
+                if not raw_code or pd.isna(raw_code):
+                    logging.warning(f"跳过无效美股数据，第{i}行，代码为空")
+                    continue
+                # 提取前缀和代码
+                if '.' in str(raw_code):
+                    prefix, code = str(raw_code).split('.', 1)
+                else:
+                    prefix = ""
+                    code = str(raw_code)
+
+                # 添加数据验证，跳过空代码或无效数据
+                if not code or code.strip() == '':
+                    logging.warning(f"跳过无效美股数据，第{i}行，代码为空")
+                    continue
+
+                # 检查是否已存在相同代码的数据（避免重复）
+                if any(existing_stock.code == code for existing_stock in data):
+                    logging.warning(f"跳过重复美股数据，代码: {code}")
+                    continue
+
+                name = row.get("名称", "")
+                if not name or pd.isna(name):
+                    logging.warning(f"跳过无效美股数据，第{i}行，名称为空")
+                    continue
+
+                # 将原始名称和前缀保存到 full_name 中
+                full_name = f"{name}({prefix})" if prefix else str(name)
+
+                s = Stock(
+                    category=category,
+                    code=code,
+                    name=clean_name(str(name)),
+                    full_name=full_name,  # 保存前缀信息，格式：名称(前缀)
+                    ipo_at=None,
+                    total_capital=None,
+                    flow_capital=None,
+                    industry=symbol,  # 使用美股分类作为行业
+                )
+                s.pinyin = s.generate_pinyin()
+                logging.info(f"获取[{KEY_PREFIX}]的数据, 第{i}条, 信息为: {s}")
+                data.append(s)
+            except Exception as row_error:
+                logging.error(f"获取[{KEY_PREFIX}]到的数据异常, 信息: {row}, 错误: {str(row_error)}")
+                continue
+    return data

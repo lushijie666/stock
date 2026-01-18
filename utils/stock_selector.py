@@ -47,7 +47,7 @@ class StockSelectorManager:
         options = [("", "请选择股票", "")]
         for stock in stocks:
             pinyin_short = format_pinyin_short(stock.pinyin) if stock.pinyin else ""
-            options.append((stock.code, stock.name, pinyin_short, stock.is_followed))
+            options.append((stock.code, stock.name, pinyin_short, stock.is_followed, stock.industry))
         return options
 
     def show_selector(self) -> None:
@@ -105,21 +105,21 @@ class StockSelectorManager:
                     pinyin = x[2] if len(x) > 2 and x[2] else ""
                     # 检查是否已关注
                     is_followed = x[3] if len(x) > 3 else False
+                    industry = x[4] if len(x) > 4 else ""
 
                     # 构建基础文本
                     if pinyin:
                         base_text = f"{x[0]} ({x[1]}-{pinyin})"
                     else:
                         base_text = f"{x[0]} ({x[1]})"
-
-                    # 对于已关注的股票，在末尾添加标记
-                    # 为了对齐，未关注的股票也保留相同长度的空格
+                    if industry:
+                        base_text =  f"{base_text} - [{industry}]"
                     if is_followed:
-                        return f"{base_text} ❤️"
+                        base_text = f"{base_text} ❤️"
                     else:
                         # 添加相同数量的空格以保持对齐
-                        return f"{base_text}           "
-
+                        base_text = f"{base_text}           "
+                    return base_text
                 selected = st.selectbox(
                     "选择股票",
                     options=options,

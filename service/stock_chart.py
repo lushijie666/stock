@@ -75,7 +75,7 @@ def show_chart(stock, t: StockHistoryType, key_suffix: str = ""):
     st.markdown(
         f"""
                <div class="table-header">
-                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{t.text}] - 图表</div>
+                   <div class="table-title">{stock.category} {stock.code} ({stock.name}) - [{stock.industry}] - [{t.text}] - 图表</div>
                </div>
                """,
         unsafe_allow_html=True

@@ -36,11 +36,11 @@ class Stock(Base):
     is_followed = Column(Boolean, default=False) # 是否关注
     followed_at = Column(DateTime) # 关注时间
     founded_at = Column(DateTime) # 成立日期
-    main_business = Column(String(1024)) # 主营业务
-    business_scope = Column(String(2048)) # 经营范围
-    selected_indices = Column(String(512)) # 入选指数
-    address = Column(String(512)) # 地址（包括注册地址和办公地址）
-    total_market_value = Column(String(128)) # 总市值
+    main_business = Column(String(1024), default=None) # 主营业务
+    business_scope = Column(String(2048), default=None) # 经营范围
+    selected_indices = Column(String(1024), default=None) # 入选指数
+    address = Column(String(2048)) # 地址（包括注册地址和办公地址）
+    total_market_value = Column(BigInteger, default=0) # 总市值
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

@@ -68,6 +68,18 @@ def clean_name(name: str) -> str:
         name = name.replace(old, new)
     return name.strip()
 
+def safe_string_assign(value):
+    if value is None:
+        return ""
+    try:
+        # 更严格的检查
+        value_str = str(value)
+        if value_str.strip().lower() in ["nan", "<na>", "none", "null", "", "nat"]:
+            return ""
+        return value_str
+    except:
+        return ""
+
 def get_column_value(row: pd.Series, field: str, default: str = "") -> str:
     try:
         # 获取可能的列名列表
@@ -242,6 +254,9 @@ def format_date_by_type(date_value, t: StockHistoryType):
         return date_obj.strftime('%Y-%m-%d %H:%M')
     else:
         return date_obj.strftime('%Y-%m-%d')
+
+def format_date(date_value):
+   return format_date_by_type(date_value, StockHistoryType.D)
 
 def extend_end_date(end_date):
     """
